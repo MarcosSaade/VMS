@@ -1,5 +1,7 @@
 # Runbook
 
+> Location in repo: `docs/RUNBOOK.md`. How to set up, run, operate and tear down the system. Update it whenever running or operations change.
+
 ## Setup
 
 Prerequisites: [uv](https://docs.astral.sh/uv/) (it downloads Python 3.12 if needed), GNU make, Docker with Compose v2.
@@ -20,3 +22,35 @@ make help    # all targets
 - Large artifacts we produce are tracked with DVC. The default remote is `local`, a gitignored directory `.dvc-storage/` at the repo root (configured in `.dvc/config`). In the cloud, an S3 remote is set in `.dvc/config.local` (not committed).
 - `make data-pull` runs `dvc pull` from the default remote. It is a no-op with a message when no remote is configured, the local remote directory is missing or empty, or nothing is DVC-tracked yet, so a fresh clone works offline.
 - Push new artifacts with `uv run dvc add <path> && uv run dvc push`, then commit the `.dvc` pointer.
+
+## Running locally
+
+_Placeholder (tasks 0.5, 1.9)._ `make up` starts the compose CPU stack, `make demo` runs the end-to-end CPU demo on `make data-mini`, `make logs` follows logs and `make down` stops the stack. Service URLs and ports go here.
+
+## Benchmarks
+
+_Placeholder (task 2.3)._ Writing a scenario in `bench/scenarios/`, running it with `make bench`, where results land, and how to promote a number to `docs/BENCHMARKS.md`.
+
+## GPU sessions
+
+_Placeholder (task 2.4)._ `scripts/gpu_session.sh` runs provision, sync, run scenarios, collect results and destroy, with teardown in a trap. Includes prerequisites (AWS credentials, the project's selected Region, spot quota), expected cost per hour and the confirmation step before any apply.
+
+## Deployment
+
+_Placeholder (tasks 6.4, 10.1, 10.2)._ Helm chart, kind smoke test, Terraform for the AWS environment, and the CD pipeline with its eval gate.
+
+## Operations
+
+_Placeholder (tasks 2.2, 9.4)._ Dashboards, alerts, drift response procedure, scaling, and promoting a model to champion.
+
+## Troubleshooting
+
+_Placeholder._ Symptom, cause and fix entries as issues are met. For sudden `AccessDenied` errors on AWS operations that used to work, check the project's spend limit status in AWS Settings > Billing.
+
+## Teardown
+
+_Placeholder (tasks 2.4, 10.1)._ `make down` locally. In the cloud: the scripted destroy, then the Resource Groups Tagging API check that no resource tagged `session=<id>` remains, then recording the session cost in the run's results.
+
+## Production checklist
+
+_Placeholder (task 10.4)._ The project is never called "production-ready" unless every item here is met.
