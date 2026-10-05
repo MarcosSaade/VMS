@@ -20,7 +20,10 @@ htmlcov/
 .dvc-storage/
 
 # Data and media: never committed. Large artifacts we produce go through DVC.
-/data/
+/data/**
+!/data/**/
+!/data/**/*.dvc
+!/data/**/.gitignore
 *.mp4
 *.avi
 *.mkv
