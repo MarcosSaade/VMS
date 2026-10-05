@@ -18,6 +18,9 @@ concurrency:
 env:
   UV_VERSION: "0.12.20"   # keep in step with the uv used to write uv.lock
   WANDB_MODE: disabled
+  # Use uv-managed CPython (as locally), not the runner image's system Python; also makes
+  # cache-python effective.
+  UV_PYTHON_PREFERENCE: only-managed
 
 jobs:
   check:
