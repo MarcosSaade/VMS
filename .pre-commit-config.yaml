@@ -1,0 +1,32 @@
+# ruff and mypy run from the project env (uv.lock), so hook versions match `make check`.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+        args: ["--unsafe"]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --quiet ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --quiet ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy (strict, src/vms)
+        entry: uv run --quiet mypy
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false

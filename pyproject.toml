@@ -1,0 +1,65 @@
+[project]
+name = "vms"
+version = "0.1.0"
+description = "Scalable Video Management System: benchmarked ML systems engineering."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "dvc>=3.60",
+    "mypy>=1.18",
+    "pre-commit>=4.3",
+    "pytest>=8.4",
+    "ruff>=0.13",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+    "PT",  # pytest style
+    "RUF", # ruff-specific
+    "T20", # no print in library code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["T20"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/vms"]
+mypy_path = "src"
+strict = true
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Non-unit tests are opt-in: `make test-integration` passes `-m integration`, which
+# overrides this default expression because the last `-m` on the command line wins.
+addopts = ["-ra", "--strict-markers", "--strict-config", "-m", "not integration and not gpu and not slow"]
+markers = [
+    "integration: needs the compose CPU stack (make up); run with make test-integration",
+    "gpu: needs a CUDA GPU; skipped by default",
+    "slow: long-running; skipped by default",
+]
+xfail_strict = true

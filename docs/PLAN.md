@@ -3,7 +3,7 @@
 > Location in repo: `docs/PLAN.md`. Tick tasks as they complete. Details, prompts and done criteria for each task are in `docs/PLAN_FULL.md`. Week estimates assume roughly 15 hours per week (about 18 weeks in total) and are guides, not deadlines.
 
 ## Phase 0: Foundation (week 1)
-- [ ] 0.1 Repo scaffold: uv, src layout, Makefile, ruff, mypy, pytest markers, pre-commit, DVC with local remote (`make data-pull`)
+- [x] 0.1 Repo scaffold: uv, src layout, Makefile, ruff, mypy, pytest markers, pre-commit, DVC with local remote (`make data-pull`)
 - [ ] 0.2 Docs skeleton with the fixed structure; decisions D1 to D11 as proposed
 - [ ] 0.3 Shared libraries: config, JSON logging, OpenTelemetry setup, IDs, injectable clock, `Tracker` (MLflow, W&B, no-op)
 - [ ] 0.4 CI: lint, typecheck, unit tests

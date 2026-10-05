@@ -1,0 +1,74 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# DVC: local remote (default, see .dvc/config) and cache; pointers (*.dvc) stay in git
+.dvc-storage/
+
+# Data and media: never committed. Large artifacts we produce go through DVC.
+/data/
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.jpg
+*.jpeg
+*.png
+*.webp
+
+# Model weights and exported models (fetched by script or DVC-tracked)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.plan
+*.safetensors
+*.ckpt
+*.bin
+*.gguf
+models/weights/
+models/triton/**/[0-9]*/
+
+# Results: small JSON summaries under bench/results and eval/results are committed.
+# Bulky raw artifacts stay out. Git cannot filter by size, so the size threshold is
+# enforced by the check-added-large-files pre-commit hook (500 KB); anything larger
+# goes to DVC.
+bench/results/**/raw/
+eval/results/**/raw/
+bench/results/**/*.parquet
+eval/results/**/*.parquet
+bench/results/**/*.csv.gz
+eval/results/**/*.jsonl.gz
+*.prof
+*.nsys-rep
+*.qdrep
+*.pftrace
+
+# Trackers and tooling
+mlruns/
+mlartifacts/
+wandb/
+.terraform/
+*.tfstate
+*.tfstate.*
+node_modules/
+frontend/dist/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
