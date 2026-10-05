@@ -5,7 +5,7 @@
 ## Phase 0: Foundation (week 1)
 - [x] 0.1 Repo scaffold: uv, src layout, Makefile, ruff, mypy, pytest markers, pre-commit, DVC with local remote (`make data-pull`)
 - [x] 0.2 Docs skeleton with the fixed structure; decisions D1 to D11 as proposed
-- [ ] 0.3 Shared libraries: config, JSON logging, OpenTelemetry setup, IDs, injectable clock, `Tracker` (MLflow, W&B, no-op)
+- [x] 0.3 Shared libraries: config, JSON logging, OpenTelemetry setup, IDs, injectable clock, `Tracker` (MLflow, W&B, no-op)
 - [ ] 0.4 CI: lint, typecheck, unit tests
 - [ ] 0.5 Compose stack: Postgres + pgvector, MinIO, Redis, OTel collector, Prometheus, Grafana, MLflow
 - [ ] 0.6 Port reusable assets from the old project; few-shots as (question, gold plan, gold SQL) triples; SQL validator

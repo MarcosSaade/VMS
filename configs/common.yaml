@@ -1,0 +1,18 @@
+# Shared defaults for every service. configs/<service>.yaml and configs/<service>.<env>.yaml
+# override these; VMS_* environment variables override all files (see vms.common.settings).
+log:
+  level: INFO
+
+telemetry:
+  enabled: true            # exports to the OTel collector in the compose stack
+  otlp_endpoint: null      # null: use OTEL_EXPORTER_OTLP_ENDPOINT, else localhost:4317
+  sample_ratio: 1.0
+
+tracking:
+  backends: [noop]         # any of: noop, mlflow, wandb (both may be enabled for one run)
+  mlflow:
+    tracking_uri: null     # null: use MLFLOW_TRACKING_URI
+    experiment: vms
+  wandb:
+    mode: null             # null: use WANDB_MODE, else disabled
+    project: vms

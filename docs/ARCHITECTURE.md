@@ -201,6 +201,13 @@ Cross-cutting: Redis cache keyed by normalized question plus data watermark; cir
 ### 4.12 frontend
 Minimal React + TypeScript (Vite): query box with mode selector, result tables and charts, frame grid, debug panel showing the plan JSON and compiled SQL, thumbs up/down feedback to `query_log`.
 
+### 4.13 Shared library (`vms.common`)
+Every service builds on the same small modules, each behind an interface so tests inject fakes:
+- **Settings:** one pydantic-settings class per service. Values are layered from code defaults, then `configs/common.yaml`, `configs/<service>.yaml` and `configs/<service>.<env>.yaml` (deep-merged, `env` from `VMS_ENV`), then `.env`, then `VMS_*` environment variables (`__` for nesting), then explicit arguments. Validation is strict, so a typo in YAML fails at startup.
+- **Observability:** `init_observability(settings)` configures JSON logs that carry the active trace and span IDs, OpenTelemetry tracing (OTLP to the collector; a no-op tracer when disabled) and a Prometheus registry. Metric names are assembled and validated as `vms_<component>_<metric>_<unit>`.
+- **IDs and time:** a monotonic ULID generator and a `Clock` protocol (system and fake implementations). Both take an injected clock and randomness source, so tests are deterministic.
+- **Tracking:** a `Tracker` protocol with no-op, MLflow and W&B backends. `build_tracker` reads the backends from config and returns a `RunTracker` that sends each call to every enabled backend, returning one run reference per backend for the results JSON. Backend libraries are imported only when enabled. Artifacts are logged by reference, never uploaded.
+
 ## 5. Data flows and guarantees
 
 **Write path:** loadgen -> ingest (store JPEG, insert frame row, publish ref) -> queue -> worker (batch, infer, track, write) -> ack.

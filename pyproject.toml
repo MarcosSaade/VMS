@@ -4,7 +4,15 @@ version = "0.1.0"
 description = "Scalable Video Management System: benchmarked ML systems engineering."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "opentelemetry-api>=1.45.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.45.0",
+    "opentelemetry-sdk>=1.45.0",
+    "prometheus-client>=0.26.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pyyaml>=6.0.3",
+]
 
 [dependency-groups]
 dev = [
@@ -13,6 +21,11 @@ dev = [
     "pre-commit>=4.3",
     "pytest>=8.4",
     "ruff>=0.13",
+    "types-pyyaml>=6.0.12.20260906",
+]
+tracking = [
+    "mlflow-skinny>=3.16.1",
+    "wandb>=0.30.0",
 ]
 
 [build-system]
@@ -20,7 +33,7 @@ requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
 [tool.uv]
-default-groups = ["dev"]
+default-groups = ["dev", "tracking"]
 
 [tool.ruff]
 line-length = 100

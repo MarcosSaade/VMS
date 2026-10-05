@@ -15,7 +15,8 @@ make help    # all targets
 
 - Tests: `make test` runs unit tests only. The `integration`, `gpu` and `slow` markers are deselected by default; `make test-integration` runs `-m integration` (it needs `make up`). Run GPU tests with `uv run pytest -m gpu`.
 - pre-commit runs ruff (check + format) and mypy from the project env, so they match `make check`. It also rejects files over 500 KB: large artifacts go to DVC.
-- Configuration: `.env` (gitignored) for secrets and endpoints; every variable is documented in `.env.example`. W&B is disabled by default (`WANDB_MODE=disabled`).
+- Configuration: service settings live in `configs/` (`common.yaml`, `<service>.yaml`, optional `<service>.<env>.yaml` chosen by `VMS_ENV`). Override any field without editing files with `VMS_<FIELD>`, using `__` for nesting: `VMS_LOG__LEVEL=DEBUG`, `VMS_TRACKING__BACKENDS='["mlflow"]'`. Priority from highest to lowest: explicit arguments, environment, `.env`, YAML layers, code defaults. `.env` (gitignored) holds secrets and endpoints; every variable is documented in `.env.example`. A `.env` key that matches no field of a service is ignored, because one `.env` is shared by all services.
+- Experiment tracking: set `tracking.backends` to any of `noop` (default), `mlflow` and `wandb`. MLflow uses `tracking.mlflow.tracking_uri`, else `MLFLOW_TRACKING_URI`. W&B uses `tracking.wandb.mode`, else `WANDB_MODE`, else `disabled`, so it never needs an account unless you choose `online`. MLflow and W&B are installed by `make setup` (the `tracking` dependency group) and imported only when enabled.
 
 ## Data
 
