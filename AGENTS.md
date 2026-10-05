@@ -70,6 +70,7 @@ These are the only Markdown files in the repo:
 |---|---|
 | `README.md` | Pitch, headline results (linked to evidence), architecture diagram, quickstart, links into docs |
 | `AGENTS.md` | These instructions |
+| `CLAUDE.md` | One-line pointer (`@AGENTS.md`) so Claude Code loads these instructions; no other content |
 | `docs/ARCHITECTURE.md` | Current design; update whenever the design changes |
 | `docs/PLAN.md` | Compact plan with status checkboxes |
 | `docs/PLAN_FULL.md` | Detailed plan: task prompts, done criteria, considerations |
