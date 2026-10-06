@@ -1,0 +1,98 @@
+# Query service. Overrides configs/common.yaml; VMS_* environment variables override this file
+# (e.g. VMS_SQL__MAX_LIMIT=500).
+
+sql:
+  dialect: postgres
+  default_limit: 100        # injected when the outer query has no LIMIT
+  max_limit: 1000           # larger LIMITs are capped to this
+  max_joins: 4
+  max_sql_chars: 20000
+
+  # Queryable schema (ARCHITECTURE 4.6): table -> column -> type. This is the validator's
+  # allowlist and the source of the schema summary in prompts. Keep it in step with the
+  # migrations (task 1.4). embeddings (served by semantic search) and query_log are left out on
+  # purpose.
+  tables:
+    cameras:
+      camera_id: text
+      name: text
+      site: text
+      timezone: text
+      created_at: timestamptz
+    zones:
+      zone_id: text
+      camera_id: text
+      name: text
+      polygon: jsonb
+    frames:
+      frame_id: text
+      camera_id: text
+      ts: timestamptz
+      object_key: text
+      width: int
+      height: int
+      brightness: double precision
+      blur_var: double precision
+      model_version: text
+    detections:
+      ts: timestamptz
+      camera_id: text
+      frame_id: text
+      track_id: text
+      class_name: text
+      confidence: double precision
+      x1: double precision
+      y1: double precision
+      x2: double precision
+      y2: double precision
+      model_version: text
+    tracks:
+      track_id: text
+      camera_id: text
+      class_name: text
+      first_seen: timestamptz
+      last_seen: timestamptz
+      n_frames: int
+    events:
+      event_id: text
+      ts: timestamptz
+      camera_id: text
+      track_id: text
+      zone_id: text
+      event_type: text
+
+  # Matched against every name a function is known by (as written, sqlglot's canonical name
+  # and the dialect rendering). Prefixes cover whole families (pg_sleep, pg_read_file,
+  # pg_terminate_backend, lo_import, dblink_exec, txid_current, ...).
+  denied_function_prefixes: [pg_, lo_, dblink, txid_]
+  denied_functions:
+    # settings, server and session state
+    - current_setting
+    - set_config
+    - version
+    - inet_server_addr
+    - inet_server_port
+    - inet_client_addr
+    # side effects on sequences
+    - nextval
+    - setval
+    - currval
+    - lastval
+    # run arbitrary SQL or dump tables as XML
+    - query_to_xml
+    - query_to_xml_and_xmlschema
+    - table_to_xml
+    - schema_to_xml
+    - database_to_xml
+    - cursor_to_xml
+    # resource exhaustion
+    - generate_series
+    - repeat
+    - lpad
+    - rpad
+
+# Versioned data files (paths from the repo root).
+assets:
+  fewshots: eval/fewshot/structured.v1.jsonl
+  planner_prompt: configs/prompts/planner.v1.txt
+  sql_prompt: configs/prompts/sql.v1.txt

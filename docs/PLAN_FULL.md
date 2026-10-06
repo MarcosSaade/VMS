@@ -40,10 +40,11 @@
 **Done when:** `make up` reaches healthy on a laptop; Grafana shows Prometheus and Tempo datasources; MLflow UI loads.
 **Considerations:** Kafka is not part of this stack; it is added in task 6.1 only if benchmarked. W&B is a hosted service and is not in compose.
 
-### 0.6 Port reusable assets
-**Prompt:** The old prototype (smart-vision) is available at a path or URL the user will provide. Extract only reusable assets: prompt templates, few-shot question/SQL examples, schema ideas, validation logic and result-type classification ideas. Store few-shots as (question, gold `QueryPlan`, gold SQL) triples: author a plan for each ported question (mark questions the plan schema cannot express), and keep the SQL for the free-form engine and for result checks. Re-implement the SQL validator on `sqlglot` ASTs (single SELECT, table/column allowlist, function denylist, LIMIT injection) with thorough tests, including injection attempts, multiple statements, comments and DDL; it guards compiled SQL from the plan engine and generated SQL from the free-form engine. Store few-shot examples as versioned data under `eval/` or `configs/`, not hardcoded strings. Do not port camera, HTP or synchronous script code.
-**Done when:** validator has comprehensive unit tests passing; few-shot triples validate against the `QueryPlan` schema (draft in `vms.query`, finalized in 1.7); assets are in place and referenced from config.
-**Considerations:** these few-shot examples must later be kept out of the eval test split (task 3.1).
+### 0.6 Query assets (built from scratch)
+
+**Prompt:** Build the query assets from scratch; the old smart-vision prototype is not used (user decision, 2026-10-06). Draft the `QueryPlan` Pydantic model in `vms.query` (finalized in 1.7). Author few-shot examples as (question, gold `QueryPlan`, gold SQL) triples covering every intent, time-range kind and abstain reason; questions the plan schema cannot express carry an `unsupported` plan plus their SQL, which also serves the free-form engine and result checks. Implement the SQL validator on `sqlglot` ASTs (single SELECT, table/column allowlist, function denylist, LIMIT injection) with thorough tests, including injection attempts, multiple statements, comments and DDL; it guards compiled SQL from the plan engine and generated SQL from the free-form engine. Write versioned prompt templates for the planner and the free-form SQL engine. Store few-shots and prompts as versioned data under `eval/` or `configs/`, not hardcoded strings, and reference them from config.
+**Done when:** validator has comprehensive unit tests passing; few-shot triples validate against the `QueryPlan` schema and their SQL passes the validator; assets are in place and referenced from config.
+**Considerations:** these few-shot examples must later be kept out of the eval test split (task 3.1). Few-shot camera and zone names (entrance, checkout, parking_lot, loading_dock) are illustrative; align the demo camera config (task 1.4) with them or update the bank. The validator's table allowlist in `configs/query.yaml` must match the migrations (task 1.4).
 
 ---
 

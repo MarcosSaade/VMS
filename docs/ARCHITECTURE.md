@@ -139,26 +139,33 @@ FastAPI, async. Public endpoints in section 6.
 Structured queries go through a `StructuredQueryEngine` interface (question plus context in, structured result out), so engines can be swapped and compared on the same eval set **(decided by eval, D11)**. The typed-plan engine is the default until D11 is accepted.
 
 **Structured pipeline (default: typed query plan):**
-1. Build context: the `QueryPlan` JSON schema, a pruned schema summary (tables, columns, known class names, zone names and event types), camera timezones, rules, and few-shot (question, plan) examples retrieved by similarity from an example bank (never from the test set).
+1. Build context: the `QueryPlan` JSON schema, a pruned schema summary (tables, columns, known class names, zone names and event types), camera timezones, rules, and few-shot (question, plan) examples retrieved by similarity from an example bank (never from the test set). The bank is versioned JSONL of (question, gold plan, gold SQL) triples (`eval/fewshot/structured.v<N>.jsonl`), and prompts are versioned templates (`configs/prompts/*.v<N>.txt`), both referenced from `configs/query.yaml`.
 2. The LLM planner emits a `QueryPlan` under constrained decoding: vLLM structured outputs when self-hosted; provider structured outputs or tool calling for the hosted fallback; JSON-schema structured outputs through the OpenAI-compatible client locally (e.g., Ollama).
 3. Validate the plan: Pydantic schema plus semantic checks (known cameras, zones and classes, sane time range, limit within cap). On failure, one repair attempt that feeds the validation error back to the planner.
 4. If the intent is `abstain`, return the abstain reason without executing.
 5. Compile the plan deterministically to parameterized SQL for the active storage backend (one compiler per backend).
-6. Defense in depth: the `sqlglot` validator checks the compiled SQL (parse to AST, single `SELECT`, table and column allowlist, function denylist, `LIMIT` injected or capped).
+6. Defense in depth: the `sqlglot` validator (`vms.query.sql_validator`, D14) checks the compiled SQL on its AST: one `SELECT` or set operation; no DML or DDL anywhere in the tree (including data-modifying CTEs), no `SELECT INTO`, locking clauses or recursive CTEs; FROM sources are allowlisted tables or subqueries, resolved per scope; every column resolves to the allowlist in `configs/query.yaml`; function denylist by name and prefix; integer-literal `LIMIT`, injected or capped. It returns SQL regenerated from the checked tree (comments dropped, `*` expanded to allowlisted columns), and only that SQL is executed.
 7. Execute on a read-only DB role with a statement timeout and row cap.
 8. Stream a short natural-language answer, structured results, the plan JSON and the compiled SQL over SSE.
 
-`QueryPlan` (Pydantic model, JSON schema exported for constrained decoding):
+`QueryPlan` (`vms.query.plan`, Pydantic model, JSON schema exported for constrained decoding; draft v0.1 from task 0.6, finalized in 1.7; D13):
 
 ```
-schema_version
+schema_version: "0.1"
 intent:         count | aggregate | list | trend | top_k | dwell | frames | abstain
-filters:        cameras, zones, classes, min_confidence, event_types,
-                time_range (absolute, or relative resolved in the camera timezone)
-aggregation, group_by, order, limit
-visual_query:   optional text for CLIP ranking (set => hybrid)
-abstain_reason: ambiguous | unanswerable | unsupported   (when intent = abstain)
+target:         tracks | detections | events | frames      (what is counted or listed)
+filters:        cameras, zones, classes (names), event_types, min_confidence,
+                time_range: absolute (camera-local wall clock) | last N units | named period
+measure:        {op: avg | min | max | sum, field: confidence | n_frames | dwell_seconds}
+group_by:       up to 2 of camera | zone | class_name | event_type
+bucket:         hour | day | week                           (trend only)
+order:          {by: count | value | time, direction}
+limit
+visual_query:   optional text for CLIP ranking (frames only; set => hybrid)
+abstain_reason: ambiguous | unanswerable | unsupported | disallowed   (when intent = abstain)
 ```
+
+The model validates field combinations (for example: `trend` needs `bucket`, `dwell` needs tracks and `dwell_seconds`, `event_types` needs target events) and reports every error at once, so one repair attempt can fix them all. Each plan maps to a result kind (scalar, table, time series, frames, abstention) that drives the answer template and the frontend view. Times in a plan are always camera-local; the compiler resolves them with the injected clock.
 
 Why a typed plan by default: the output space is bounded, so validation is exhaustive and values are always bound as parameters; model accuracy is independent of the SQL dialect; training targets are short and checkable. The cost is expressiveness: questions outside the schema must abstain with `unsupported`, and plan coverage of the eval set is measured and reported.
 

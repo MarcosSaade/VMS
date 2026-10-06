@@ -8,7 +8,7 @@
 - [x] 0.3 Shared libraries: config, JSON logging, OpenTelemetry setup, IDs, injectable clock, `Tracker` (MLflow, W&B, no-op)
 - [x] 0.4 CI: lint, typecheck, unit tests
 - [x] 0.5 Compose stack: Postgres + pgvector, object store (SeaweedFS, D12), Redis, OTel collector, Prometheus, Tempo, Grafana, MLflow
-- [ ] 0.6 Port reusable assets from the old project; few-shots as (question, gold plan, gold SQL) triples; SQL validator
+- [x] 0.6 Query assets built from scratch (no legacy code): draft `QueryPlan`, sqlglot SQL validator, few-shot (question, gold plan, gold SQL) triples, prompt templates
 
 ## Phase 1: Naive end-to-end baseline (weeks 2 to 3)
 - [ ] 1.1 Dataset download scripts with checksums and license notes
@@ -100,3 +100,4 @@
 ## Plan revisions
 
 - **2026-10-04:** AWS is the default provider (D9 narrowed to long GPU runs), with tagged resources and verified teardown. Kafka replaces Redpanda as the D3 candidate, and D3 also covers a detections/events stream. W&B (training) and MLflow (eval, registry) sit behind a `Tracker` interface; DVC tracks large artifacts. The default structured path is now a typed `QueryPlan` compiled to SQL per backend, with free-form SQL as an alternative and the choice recorded in D11. Added 9.5 (detector fine-tune on drifted data, Phase 9 now two weeks) and stretch 10.5 (retraining loop, D10); total about 18 weeks.
+- **2026-10-06:** The local object store is SeaweedFS instead of MinIO, which no longer publishes images (D12). Task 0.6 no longer ports the old smart-vision prototype: by the user's decision, the query assets (draft `QueryPlan`, SQL validator, few-shot bank, prompt templates) are built from scratch (D13, D14).
