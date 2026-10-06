@@ -17,7 +17,7 @@ make help    # all targets
 - pre-commit runs ruff (check + format) and mypy from the project env, so they match `make check`. It also rejects files over 500 KB: large artifacts go to DVC.
 - CI (`.github/workflows/ci.yml`) runs `make setup && make check` on every push and pull request, with the uv dependency and Python caches keyed on `uv.lock`. Any lint, type or test error fails the run. The `integration` job runs `make up`, then `make test-integration`, dumps service state and logs on failure, and always finishes with `make down-volumes`. Actions are pinned by commit SHA; to update one, look up the new release tag's SHA and keep the `# vX.Y.Z` comment in sync. The uv version is pinned in the workflow's `UV_VERSION`. Lint workflow changes locally with `uvx --from actionlint-py actionlint`.
 - Configuration: service settings live in `configs/` (`common.yaml`, `<service>.yaml`, optional `<service>.<env>.yaml` chosen by `VMS_ENV`). Override any field without editing files with `VMS_<FIELD>`, using `__` for nesting: `VMS_LOG__LEVEL=DEBUG`, `VMS_TRACKING__BACKENDS='["mlflow"]'`. Priority from highest to lowest: explicit arguments, environment, `.env`, YAML layers, code defaults. `.env` (gitignored) holds secrets and endpoints; every variable is documented in `.env.example`. A `.env` key that matches no field of a service is ignored, because one `.env` is shared by all services.
-- Experiment tracking: set `tracking.backends` to any of `noop` (default), `mlflow` and `wandb`. MLflow uses `tracking.mlflow.tracking_uri`, else `MLFLOW_TRACKING_URI`. W&B uses `tracking.wandb.mode`, else `WANDB_MODE`, else `disabled`, so it never needs an account unless you choose `online`. MLflow and W&B are installed by `make setup` (the `tracking` dependency group) and imported only when enabled.
+- Results: every benchmark and eval run writes a results JSON (the source of truth for reported numbers). There is no experiment tracker; MLflow and W&B were removed in task 0.7 (D16).
 
 ## Data
 
@@ -55,29 +55,27 @@ Adding a clip: look at its frames first, keep only static cameras, and label the
 ```bash
 make up            # build/pull, start, wait until every health check passes (timeout 300 s), print URLs
 make ps            # services and health
-make logs          # follow all logs; make logs SERVICE=mlflow for one service
+make logs          # follow all logs; make logs SERVICE=grafana for one service
 make down          # stop; data volumes are kept
-make down-volumes  # stop and delete all stack data (Postgres, object store, Redis, Prometheus, Tempo, Grafana)
+make down-volumes  # stop and delete all stack data (Postgres, object store, Prometheus, Tempo, Grafana)
 make test-integration  # smoke tests against the running stack
 ```
 
-Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); every variable also has a default in the compose file. All ports bind to `127.0.0.1`. First start takes about 18 s once images are cached; the stack uses about 1 GiB of RAM at idle (E-002).
+Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); every variable also has a default in the compose file. All ports bind to `127.0.0.1`. First start takes about 18 s once images are cached; the stack uses about 365 MiB of RAM at idle (D16).
 
 | Service | Host URL / port (default) | Port variable | Notes |
 |---|---|---|---|
 | Grafana | http://localhost:3000 | `GRAFANA_PORT` | Anonymous viewer; admin is `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`. Datasources Prometheus and Tempo are provisioned. |
-| MLflow | http://localhost:5000 | `MLFLOW_PORT` | Backend DB `MLFLOW_DB` in Postgres; artifacts in bucket `MLFLOW_ARTIFACTS_BUCKET`, uploaded through the server. |
 | Prometheus | http://localhost:9090 | `PROMETHEUS_PORT` | Scrape config: `deploy/compose/prometheus/prometheus.yml`. Retention `PROMETHEUS_RETENTION` (15d). |
 | Tempo | http://localhost:3200 | `TEMPO_PORT` | Query API; traces arrive only through the collector. |
 | OTel collector | localhost:4317 (gRPC), 4318 (HTTP) | `OTEL_GRPC_PORT`, `OTEL_HTTP_PORT` | Point `OTEL_EXPORTER_OTLP_ENDPOINT` here. |
 | Postgres + pgvector | localhost:5432 | `POSTGRES_PORT` | User/DB from `POSTGRES_*`. `vector` is available; migrations (task 1.4) create it. |
-| Redis | localhost:6379 | `REDIS_PORT` | AOF enabled. |
-| Object store (SeaweedFS, S3 API) | http://localhost:8333 | `S3_PORT` | Credentials `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`; buckets `S3_BUCKET` and `MLFLOW_ARTIFACTS_BUCKET` are created at startup. |
+| Object store (SeaweedFS, S3 API) | http://localhost:8333 | `S3_PORT` | Credentials `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`; bucket `S3_BUCKET` is created at startup. |
 
-- Port taken on the host: set the `*_PORT` variable in `.env` and update the matching URL (`REDIS_URL`, `S3_ENDPOINT_URL`, `MLFLOW_TRACKING_URI`), then `make up`.
+- Port taken on the host: set the `*_PORT` variable in `.env` and update the matching URL (`S3_ENDPOINT_URL` for `S3_PORT`), then `make up`.
 - Profiles: `make up` activates the `cpu` profile; `make up PROFILES=gpu` activates the `gpu` profile (GPU services arrive in Phase 5 and need the NVIDIA container toolkit).
-- Credentials and database names are applied when a volume is first created. After changing `POSTGRES_*`, `MLFLOW_DB` or `S3_*` credentials, run `make down-volumes && make up`, which deletes all stack data.
-- Images are pinned by tag in the compose file. The MLflow image (`deploy/compose/mlflow/Dockerfile`) adds the Postgres and S3 drivers; keep its tag in step with `mlflow-skinny` in `uv.lock`. Tempo and the collector get a static busybox `wget` for health checks, because their images have no shell.
+- Credentials and database names are applied when a volume is first created. After changing `POSTGRES_*` or `S3_*` credentials, run `make down-volumes && make up`, which deletes all stack data.
+- Images are pinned by tag in the compose file. Tempo and the collector get a static busybox `wget` for health checks, because their images have no shell.
 
 ## Benchmarks
 
@@ -101,7 +99,7 @@ Symptom, cause and fix entries as issues are met.
 
 - `make up` fails with "port is already allocated" or "address already in use": another process holds a default port. Change the `*_PORT` variable and its URL in `.env` (see Running locally).
 - `make up` reports `dependency failed to start: container vms-<service>-1 is unhealthy`: run `make ps`, then `make logs SERVICE=<service>`. `docker inspect vms-<service>-1 --format '{{json .State.Health}}'` shows the health check output.
-- MLflow fails with a database authentication error after you change `POSTGRES_PASSWORD`: the password was set when the volume was first created. Run `make down-volumes && make up`.
+- Old `vms-redis-1` or `vms-mlflow-1` containers after pulling task 0.7: `make up` removes them (`--remove-orphans`); `make down-volumes` also drops their old volumes.
 - `make data` fails with a checksum or size mismatch: the upstream file changed or the download was corrupted. Re-run once (corrupt cached files are re-downloaded). If it persists, the source changed: re-check the clip and re-pin it (see Data).
 - `make data` reports an implausible frame rate for a video file: the container's rate is wrong. Set `source.fps` in `configs/data/sources.yaml` (check it with `ffprobe`).
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.

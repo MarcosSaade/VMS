@@ -7,12 +7,3 @@ telemetry:
   enabled: true            # exports to the OTel collector in the compose stack
   otlp_endpoint: null      # null: use OTEL_EXPORTER_OTLP_ENDPOINT, else localhost:4317
   sample_ratio: 1.0
-
-tracking:
-  backends: [noop]         # any of: noop, mlflow, wandb (both may be enabled for one run)
-  mlflow:
-    tracking_uri: null     # null: use MLFLOW_TRACKING_URI
-    experiment: vms
-  wandb:
-    mode: null             # null: use WANDB_MODE, else disabled
-    project: vms

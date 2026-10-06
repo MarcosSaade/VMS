@@ -59,7 +59,7 @@ check: lint typecheck test ## Lint + typecheck + unit tests
 
 .PHONY: up
 up: ## Start the compose stack and wait until healthy (PROFILES=cpu|gpu)
-	$(COMPOSE) up -d --build --wait --wait-timeout $(STACK_WAIT_TIMEOUT)
+	$(COMPOSE) up -d --build --remove-orphans --wait --wait-timeout $(STACK_WAIT_TIMEOUT)
 	@scripts/stack_urls.sh $(ENV_FILE)
 
 .PHONY: down

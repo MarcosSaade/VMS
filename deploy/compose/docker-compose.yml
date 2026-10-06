@@ -6,7 +6,7 @@
 # overridable with *_PORT variables when a default port is taken on the host.
 #
 # Profiles: infrastructure below has no profile and always starts. Application services that
-# exist in a CPU and a GPU variant (inference worker, Triton, vLLM; Phase 1+) carry
+# exist in a CPU and a GPU variant (the inference worker; Phase 1+) carry
 # `profiles: [cpu]` or `profiles: [gpu]`. `make up` activates `cpu`; `make up PROFILES=gpu`
 # activates `gpu`.
 #
@@ -30,19 +30,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-vms}
       POSTGRES_USER: ${POSTGRES_USER:-vms}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
-      MLFLOW_DB: ${MLFLOW_DB:-mlflow}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       <<: *healthcheck-defaults
       # Over TCP, because the temporary server used during first-time init listens only on the
-      # Unix socket. Querying the MLflow database also proves the init script ran.
+      # Unix socket, so a socket check can pass before the real server is up.
       test:
         - CMD-SHELL
-        - psql -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$MLFLOW_DB" -tAc 'SELECT 1' >/dev/null
+        - psql -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -tAc 'SELECT 1' >/dev/null
     restart: unless-stopped
 
   # S3-compatible object store (SeaweedFS in single-process "mini" mode; see D12 for why not
@@ -52,7 +50,7 @@ services:
     command:
       - mini
       - -dir=/data
-      - -bucket=${S3_BUCKET:-vms-frames},${MLFLOW_ARTIFACTS_BUCKET:-vms-mlflow}
+      - -bucket=${S3_BUCKET:-vms-frames}
       - -master.telemetry=false
       - -webdav=false
     environment:
@@ -60,34 +58,19 @@ services:
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-vms-local}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-change-me-s3}
       S3_BUCKET: ${S3_BUCKET:-vms-frames}
-      MLFLOW_ARTIFACTS_BUCKET: ${MLFLOW_ARTIFACTS_BUCKET:-vms-mlflow}
     volumes:
       - objectstore-data:/data
     ports:
       - "127.0.0.1:${S3_PORT:-8333}:8333"
     healthcheck:
       <<: *healthcheck-defaults
-      # Healthy once the S3 gateway answers and both buckets exist (filer lists /buckets).
+      # Healthy once the S3 gateway answers and the bucket exists (filer lists /buckets).
       test:
         - CMD-SHELL
         - >-
           wget -q -O /dev/null http://localhost:8333/healthz &&
-          wget -q -O - --header 'Accept: application/json' http://localhost:8888/buckets/ > /tmp/b &&
-          grep -q "/buckets/$$S3_BUCKET\"" /tmp/b && grep -q "/buckets/$$MLFLOW_ARTIFACTS_BUCKET\"" /tmp/b
-    restart: unless-stopped
-
-  redis:
-    image: redis:8.8.3-alpine
-    # AOF with fsync every second: Redis is a frame-queue candidate (D3), so restarts should
-    # not silently drop the stream.
-    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
-    volumes:
-      - redis-data:/data
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      <<: *healthcheck-defaults
-      test: ["CMD", "redis-cli", "ping"]
+          wget -q -O - --header 'Accept: application/json' http://localhost:8888/buckets/ |
+          grep -q "/buckets/$$S3_BUCKET\""
     restart: unless-stopped
 
   otel-collector:
@@ -171,52 +154,9 @@ services:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
     restart: unless-stopped
 
-  mlflow:
-    build:
-      context: ./mlflow
-    image: vms/mlflow:3.16.1
-    command:
-      - mlflow
-      - server
-      - --host=0.0.0.0
-      - --port=5000
-      - --backend-store-uri=postgresql://${POSTGRES_USER:-vms}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${MLFLOW_DB:-mlflow}
-      # Clients upload artifacts through the server (proxied), so they need no S3 credentials.
-      - --serve-artifacts
-      - --artifacts-destination=s3://${MLFLOW_ARTIFACTS_BUCKET:-vms-mlflow}
-      - --allowed-hosts=localhost,localhost:*,127.0.0.1,127.0.0.1:*,mlflow,mlflow:*
-      # Default is 4 workers (~250 MB each); tracking load here is a few runs at a time.
-      - --workers=${MLFLOW_WORKERS:-2}
-    environment:
-      # The server-side job runner (GenAI scorer jobs) starts 7 extra processes (~1.5 GB) and
-      # is unused: eval runs score locally and log results to MLflow.
-      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
-      MLFLOW_S3_ENDPOINT_URL: http://objectstore:8333
-      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-vms-local}
-      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-change-me-s3}
-      # Signing Region for the local S3 endpoint only; no AWS resource is involved.
-      AWS_DEFAULT_REGION: us-east-1
-    ports:
-      - "127.0.0.1:${MLFLOW_PORT:-5000}:5000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      objectstore:
-        condition: service_healthy
-    healthcheck:
-      <<: *healthcheck-defaults
-      start_period: 30s
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=2)"
-    restart: unless-stopped
-
 volumes:
   postgres-data:
   objectstore-data:
-  redis-data:
   tempo-data:
   prometheus-data:
   grafana-data:

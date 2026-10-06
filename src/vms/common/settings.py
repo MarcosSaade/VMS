@@ -5,7 +5,7 @@ resolved from these layers, highest priority first:
 
 1. Keyword arguments passed to `load_settings` (tests, scripts).
 2. Environment variables `VMS_<FIELD>`, with `__` for nesting: `VMS_LOG__LEVEL=DEBUG`,
-   `VMS_TRACKING__BACKENDS='["mlflow","wandb"]'`.
+   `VMS_TELEMETRY__SAMPLE_RATIO=0.1`.
 3. An optional dotenv file (`.env`), same names as 2.
 4. YAML files in `configs/`, deep-merged in order: `common.yaml` (optional, shared by every
    service), `<service>.yaml` (required), `<service>.<env>.yaml` (optional; `env` comes from
@@ -17,9 +17,8 @@ differs through the environment (twelve-factor), and pydantic validates everythi
 a typo in a config fails fast with a clear error instead of misbehaving at runtime. The fully
 resolved settings are what benchmark results record.
 
-Third-party variables such as `OTEL_EXPORTER_OTLP_ENDPOINT`, `MLFLOW_TRACKING_URI`, `WANDB_MODE`
-and `WANDB_API_KEY` are read by those libraries themselves whenever the matching field here is
-left unset (`None`).
+Third-party variables such as `OTEL_EXPORTER_OTLP_ENDPOINT` are read by those libraries
+themselves whenever the matching field here is left unset (`None`).
 """
 
 from __future__ import annotations
@@ -62,31 +61,6 @@ class TelemetrySettings(_Section):
     sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
-class MlflowSettings(_Section):
-    # None defers to MLFLOW_TRACKING_URI.
-    tracking_uri: str | None = None
-    experiment: str = "vms"
-
-
-class WandbSettings(_Section):
-    # None defers to WANDB_MODE, then "disabled", so nothing needs a W&B account by default.
-    mode: Literal["disabled", "offline", "online"] | None = None
-    project: str = "vms"
-    entity: str | None = None
-
-
-TrackerBackend = Literal["noop", "mlflow", "wandb"]
-
-
-class TrackingSettings(_Section):
-    """Experiment tracking. By convention W&B records training runs and sweeps, and MLflow
-    records eval results and the model registry. Both may be enabled for one run."""
-
-    backends: list[TrackerBackend] = Field(default_factory=lambda: list[TrackerBackend](["noop"]))
-    mlflow: MlflowSettings = Field(default_factory=MlflowSettings)
-    wandb: WandbSettings = Field(default_factory=WandbSettings)
-
-
 class ServiceSettings(BaseSettings):
     """Settings shared by every service. Subclass and add service-specific fields."""
 
@@ -102,7 +76,6 @@ class ServiceSettings(BaseSettings):
     seed: int = 1234
     log: LoggingSettings = Field(default_factory=LoggingSettings)
     telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
-    tracking: TrackingSettings = Field(default_factory=TrackingSettings)
 
     # Merged YAML layers; set per load by `load_settings` on a throwaway subclass.
     _yaml_data: ClassVar[dict[str, Any]] = {}
@@ -138,7 +111,7 @@ class _DictSource(PydanticBaseSettingsSource):
 class _DeclaredFieldsOnly(PydanticBaseSettingsSource):
     """Keeps only dotenv keys that map to a declared field, like the process-environment source.
 
-    One `.env` is shared by every service and by other tools (POSTGRES_*, WANDB_*, another
+    One `.env` is shared by every service and by other tools (POSTGRES_*, OTEL_*, another
     service's VMS_PORT), so unknown keys are ignored rather than rejected by `extra="forbid"`.
     Typos are still caught in the per-service YAML files, which are validated strictly.
     """

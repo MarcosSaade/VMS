@@ -2,6 +2,8 @@
 
 > Location in repo: `docs/ARCHITECTURE.md`. This file describes the target design. Items marked **(decided by benchmark)** are hypotheses until the matching decision in `docs/DECISIONS.md` is accepted. Update this file whenever the design changes.
 
+**Current scope (2026-10-06 re-scope, `PLAN.md`).** The plan builds a subset of this design: loadgen, REST ingest, the object store, a worker with YOLO11 and tracking that claims frames from Postgres (`SKIP LOCKED`, D3 default), the structured query path (typed plan, compiler, validator), a minimal UI, observability and dashboards, the evaluation harness, a precision ladder with the worker on the best backend in-process (no Triton), drift detection, and short scripted GPU sessions on AWS. Deferred parts of the design are marked with a scope note in their sections: the queue comparison and event stream, gRPC ingest, Triton, CLIP with semantic and hybrid search, vLLM and LoRA, storage benchmarks, Kubernetes and autoscaling, Terraform and CD. Decisions about deferred parts are accepted defaults (`DECISIONS.md`), not benchmark results.
+
 ## 1. Purpose and principles
 
 A scalable Video Management System (VMS). It ingests many simulated camera streams, runs object detection, tracking and image embedding on GPUs, stores the results efficiently, and answers questions about the footage in three ways:
@@ -40,6 +42,8 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
 
 ## 3. System overview
 
+The diagram shows the target design; the current scope (top of this file) builds a subset of it.
+
 ```
  loadgen: N virtual cameras, fixed FPS, drift injection
         |  gRPC client stream (JPEG + metadata)          [REST baseline in Phase 1]
@@ -47,7 +51,7 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
  ingest-gateway ------------------------------> object store (SeaweedFS / S3): frames
         |  frame refs (not images)
         v
- queue (Redis Streams | Kafka), keyed by camera_id   <- lag metric drives autoscaling
+ queue keyed by camera_id (in scope: Postgres SKIP LOCKED; deferred: Redis Streams | Kafka)
         |
         v
  inference-worker: batching, tracking, zone events --gRPC--> Triton
@@ -68,8 +72,7 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
  drift-monitor: reads stream aggregates -> Prometheus metrics -> Alertmanager
  metadata DB (Postgres): cameras, zones, model versions, query log
  observability: OpenTelemetry -> collector -> Prometheus + Tempo -> Grafana
- experiment tracking (Tracker interface): W&B (training runs, sweeps, reports),
-                                          MLflow (eval results, model registry, champion)
+ eval and benchmark results: results JSON files in the repo (no experiment tracker, D16)
  artifacts: DVC (datasets, adapters, fine-tuned weights) -> local remote | S3
  cloud: AWS (S3, ECR, IAM, Budgets, EC2 spot GPU + k3s), all via Terraform
  [stretch, D10: orchestrator (Prefect | Airflow) for the retraining loop]
@@ -90,6 +93,7 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
 - Backpressure: when queue lag exceeds a threshold, reject with `RESOURCE_EXHAUSTED` (or HTTP 429). Load shedding policy is configurable and measured.
 
 ### 4.3 queue
+*Scope note: deferred. In this plan the worker claims `pending` frames from Postgres with `SELECT ... FOR UPDATE SKIP LOCKED`, per camera (D3 default); no Redis, no Kafka.*
 - Decouples ingest from GPU work and absorbs bursts. Candidates: Redis Streams, Apache Kafka (KRaft mode, single broker for local runs and benchmarks) **(decided by benchmark, D3)**.
 - **Keyed or partitioned by `camera_id`** so a camera's frames are processed in order by one consumer at a time. Tracking depends on this. It is also the main constraint on how workers scale.
 - At-least-once delivery. Messages are acked only after results are durably written. Poison messages go to a dead-letter stream.
@@ -104,6 +108,7 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
 - Phase 1 runs models in-process with PyTorch at batch size 1. Phase 5 moves inference to Triton.
 
 ### 4.5 Triton Inference Server
+*Scope note: deferred. The precision ladder (PyTorch, ONNX Runtime, TensorRT FP16 and INT8) is measured in-process for YOLO11 only, and the worker runs the chosen backend in-process (D5).*
 - Model repository under `models/triton/` (configs and export scripts are versioned; weights are fetched by script, never committed).
 - Models: `yolo` (detector), `clip_image`, `clip_text`. Pre- and post-processing can move to GPU (ensemble, DALI or TensorRT NMS plugin) if profiling shows CPU-bound stages.
 - Backend and precision ladder: PyTorch eager -> ONNX Runtime CUDA -> TensorRT FP16 -> TensorRT INT8 **(decided by benchmark, D5)**. Dynamic batching and instance counts are tuned with `perf_analyzer`.
@@ -173,32 +178,36 @@ Why a typed plan by default: the output space is bounded, so validation is exhau
 - Free-form SQL engine (task 7.2): pruned schema DDL prompt, the LLM writes SQL, `sqlglot` validation, one self-correction attempt on execution error.
 - Agent loop (optional prototype for D11): tool calling over the plan executor and CLIP search.
 
+*Scope note: semantic and hybrid search are deferred with CLIP; `visual_query` is rejected as unsupported.*
+
 **Semantic pipeline:** CLIP text embedding via Triton -> ANN top-k with optional camera and time filters -> frames with presigned URLs.
 
 **Hybrid pipeline:** a `QueryPlan` with `visual_query` set, so one planner serves structured and hybrid queries. The executor runs either filtered ANN search or a compiled SQL prefilter followed by vector rerank, chosen by estimated filter selectivity (thresholds measured).
 
-Cross-cutting: Redis cache keyed by normalized question plus data watermark; circuit breaker with fallback to a hosted LLM; every query logged to `query_log` with engine, plan JSON, compiled SQL and stage timings.
+Cross-cutting (deferred: cache and circuit breaker): a cache keyed by normalized question plus data watermark; circuit breaker with fallback to a hosted LLM. In scope: every query logged to `query_log` with engine, plan JSON, compiled SQL and stage timings.
 
 ### 4.8 llm-service
+*Scope note: deferred. The planner calls an OpenAI-compatible endpoint (Ollama locally or a hosted API) with few-shot prompting (D7 default).*
 - vLLM with an OpenAI-compatible API, prefix caching on (the schema prompt is long and shared) and structured outputs for `QueryPlan` JSON; the constrained-decoding overhead is measured.
 - Small open model chosen by eval; a LoRA adapter whose target is `QueryPlan` JSON (hybrid uses the same plan, so one adapter covers both). Optionally a second adapter with SQL targets for the D11 comparison. If both exist they are served on one quantized base (AWQ or GPTQ) with multi-LoRA; otherwise adapter vs merged overhead is measured and reported.
 - Choice of prompting vs LoRA vs hosted **(decided by benchmark, D7)** on structured-query execution accuracy, p95 latency and cost per 1,000 queries.
 
 ### 4.9 drift-monitor
 - Per camera, compares a rolling window against a reference window captured during a calibration period.
-- Signals: class-mix PSI, confidence distribution (KS or Wasserstein), detections per frame, input statistics (brightness, blur), embedding drift (MMD on sampled embeddings or centroid shift).
-- Exports gauges to Prometheus; alert rules in Alertmanager. Thresholds are calibrated on clean runs to a target false-alarm rate.
+- Signals: class-mix PSI, confidence distribution (KS or Wasserstein), detections per frame, input statistics (brightness, blur). Embedding drift (MMD or centroid shift) is deferred with CLIP.
+- Exports gauges to Prometheus. Detection is sequential change detection: a fixed threshold baseline and CUSUM on standardized statistics, each calibrated on clean runs and compared on detection delay against false-alarm rate (task 9.3). Alert rules use the chosen operating point.
 - Validated with loadgen drift injection: detection delay and false-alarm rate per drift type, plus the measured mAP drop under each drift to justify why it matters.
-- Response: the detector is fine-tuned on a clean plus photometrically drifted mix (task 9.5) and must pass the eval gate before becoming champion. A stretch orchestrated retraining loop (task 10.5, D10) chains drift alert -> frame sampling -> fine-tune -> eval gate -> registry.
+- Response: the detector is fine-tuned on a clean plus photometrically drifted mix (task 9.5); before/after mAP on drifted and clean sets is reported. The eval gate and the retraining loop (10.2, 10.5) are deferred.
 
 ### 4.10 Evaluation and experiment tracking
 - `eval/` holds versioned datasets and the harness:
   - Structured suite (`make eval SUITE=structured`): structured-query execution accuracy. Gold entries store the expected result set, per-dialect gold SQL where needed, a gold `QueryPlan` where expressible and an `expressible_by_plan` flag. Category `unsupported` covers valid analytic questions outside the plan schema (the plan engine must abstain with reason `unsupported`). Reports accuracy over all questions and over expressible ones, plus plan coverage, with plan error classes (invalid plan, plan failed validation, wrong filter, wrong aggregation, wrong group_by) alongside the SQL error classes.
-  - Retrieval recall@k and nDCG; detection mAP on a fixed labeled subset (clean and drifted).
+  - Detection mAP on a fixed labeled subset (clean and drifted). Retrieval recall@k and nDCG are deferred with CLIP.
+  - Every headline metric is reported with a bootstrap 95% confidence interval, and each metric's documentation says what it does and does not measure.
 - Dev and test splits; the test split is frozen and only used for reported numbers.
-- Experiment tracking goes through a `Tracker` protocol in `vms.common` with MLflow, W&B and no-op implementations selected by config. W&B records training runs, sweeps and reports (LoRA, detector fine-tune). MLflow (self-hosted in compose) records eval results and holds the model registry and champion tracking. W&B defaults to disabled or offline and is never needed for the demo. Result JSON files in the repo remain the source of truth for reported numbers and record tracker run IDs or URLs.
+- Results JSON files in the repo are the only record of runs and the source of truth for reported numbers; comparing two runs is a diff of two results files. There is no experiment tracker: MLflow and W&B were removed in task 0.7 because no kept task needs them (D16).
 - DVC tracks large artifacts we produce (synthetic datasets, training data, adapters, fine-tuned weights, large eval snapshots); small eval JSONL and configs stay in git. See section 10.
-- An eval gate in CD blocks a model or prompt change that regresses against the recorded champion.
+- (Deferred, 10.2) An eval gate in CD blocks a model or prompt change that regresses against the recorded champion.
 
 ### 4.11 Observability
 - OpenTelemetry in every service. A frame's trace spans loadgen -> ingest -> queue -> worker -> Triton -> DB write. A query's trace spans every pipeline stage.
@@ -206,14 +215,13 @@ Cross-cutting: Redis cache keyed by normalized question plus data watermark; cir
 - Structured JSON logs with trace IDs. Dashboards as code in `deploy/grafana/`.
 
 ### 4.12 frontend
-Minimal React + TypeScript (Vite): query box with mode selector, result tables and charts, frame grid, debug panel showing the plan JSON and compiled SQL, thumbs up/down feedback to `query_log`.
+Minimal Vite + TypeScript UI: a camera wall with the latest frame per camera and its detection boxes; a query box with the answer, a table or chart chosen from the result kind, and a panel with the plan JSON and compiled SQL; clear states for abstention and validator rejection. Built to make the demo and write-up visual. Semantic mode and feedback buttons are deferred.
 
 ### 4.13 Shared library (`vms.common`)
 Every service builds on the same small modules, each behind an interface so tests inject fakes:
 - **Settings:** one pydantic-settings class per service. Values are layered from code defaults, then `configs/common.yaml`, `configs/<service>.yaml` and `configs/<service>.<env>.yaml` (deep-merged, `env` from `VMS_ENV`), then `.env`, then `VMS_*` environment variables (`__` for nesting), then explicit arguments. Validation is strict, so a typo in YAML fails at startup.
 - **Observability:** `init_observability(settings)` configures JSON logs that carry the active trace and span IDs, OpenTelemetry tracing (OTLP to the collector; a no-op tracer when disabled) and a Prometheus registry. Metric names are assembled and validated as `vms_<component>_<metric>_<unit>`.
 - **IDs and time:** a monotonic ULID generator and a `Clock` protocol (system and fake implementations). Both take an injected clock and randomness source, so tests are deterministic.
-- **Tracking:** a `Tracker` protocol with no-op, MLflow and W&B backends. `build_tracker` reads the backends from config and returns a `RunTracker` that sends each call to every enabled backend, returning one run reference per backend for the results JSON. Backend libraries are imported only when enabled. Artifacts are logged by reference, never uploaded.
 
 ## 5. Data flows and guarantees
 
@@ -288,10 +296,10 @@ Targets may be revised with evidence; record any change in `docs/DECISIONS.md`.
 
 ## 9. Deployment
 
-- **Local:** `docker compose` CPU profile with small models; GPU profile when a GPU is present. The stack (`deploy/compose/docker-compose.yml`) runs the infrastructure every service needs, each with a health check: Postgres 17 with pgvector (application DB and MLflow backend DB), SeaweedFS as the S3-compatible object store (D12; buckets for frames and MLflow artifacts are created at startup), Redis (AOF on), the OpenTelemetry collector (OTLP in; traces to Tempo, OTLP metrics re-exposed for Prometheus), Prometheus, Tempo, Grafana with provisioned Prometheus and Tempo datasources (fixed UIDs `prometheus` and `tempo`, files in `deploy/grafana/provisioning/`) and MLflow (Postgres backend, artifacts proxied by the server into the object store, so clients need no S3 credentials). Infrastructure services have no profile and always start. Application services that come in CPU and GPU variants carry `profiles: [cpu]` or `profiles: [gpu]`; `make up` activates `cpu`, `make up PROFILES=gpu` activates `gpu`. Kafka is not in the stack; it is added only if D3 benchmarks justify it (task 6.1). W&B is hosted and not in compose.
-- **Kubernetes:** one Helm chart with per-service values. `kind` in CI for smoke tests. GPU benchmarks run on an EC2 spot GPU instance with single-node k3s. EKS only if a decision record justifies it and the user approves the cost. KEDA scales workers on queue lag; HPA scales query-service on CPU or RPS. Triton gets GPU resource requests.
-- **Cloud (AWS by default):** Terraform under `deploy/terraform/` provisions, in the project's single configured Region: S3 (frames, DVC remote, artifacts), ECR, IAM with least-privilege roles (GPU instance role limited to the project bucket and ECR pull; CI role limited to ECR push), AWS Budgets alerts, and EC2 spot GPU instances (g5 or g6) running k3s. Every resource is tagged `project=vms` and `session=<id>`. Every apply has a scripted destroy; after destroy, `scripts/gpu_session.sh` lists remaining tagged resources through the Resource Groups Tagging API and fails loudly if any remain. D9 decides only whether long GPU benchmark runs move to a cheaper provider.
-- **CI/CD (GitHub Actions):** lint, typecheck, unit tests, integration tests on the compose CPU stack, image builds, Helm lint and kind smoke test, eval gate on a small dev subset.
+- **Local:** `docker compose` CPU profile with small models; GPU profile when a GPU is present. The stack (`deploy/compose/docker-compose.yml`) runs the infrastructure every service needs, each with a health check: Postgres 17 with pgvector (application DB), SeaweedFS as the S3-compatible object store (D12; the frames bucket is created at startup), the OpenTelemetry collector (OTLP in; traces to Tempo, OTLP metrics re-exposed for Prometheus), Prometheus, Tempo, Grafana with provisioned Prometheus and Tempo datasources (fixed UIDs `prometheus` and `tempo`, files in `deploy/grafana/provisioning/`). Redis and MLflow were removed in task 0.7 (D16). Infrastructure services have no profile and always start. Application services that come in CPU and GPU variants carry `profiles: [cpu]` or `profiles: [gpu]`; `make up` activates `cpu`, `make up PROFILES=gpu` activates `gpu`. Kafka is not in the stack; it is added only if D3 benchmarks justify it (task 6.1, deferred).
+- **Kubernetes (deferred):** one Helm chart with per-service values. `kind` in CI for smoke tests. GPU benchmarks run on an EC2 spot GPU instance with single-node k3s. EKS only if a decision record justifies it and the user approves the cost. KEDA scales workers on queue lag; HPA scales query-service on CPU or RPS. Triton gets GPU resource requests.
+- **Cloud (AWS by default):** in this plan, `scripts/gpu_session.sh` launches one tagged EC2 spot GPU instance with the AWS CLI, runs scenarios with docker compose and verifies teardown through the Resource Groups Tagging API; an AWS Budgets alarm guards spend (task 2.4). Deferred target design (10.1): Terraform under `deploy/terraform/` provisions, in the project's single configured Region: S3 (frames, DVC remote, artifacts), ECR, IAM with least-privilege roles (GPU instance role limited to the project bucket and ECR pull; CI role limited to ECR push), AWS Budgets alerts, and EC2 spot GPU instances (g5 or g6) running k3s. Every resource is tagged `project=vms` and `session=<id>`. Every apply has a scripted destroy; after destroy, `scripts/gpu_session.sh` lists remaining tagged resources through the Resource Groups Tagging API and fails loudly if any remain. D9 decides only whether long GPU benchmark runs move to a cheaper provider.
+- **CI (GitHub Actions):** lint, typecheck, unit tests, integration tests on the compose CPU stack, and the eval harness on a tiny subset with a fake LLM. Image builds, Helm lint, the kind smoke test and the CD eval gate are deferred.
 
 ## 10. Repository layout
 
@@ -305,7 +313,7 @@ Targets may be revised with evidence; record any change in `docs/DECISIONS.md`.
 ├── configs/              # YAML config per service and environment
 ├── proto/                # gRPC definitions
 ├── src/vms/
-│   ├── common/           # config, logging, telemetry, ids, clock, Tracker, shared schemas
+│   ├── common/           # config, logging, telemetry, ids, clock, shared schemas
 │   ├── loadgen/
 │   ├── ingest/
 │   ├── worker/           # inference client, tracking, zones, input stats

@@ -30,8 +30,8 @@ def test_defaults_without_yaml_layers(tmp_path: Path) -> None:
     assert settings.env == "local"
     assert settings.port == 8000
     assert settings.telemetry.enabled is False
-    assert settings.tracking.backends == ["noop"]
-    assert settings.tracking.wandb.mode is None
+    assert settings.telemetry.otlp_endpoint is None
+    assert settings.log.level == "INFO"
 
 
 def test_yaml_layers_deep_merge(config_dir: Path) -> None:
@@ -53,12 +53,12 @@ def test_env_overlay_selected_by_vms_env(config_dir: Path) -> None:
 def test_environment_overrides_yaml(config_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("VMS_PORT", "9500")
     monkeypatch.setenv("VMS_LOG__LEVEL", "debug")
-    monkeypatch.setenv("VMS_TRACKING__BACKENDS", '["mlflow", "wandb"]')
+    monkeypatch.setenv("VMS_TELEMETRY__OTLP_ENDPOINT", "http://collector:4317")
     monkeypatch.setenv("VMS_TELEMETRY__SAMPLE_RATIO", "0.1")
     settings = load_settings(IngestSettings, "ingest", config_dir=config_dir)
     assert settings.port == 9500
     assert settings.log.level == "DEBUG"
-    assert settings.tracking.backends == ["mlflow", "wandb"]
+    assert settings.telemetry.otlp_endpoint == "http://collector:4317"
     assert settings.telemetry.sample_ratio == 0.1
     assert settings.telemetry.enabled is True  # untouched siblings keep their YAML value
 
@@ -79,9 +79,9 @@ def test_dotenv_file_is_read_when_given(config_dir: Path, tmp_path: Path) -> Non
 
 
 def test_dotenv_ignores_unrelated_keys_but_reads_vms_ones(config_dir: Path, tmp_path: Path) -> None:
-    # The shared .env also holds POSTGRES_*, WANDB_* etc. for other consumers.
+    # The shared .env also holds POSTGRES_*, S3_* etc. for other consumers.
     env_file = tmp_path / "test.env"
-    write(env_file, "POSTGRES_HOST=db\nWANDB_MODE=offline\nVMS_PORT=7777\nVMS_LOG__LEVEL=debug\n")
+    write(env_file, "POSTGRES_HOST=db\nS3_BUCKET=x\nVMS_PORT=7777\nVMS_LOG__LEVEL=debug\n")
     settings = load_settings(IngestSettings, "ingest", config_dir=config_dir, env_file=env_file)
     assert (settings.port, settings.log.level) == (7777, "DEBUG")
 
@@ -98,7 +98,8 @@ def test_dotenv_keys_for_other_services_are_ignored(tmp_path: Path) -> None:
 def test_repo_env_example_loads(config_dir: Path) -> None:
     env_example = Path(__file__).parents[3] / ".env.example"
     settings = load_settings(IngestSettings, "ingest", config_dir=config_dir, env_file=env_example)
-    assert settings.tracking.backends == ["noop"]
+    assert settings.log.level == "INFO"
+    assert settings.telemetry.enabled is True
 
 
 def test_missing_service_config_fails(tmp_path: Path) -> None:
@@ -112,7 +113,7 @@ def test_missing_service_config_fails(tmp_path: Path) -> None:
         "prot: 9000\n",  # typo in a top-level key
         "telemetry:\n  enabld: true\n",  # typo in a nested key
         "telemetry:\n  sample_ratio: 1.5\n",  # out of range
-        "tracking:\n  backends: [mlfow]\n",  # unknown backend
+        "telemetry:\n  export_timeout_s: 0\n",  # must be positive
         "log:\n  level: LOUD\n",
     ],
 )
@@ -149,4 +150,5 @@ def test_repo_common_config_is_valid(tmp_path: Path) -> None:
     write(tmp_path / "common.yaml", repo_common.read_text(encoding="utf-8"))
     write(tmp_path / "svc.yaml", "")
     settings = load_settings(ServiceSettings, "svc", config_dir=tmp_path)
-    assert settings.tracking.backends == ["noop"]
+    assert settings.telemetry.enabled is True
+    assert settings.telemetry.sample_ratio == 1.0

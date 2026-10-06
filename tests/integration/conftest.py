@@ -28,15 +28,11 @@ class StackSettings(BaseSettings):
     postgres_db: str = "vms"
     postgres_user: str = "vms"
     postgres_password: str = "change-me"
-    mlflow_db: str = "mlflow"
 
     s3_endpoint_url: str = "http://localhost:8333"
     s3_bucket: str = "vms-frames"
     s3_access_key_id: str = "vms-local"
     s3_secret_access_key: str = "change-me-s3"
-    mlflow_artifacts_bucket: str = "vms-mlflow"
-
-    redis_url: str = "redis://localhost:6379/0"
 
     otel_grpc_port: int = 4317
     prometheus_port: int = 9090
@@ -44,7 +40,6 @@ class StackSettings(BaseSettings):
     grafana_port: int = 3000
     grafana_admin_user: str = "admin"
     grafana_admin_password: str = "change-me-grafana"
-    mlflow_port: int = 5000
 
     @property
     def postgres_dsn(self) -> str:

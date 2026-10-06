@@ -53,3 +53,8 @@ Outcome: added `source.fps` to pin a rate in the spec, plus a hard failure on pr
 Tried: checking that clips come from static cameras: first-vs-last frame difference, phase correlation every 0.5 s, and median sparse optical flow on corners.
 Result: Pie-IX pans throughout (68 of 121 half-second steps moved; visible framing change), so it was dropped. Roncesvalles is handheld but steady until about 10.6 s, so it was trimmed to 10 s. Both automatic metrics are unreliable in crowds: they flagged MOT20-01 (26/35 steps) and MOT20-03 because the crowd's motion dominates. MOT17-02/04/08/09 showed 0 moving steps.
 Outcome: static-camera checks stay manual (look at frames). MOT20 is kept as static per the benchmark's documentation.
+
+### E-008 | 2026-10-06 | infra
+Tried: the compose stack after task 0.7 removed Redis and MLflow (same laptop as E-002; `docker stats` at idle, not a benchmark).
+Result: about 365 MiB in total (Grafana 167, SeaweedFS 75, OTel collector 38, Prometheus 38, Postgres 24, Tempo 23 MiB), down from about 1.0 GiB (E-002). `make up` from empty volumes: 18 s. 21 Python packages dropped from the environment (mlflow-skinny, wandb, redis and their dependencies).
+Outcome: keep; D16.

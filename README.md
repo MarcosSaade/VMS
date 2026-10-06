@@ -19,7 +19,7 @@ Requires [uv](https://docs.astral.sh/uv/), GNU make and Docker.
 ```bash
 make setup   # Python 3.12 env from uv.lock, pre-commit hooks, .env
 make check   # lint + typecheck + unit tests
-make up      # local stack (Postgres + pgvector, object store, Redis, OTel, Prometheus, Tempo, Grafana, MLflow), waits until healthy
+make up      # local stack (Postgres + pgvector, object store, OTel, Prometheus, Tempo, Grafana), waits until healthy
 ```
 
 Run `make help` to list every target. Details are in [docs/RUNBOOK.md](docs/RUNBOOK.md).

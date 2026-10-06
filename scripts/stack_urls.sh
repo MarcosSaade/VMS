@@ -14,11 +14,9 @@ port() {
 cat <<URLS
 Stack is healthy:
   Grafana      http://localhost:$(port GRAFANA_PORT 3000)  (anonymous viewer; admin login in .env)
-  MLflow       http://localhost:$(port MLFLOW_PORT 5000)
   Prometheus   http://localhost:$(port PROMETHEUS_PORT 9090)
   Tempo API    http://localhost:$(port TEMPO_PORT 3200)
   OTLP         grpc localhost:$(port OTEL_GRPC_PORT 4317), http localhost:$(port OTEL_HTTP_PORT 4318)
   Postgres     localhost:$(port POSTGRES_PORT 5432)
-  Redis        localhost:$(port REDIS_PORT 6379)
   S3 (SeaweedFS) http://localhost:$(port S3_PORT 8333)
 URLS

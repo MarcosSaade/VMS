@@ -93,10 +93,10 @@ Rules:
 - All configuration lives in versioned YAML under `configs/` with environment overrides (pydantic-settings). No magic numbers in code.
 - Seed every source of randomness and record the seed.
 - Every reported number comes from a script run through `make` or `python -m vms...`. No results from notebooks or ad hoc shell sessions.
-- Every benchmark, eval and training run writes a results JSON with: run ID, git SHA and dirty flag, fully resolved config, hardware (GPU model, driver, CUDA, CPU, RAM), key package versions, seed, start and end time, metrics, cloud cost if any, and the tracker run IDs or URLs (MLflow, W&B) when a tracker is enabled. Small results are committed under `bench/results/` or `eval/results/`; large artifacts are tracked with DVC (below).
-- Experiment tracking goes through the `Tracker` interface in `vms.common` (MLflow, W&B or no-op, chosen by config). W&B is for training runs, sweeps and reports; MLflow is for eval results, the model registry and champion tracking. The results JSON in the repo stays the source of truth for reported numbers.
+- Every benchmark, eval and training run writes a results JSON with: run ID, git SHA and dirty flag, fully resolved config, hardware (GPU model, driver, CUDA, CPU, RAM), key package versions, seed, start and end time, metrics, and cloud cost if any. Small results are committed under `bench/results/` or `eval/results/`; large artifacts are tracked with DVC (below).
+- The results JSON files in the repo are the record of every run and the source of truth for reported numbers. There is no experiment tracker (MLflow and W&B were removed, D16); add one only through a decision record backed by a measured need.
 - Data and artifacts: small files (eval JSONL, configs) stay in git. Large artifacts we produce (synthetic datasets, training data, LoRA adapters, fine-tuned weights, large eval snapshots) are tracked with DVC (local remote by default, S3 remote in the cloud). Public third-party datasets and pretrained weights are fetched by scripts with checksums and license notes. Never commit videos, images or weights to git.
-- A fresh clone must work with `make setup && make up && make demo` on a CPU-only machine without W&B, AWS or DVC remote access (the demo uses `make data-mini`; W&B defaults to disabled or offline). Keep this true at all times.
+- A fresh clone must work with `make setup && make up && make demo` on a CPU-only machine without AWS or DVC remote access (the demo uses `make data-mini`). Keep this true at all times.
 
 ## 8. Benchmarking and evaluation rules
 
@@ -129,7 +129,7 @@ Rules:
 - Tag every cloud resource `project=vms` and `session=<id>`. After teardown, `scripts/gpu_session.sh` lists resources still carrying the session tag (Resource Groups Tagging API) and fails loudly if any remain.
 - Before anything that costs money or is irreversible (provisioning, deleting data or volumes, force-pushing, publishing anything), state the expected cost or impact and get the user's confirmation.
 - Never leave resources running at the end of a session. Verify teardown and log the cost in the run's results.
-- Secrets live only in `.env` (gitignored) or a secret manager. Keep `.env.example` complete, including optional variables such as `WANDB_API_KEY` and `WANDB_MODE` (default `disabled` or `offline`).
+- Secrets live only in `.env` (gitignored) or a secret manager. Keep `.env.example` complete, including optional variables such as `LLM_API_KEY` and `AWS_PROFILE`.
 
 ## 11. Git
 

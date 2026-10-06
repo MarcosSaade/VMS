@@ -24,13 +24,8 @@ dev = [
     "pre-commit>=4.3",
     "psycopg[binary]>=3.3.6",
     "pytest>=8.4",
-    "redis>=8.1.0",
     "ruff>=0.13",
     "types-pyyaml>=6.0.12.20260906",
-]
-tracking = [
-    "mlflow-skinny>=3.16.1",
-    "wandb>=0.30.0",
 ]
 
 [build-system]
@@ -38,7 +33,7 @@ requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
 
 [tool.uv]
-default-groups = ["dev", "tracking"]
+default-groups = ["dev"]
 
 [tool.ruff]
 line-length = 100
