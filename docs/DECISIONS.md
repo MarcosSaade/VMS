@@ -103,3 +103,12 @@ Options: typed `QueryPlan` compiled to parameterized SQL (default); free-form SQ
 Decision: pending (Phase 7, task 7.2). The typed plan is the default until this record is accepted.
 Evidence: pending. To compare: execution accuracy (all questions and expressible ones), abstention correctness, p95 latency, tokens and cost, plan coverage, red-team attack success rate.
 Trade-offs and consequences: pending.
+
+## D12: Local object store
+
+Status: accepted    Date: 2026-10-06
+Context: The compose stack needs an S3-compatible object store for frames (ingest) and MLflow artifacts, standing in for S3 so the same boto3 code runs locally and in the cloud. It must run as one small container on a laptop and in CI, create buckets without manual steps, and have a pinned, pullable image. The plan named MinIO, but MinIO no longer publishes community images (E-001).
+Options: build MinIO from its last source release; SeaweedFS (`weed mini`); RustFS; Garage.
+Decision: SeaweedFS 4.48 in `weed mini` mode (single process: master, volume, filer, S3 gateway). Buckets are created at startup with `-bucket`, so no bootstrap job is needed; the S3 admin identity comes from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`.
+Evidence: E-001 (MinIO images unavailable). Integration tests pass against it: authenticated put/get/delete, anonymous access refused (403), MLflow proxied artifact upload lands in the bucket (`tests/integration/test_compose_stack.py`). Idle memory about 140 MiB (E-002).
+Trade-offs and consequences: SeaweedFS is Apache-2.0 and has been developed since 2015, but its S3 layer is less widely used than MinIO's, so an S3 feature we need may behave differently (watch multipart uploads, presigned URLs and lifecycle rules). Building MinIO from source would keep a familiar server, but it adds a slow Go build to every fresh clone and CI run, for a project that no longer ships updates. RustFS reached 1.0 only days ago. Garage needs a cluster layout step before it will serve requests. Application code talks only to the S3 API through an injected client, so changing the store later means editing compose, not code. In the cloud this is S3 regardless. Revisit if an S3 incompatibility shows up in ingest benchmarks (Phase 2).

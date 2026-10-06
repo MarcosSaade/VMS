@@ -45,9 +45,7 @@ jobs:
         run: make check
 
   integration:
-    # Placeholder: runs against the compose CPU stack once it exists (task 0.5).
-    # Then: make up -> wait for /readyz -> make test-integration -> make logs on failure -> make down.
-    name: integration (placeholder)
+    name: integration (compose CPU stack)
     needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -61,7 +59,20 @@ jobs:
           cache-dependency-glob: uv.lock
           cache-python: true
 
-      - run: make setup
+      - run: make setup   # also creates .env from .env.example, which make up reads
+
+      - name: make up (waits until every service is healthy)
+        run: make up
 
       - name: make test-integration
         run: make test-integration
+
+      - name: Stack state and logs on failure
+        if: failure()
+        run: |
+          make ps
+          docker compose --env-file .env -f deploy/compose/docker-compose.yml logs --no-color --tail=300
+
+      - name: Tear down
+        if: always()
+        run: make down-volumes

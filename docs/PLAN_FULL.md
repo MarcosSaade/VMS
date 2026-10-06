@@ -62,7 +62,7 @@
 **Done when:** 20 cameras at 5 FPS run stably against a stub server on a laptop; self-test rate recorded in `EXPERIMENTS.md`.
 
 ### 1.3 Ingest v0
-**Prompt:** Implement `vms.ingest` as a FastAPI service: accept multipart frames, write the JPEG to MinIO at `frames/{camera_id}/{date}/{frame_id}.jpg`, insert a `frames` row with status `pending`. Idempotency on `(camera_id, seq)` or `frame_id`. Health, readiness and metrics endpoints.
+**Prompt:** Implement `vms.ingest` as a FastAPI service: accept multipart frames, write the JPEG to the object store (SeaweedFS locally, S3 in the cloud; D12) at `frames/{camera_id}/{date}/{frame_id}.jpg`, insert a `frames` row with status `pending`. Idempotency on `(camera_id, seq)` or `frame_id`. Health, readiness and metrics endpoints.
 **Done when:** integration test sends frames and finds objects and rows; duplicate sends create no duplicates.
 
 ### 1.4 Schema v1

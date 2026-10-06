@@ -1,0 +1,24 @@
+# Scrape targets for the local stack. VMS services are added here as they land (Phase 1+);
+# each exposes /metrics with names of the form vms_<component>_<metric>_<unit>.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]
+
+  # OTLP metrics received by the collector, re-exposed in Prometheus format.
+  - job_name: otel-collector-otlp
+    honor_labels: true
+    static_configs:
+      - targets: ["otel-collector:8889"]
+
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]

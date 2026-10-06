@@ -44,7 +44,7 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
  loadgen: N virtual cameras, fixed FPS, drift injection
         |  gRPC client stream (JPEG + metadata)          [REST baseline in Phase 1]
         v
- ingest-gateway ------------------------------> object store (MinIO / S3): frames
+ ingest-gateway ------------------------------> object store (SeaweedFS / S3): frames
         |  frame refs (not images)
         v
  queue (Redis Streams | Kafka), keyed by camera_id   <- lag metric drives autoscaling
@@ -116,7 +116,7 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
 | Metadata DB | cameras, zones, model registry, query log, mutable track state | Postgres |
 | Detection store | detections, events (append-heavy, analytical reads) | Postgres partitioned, TimescaleDB, ClickHouse **(D1)** |
 | Vector store | frame embeddings with camera/time filters | pgvector HNSW, Qdrant **(D2)** |
-| Object store | JPEG frames | MinIO locally, S3 in cloud |
+| Object store | JPEG frames | SeaweedFS locally (D12), S3 in cloud |
 
 Logical schema (types simplified; all timestamps UTC, each camera has an IANA timezone for "this morning" style questions):
 
@@ -281,7 +281,7 @@ Targets may be revised with evidence; record any change in `docs/DECISIONS.md`.
 
 ## 9. Deployment
 
-- **Local:** `docker compose` CPU profile with small models; GPU profile when a GPU is present.
+- **Local:** `docker compose` CPU profile with small models; GPU profile when a GPU is present. The stack (`deploy/compose/docker-compose.yml`) runs the infrastructure every service needs, each with a health check: Postgres 17 with pgvector (application DB and MLflow backend DB), SeaweedFS as the S3-compatible object store (D12; buckets for frames and MLflow artifacts are created at startup), Redis (AOF on), the OpenTelemetry collector (OTLP in; traces to Tempo, OTLP metrics re-exposed for Prometheus), Prometheus, Tempo, Grafana with provisioned Prometheus and Tempo datasources (fixed UIDs `prometheus` and `tempo`, files in `deploy/grafana/provisioning/`) and MLflow (Postgres backend, artifacts proxied by the server into the object store, so clients need no S3 credentials). Infrastructure services have no profile and always start. Application services that come in CPU and GPU variants carry `profiles: [cpu]` or `profiles: [gpu]`; `make up` activates `cpu`, `make up PROFILES=gpu` activates `gpu`. Kafka is not in the stack; it is added only if D3 benchmarks justify it (task 6.1). W&B is hosted and not in compose.
 - **Kubernetes:** one Helm chart with per-service values. `kind` in CI for smoke tests. GPU benchmarks run on an EC2 spot GPU instance with single-node k3s. EKS only if a decision record justifies it and the user approves the cost. KEDA scales workers on queue lag; HPA scales query-service on CPU or RPS. Triton gets GPU resource requests.
 - **Cloud (AWS by default):** Terraform under `deploy/terraform/` provisions, in the project's single configured Region: S3 (frames, DVC remote, artifacts), ECR, IAM with least-privilege roles (GPU instance role limited to the project bucket and ECR pull; CI role limited to ECR push), AWS Budgets alerts, and EC2 spot GPU instances (g5 or g6) running k3s. Every resource is tagged `project=vms` and `session=<id>`. Every apply has a scripted destroy; after destroy, `scripts/gpu_session.sh` lists remaining tagged resources through the Resource Groups Tagging API and fails loudly if any remain. D9 decides only whether long GPU benchmark runs move to a cheaper provider.
 - **CI/CD (GitHub Actions):** lint, typecheck, unit tests, integration tests on the compose CPU stack, image builds, Helm lint and kind smoke test, eval gate on a small dev subset.

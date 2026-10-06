@@ -16,10 +16,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "boto3>=1.43.108",
     "dvc>=3.60",
     "mypy>=1.18",
     "pre-commit>=4.3",
+    "psycopg[binary]>=3.3.6",
     "pytest>=8.4",
+    "redis>=8.1.0",
     "ruff>=0.13",
     "types-pyyaml>=6.0.12.20260906",
 ]

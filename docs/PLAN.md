@@ -7,13 +7,13 @@
 - [x] 0.2 Docs skeleton with the fixed structure; decisions D1 to D11 as proposed
 - [x] 0.3 Shared libraries: config, JSON logging, OpenTelemetry setup, IDs, injectable clock, `Tracker` (MLflow, W&B, no-op)
 - [x] 0.4 CI: lint, typecheck, unit tests
-- [ ] 0.5 Compose stack: Postgres + pgvector, MinIO, Redis, OTel collector, Prometheus, Grafana, MLflow
+- [x] 0.5 Compose stack: Postgres + pgvector, object store (SeaweedFS, D12), Redis, OTel collector, Prometheus, Tempo, Grafana, MLflow
 - [ ] 0.6 Port reusable assets from the old project; few-shots as (question, gold plan, gold SQL) triples; SQL validator
 
 ## Phase 1: Naive end-to-end baseline (weeks 2 to 3)
 - [ ] 1.1 Dataset download scripts with checksums and license notes
 - [ ] 1.2 Loadgen v0: N virtual cameras at fixed FPS over REST
-- [ ] 1.3 Ingest v0: REST, JPEG to MinIO, frame rows to Postgres
+- [ ] 1.3 Ingest v0: REST, JPEG to object store, frame rows to Postgres
 - [ ] 1.4 Schema v1 and migrations
 - [ ] 1.5 Worker v0: polls DB, in-process PyTorch YOLO11 and CLIP, batch size 1
 - [ ] 1.6 Tracking (ByteTrack) and zone events

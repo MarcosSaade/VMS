@@ -1,0 +1,222 @@
+# Local stack: infrastructure every VMS service depends on.
+#
+# Start with `make up` (waits until every health check passes), stop with `make down`.
+# Variables come from the repo-root .env (the Makefile passes --env-file); every one has a
+# default here so the stack also starts without it. Host ports bind to 127.0.0.1 only and are
+# overridable with *_PORT variables when a default port is taken on the host.
+#
+# Profiles: infrastructure below has no profile and always starts. Application services that
+# exist in a CPU and a GPU variant (inference worker, Triton, vLLM; Phase 1+) carry
+# `profiles: [cpu]` or `profiles: [gpu]`. `make up` activates `cpu`; `make up PROFILES=gpu`
+# activates `gpu`.
+#
+# Images are pinned by tag; bump deliberately and re-run `make test-integration`.
+
+name: vms
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 10s
+
+# Tempo and the OTel collector ship distroless images with no shell or HTTP client for health
+# checks; their inline builds add a static busybox as /bin/wget and nothing else.
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17-trixie
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vms}
+      POSTGRES_USER: ${POSTGRES_USER:-vms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      MLFLOW_DB: ${MLFLOW_DB:-mlflow}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Over TCP, because the temporary server used during first-time init listens only on the
+      # Unix socket. Querying the MLflow database also proves the init script ran.
+      test:
+        - CMD-SHELL
+        - psql -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$MLFLOW_DB" -tAc 'SELECT 1' >/dev/null
+    restart: unless-stopped
+
+  # S3-compatible object store (SeaweedFS in single-process "mini" mode; see D12 for why not
+  # MinIO). `-bucket` creates the buckets at startup, so no separate bootstrap job is needed.
+  objectstore:
+    image: chrislusf/seaweedfs:4.48
+    command:
+      - mini
+      - -dir=/data
+      - -bucket=${S3_BUCKET:-vms-frames},${MLFLOW_ARTIFACTS_BUCKET:-vms-mlflow}
+      - -master.telemetry=false
+      - -webdav=false
+    environment:
+      # Becomes the S3 admin identity.
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-vms-local}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-change-me-s3}
+      S3_BUCKET: ${S3_BUCKET:-vms-frames}
+      MLFLOW_ARTIFACTS_BUCKET: ${MLFLOW_ARTIFACTS_BUCKET:-vms-mlflow}
+    volumes:
+      - objectstore-data:/data
+    ports:
+      - "127.0.0.1:${S3_PORT:-8333}:8333"
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Healthy once the S3 gateway answers and both buckets exist (filer lists /buckets).
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O /dev/null http://localhost:8333/healthz &&
+          wget -q -O - --header 'Accept: application/json' http://localhost:8888/buckets/ > /tmp/b &&
+          grep -q "/buckets/$$S3_BUCKET\"" /tmp/b && grep -q "/buckets/$$MLFLOW_ARTIFACTS_BUCKET\"" /tmp/b
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.8.3-alpine
+    # AOF with fsync every second: Redis is a frame-queue candidate (D3), so restarts should
+    # not silently drop the stream.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "ping"]
+    restart: unless-stopped
+
+  otel-collector:
+    build:
+      dockerfile_inline: |
+        FROM otel/opentelemetry-collector-contrib:0.162.0
+        COPY --from=busybox:1.37.0-musl /bin/busybox /bin/wget
+    image: vms/otel-collector:0.162.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${OTEL_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OTEL_HTTP_PORT:-4318}:4318"
+    depends_on:
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "/bin/wget", "-q", "-O", "/dev/null", "http://localhost:13133/"]
+    restart: unless-stopped
+
+  tempo:
+    build:
+      dockerfile_inline: |
+        FROM grafana/tempo:3.1.0
+        COPY --from=busybox:1.37.0-musl /bin/busybox /bin/wget
+    image: vms/tempo:3.1.0
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "127.0.0.1:${TEMPO_PORT:-3200}:3200"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "/bin/wget", "-q", "-O", "/dev/null", "http://localhost:3200/ready"]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      # Lets Tempo's metrics generator (and later k6) push samples.
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/ready"]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.0.10
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-grafana}
+      # Local convenience: dashboards are readable without logging in. Editing needs admin.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
+    restart: unless-stopped
+
+  mlflow:
+    build:
+      context: ./mlflow
+    image: vms/mlflow:3.16.1
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=postgresql://${POSTGRES_USER:-vms}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${MLFLOW_DB:-mlflow}
+      # Clients upload artifacts through the server (proxied), so they need no S3 credentials.
+      - --serve-artifacts
+      - --artifacts-destination=s3://${MLFLOW_ARTIFACTS_BUCKET:-vms-mlflow}
+      - --allowed-hosts=localhost,localhost:*,127.0.0.1,127.0.0.1:*,mlflow,mlflow:*
+      # Default is 4 workers (~250 MB each); tracking load here is a few runs at a time.
+      - --workers=${MLFLOW_WORKERS:-2}
+    environment:
+      # The server-side job runner (GenAI scorer jobs) starts 7 extra processes (~1.5 GB) and
+      # is unused: eval runs score locally and log results to MLflow.
+      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
+      MLFLOW_S3_ENDPOINT_URL: http://objectstore:8333
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-vms-local}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-change-me-s3}
+      # Signing Region for the local S3 endpoint only; no AWS resource is involved.
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "127.0.0.1:${MLFLOW_PORT:-5000}:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      start_period: 30s
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=2)"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  objectstore-data:
+  redis-data:
+  tempo-data:
+  prometheus-data:
+  grafana-data:

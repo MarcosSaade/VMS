@@ -19,6 +19,7 @@ Requires [uv](https://docs.astral.sh/uv/), GNU make and Docker.
 ```bash
 make setup   # Python 3.12 env from uv.lock, pre-commit hooks, .env
 make check   # lint + typecheck + unit tests
+make up      # local stack (Postgres + pgvector, object store, Redis, OTel, Prometheus, Tempo, Grafana, MLflow), waits until healthy
 ```
 
 Run `make help` to list every target. Details are in [docs/RUNBOOK.md](docs/RUNBOOK.md).
@@ -29,7 +30,7 @@ Run `make help` to list every target. Details are in [docs/RUNBOOK.md](docs/RUNB
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Current design |
 | [docs/PLAN.md](docs/PLAN.md) / [docs/PLAN_FULL.md](docs/PLAN_FULL.md) | Plan with status, and detailed task prompts |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Decision records (D1 to D11) |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Decision records |
 | [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | Append-only log of everything tried |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Curated current numbers and how to reproduce them |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | Setup, running, operating, teardown |

@@ -4,7 +4,12 @@ SHELL := /bin/bash
 UV ?= uv
 RUN := $(UV) run
 COMPOSE_FILE ?= deploy/compose/docker-compose.yml
-COMPOSE := docker compose -f $(COMPOSE_FILE)
+# Compose reads variables from the repo-root .env (falls back to .env.example on a fresh clone).
+ENV_FILE ?= $(if $(wildcard .env),.env,.env.example)
+# Compose profiles to activate: cpu (default) or gpu, for services that exist in both variants.
+PROFILES ?= cpu
+STACK_WAIT_TIMEOUT ?= 300
+COMPOSE := COMPOSE_PROFILES=$(PROFILES) docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
 
 # Prints a clear error for targets whose implementation lands in a later task.
 define not_yet
@@ -53,19 +58,25 @@ check: lint typecheck test ## Lint + typecheck + unit tests
 # --- Local stack ---------------------------------------------------------------
 
 .PHONY: up
-up: ## Start the compose CPU stack
-	@test -f $(COMPOSE_FILE) || { echo "make up: $(COMPOSE_FILE) not found yet (task 0.5)." >&2; exit 1; }
-	$(COMPOSE) up -d
+up: ## Start the compose stack and wait until healthy (PROFILES=cpu|gpu)
+	$(COMPOSE) up -d --build --wait --wait-timeout $(STACK_WAIT_TIMEOUT)
+	@scripts/stack_urls.sh $(ENV_FILE)
 
 .PHONY: down
-down: ## Stop the compose stack
-	@test -f $(COMPOSE_FILE) || { echo "make down: $(COMPOSE_FILE) not found yet (task 0.5)." >&2; exit 1; }
+down: ## Stop the compose stack (keeps data volumes)
 	$(COMPOSE) down
 
+.PHONY: down-volumes
+down-volumes: ## Stop the compose stack and delete its data volumes
+	$(COMPOSE) down --volumes
+
+.PHONY: ps
+ps: ## Show compose services and health
+	$(COMPOSE) ps
+
 .PHONY: logs
-logs: ## Follow compose logs
-	@test -f $(COMPOSE_FILE) || { echo "make logs: $(COMPOSE_FILE) not found yet (task 0.5)." >&2; exit 1; }
-	$(COMPOSE) logs -f --tail=200
+logs: ## Follow compose logs (SERVICE=<name> for one service)
+	$(COMPOSE) logs -f --tail=200 $(SERVICE)
 
 .PHONY: demo
 demo: ## End-to-end CPU demo on the mini dataset
