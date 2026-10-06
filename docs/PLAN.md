@@ -11,7 +11,7 @@
 - [x] 0.6 Query assets built from scratch (no legacy code): draft `QueryPlan`, sqlglot SQL validator, few-shot (question, gold plan, gold SQL) triples, prompt templates
 
 ## Phase 1: Naive end-to-end baseline (weeks 2 to 3)
-- [ ] 1.1 Dataset download scripts with checksums and license notes
+- [x] 1.1 Dataset download scripts with checksums and license notes
 - [ ] 1.2 Loadgen v0: N virtual cameras at fixed FPS over REST
 - [ ] 1.3 Ingest v0: REST, JPEG to object store, frame rows to Postgres
 - [ ] 1.4 Schema v1 and migrations

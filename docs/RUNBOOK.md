@@ -21,6 +21,29 @@ make help    # all targets
 
 ## Data
 
+### Video clips (virtual cameras)
+
+```bash
+make data-mini          # 3 short clips (~180 MB, under a minute): CI, laptops, the demo
+make data               # all clips that need no license acceptance (~820 MB, about 3 minutes)
+make data ACCEPT=virat  # also the VIRAT clips, after you have read and accepted their agreement
+```
+
+`python -m vms.datasets` reads `configs/data/sources.yaml`, downloads each clip, verifies it against its pinned checksum, and writes normalized clips to `data/clips/<clip_id>/` (gitignored): JPEG frames scaled to at most 720 px high (never upscaled), at most 30 fps, JPEG quality 90, plus a `clip.json` with the measured properties. MOT sequences are read straight out of the 5 to 6 GB archives with HTTP range requests, so only the frames needed are downloaded. Video files are cached in `data/raw/`. Re-running is idempotent: a clip whose `clip.json` matches its spec hash (source plus processing settings) is skipped, and a failed or interrupted run never leaves a clip that looks complete. The run also refreshes `configs/data/manifest.yaml` (committed), which records each clip's frames, fps, size, mean brightness and content hash. If a rebuilt clip's content hash differs from the committed one (for example, a different OpenCV build), the run warns; `--strict` makes that an error.
+
+| Clips | Source | License | Notes |
+|---|---|---|---|
+| mot17-02, mot17-04, mot17-08, mot17-09 (+ two 10 s `-mini` trims) | [MOT17](https://motchallenge.net/data/MOT17/) | [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/) | Non-commercial only. Cite Milan et al., MOT16, arXiv:1603.00831. |
+| mot20-01, mot20-03 (first 30 s) | [MOT20](https://motchallenge.net/data/MOT20/) | CC BY-NC-SA 3.0 | Non-commercial only. Cite Dendorfer et al., MOT20, arXiv:2003.09003. |
+| commons-roncesvalles (first 10 s) | [Wikimedia Commons, by Qviri](https://commons.wikimedia.org/wiki/File:Roncesvalles_Ave_crossing_at_Galley_Ave,_PXO_Type_A_lights_flashing,_July_2026.webm) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | Attribute the author; derivatives share alike. |
+| virat-000201, virat-040000, virat-050000 | [VIRAT Video Dataset 2.0](https://viratdata.org/), Kitware | [VIRAT Video Data Set Protection Agreement](https://actev.kitware.com/pub/VIRAT-Video-Data-Set-Protection-Agreement-1-4-11.pdf) | Opt-in (`ACCEPT=virat`). Every user must sign the agreement. No redistribution; never try to identify people. A few frames may appear in publications. |
+
+Because of the NC and agreement terms, never commit or publish clips or frames from `data/`, and keep screenshots in public material to a few frames with attribution. Checked in October 2026: the MOTChallenge site's front page returns HTTP 410, but the `data/*.zip` downloads still work. If a source disappears, the fetch fails loudly on the size or checksum check; replace the clip in `sources.yaml` rather than loosening the check.
+
+Adding a clip: look at its frames first, keep only static cameras, and label the scene by eye. For a video file, use the checksum its host publishes (Commons: sha1 from the API; Kitware: sha512). For a zip sequence, set a placeholder checksum, run `uv run python -m vms.datasets pin <clip_id>`, and paste the printed value. Set `source.fps` when the container's frame rate is unreliable (E-006). Bump `version` in `sources.yaml`.
+
+### DVC artifacts
+
 - Large artifacts we produce are tracked with DVC. The default remote is `local`, a gitignored directory `.dvc-storage/` at the repo root (configured in `.dvc/config`). In the cloud, an S3 remote is set in `.dvc/config.local` (not committed).
 - `make data-pull` runs `dvc pull` from the default remote. It is a no-op with a message when no remote is configured, the local remote directory is missing or empty, or nothing is DVC-tracked yet, so a fresh clone works offline.
 - Push new artifacts with `uv run dvc add <path> && uv run dvc push`, then commit the `.dvc` pointer.
@@ -79,6 +102,8 @@ Symptom, cause and fix entries as issues are met.
 - `make up` fails with "port is already allocated" or "address already in use": another process holds a default port. Change the `*_PORT` variable and its URL in `.env` (see Running locally).
 - `make up` reports `dependency failed to start: container vms-<service>-1 is unhealthy`: run `make ps`, then `make logs SERVICE=<service>`. `docker inspect vms-<service>-1 --format '{{json .State.Health}}'` shows the health check output.
 - MLflow fails with a database authentication error after you change `POSTGRES_PASSWORD`: the password was set when the volume was first created. Run `make down-volumes && make up`.
+- `make data` fails with a checksum or size mismatch: the upstream file changed or the download was corrupted. Re-run once (corrupt cached files are re-downloaded). If it persists, the source changed: re-check the clip and re-pin it (see Data).
+- `make data` reports an implausible frame rate for a video file: the container's rate is wrong. Set `source.fps` in `configs/data/sources.yaml` (check it with `ffprobe`).
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.
 
 ## Teardown

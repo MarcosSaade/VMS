@@ -5,6 +5,7 @@ description = "Scalable Video Management System: benchmarked ML systems engineer
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "opencv-python-headless>=5.0.0.93",
     "opentelemetry-api>=1.45.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.45.0",
     "opentelemetry-sdk>=1.45.0",

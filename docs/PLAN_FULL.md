@@ -54,9 +54,9 @@
 **Exit gate:** `make demo` runs end to end on a CPU laptop; integration tests pass; `ARCHITECTURE.md` notes what v0 actually does.
 
 ### 1.1 Datasets
-**Prompt:** Write `scripts/data/download.py` (invoked by `make data`) that fetches public video suitable for virtual cameras, verifies checksums and extracts clips into `data/` (gitignored). Candidates: MOT17/MOT20 sequences and the VIRAT Video Dataset; check current availability and licenses and record them in `RUNBOOK.md` under Data. Produce a clip manifest (YAML) with clip ID, source, duration, resolution, scene type (indoor/outdoor, day/night) and license. Aim for variety so drift scenarios and retrieval queries are possible later.
+**Prompt:** Write a fetcher (`python -m vms.datasets`, invoked by `make data`) that fetches public video suitable for virtual cameras, verifies checksums and extracts clips into `data/` (gitignored). Candidates: MOT17/MOT20 sequences and the VIRAT Video Dataset; check current availability and licenses and record them in `RUNBOOK.md` under Data. Produce a clip manifest (YAML) with clip ID, source, duration, resolution, scene type (indoor/outdoor, day/night) and license. Aim for variety so drift scenarios and retrieval queries are possible later.
 **Done when:** `make data` is reproducible and idempotent; manifest committed; licenses documented.
-**Considerations:** use the same clips for every benchmark. A small `make data-mini` subset keeps CI and laptops fast.
+**Considerations:** use the same clips for every benchmark. A small `make data-mini` subset keeps CI and laptops fast. Done 2026-10-06: sources, checksums and licenses in `configs/data/sources.yaml`, measured manifest in `configs/data/manifest.yaml`; VIRAT is opt-in because its agreement must be signed by each user (D15).
 
 ### 1.2 Loadgen v0
 **Prompt:** Implement `vms.loadgen`: async, N virtual cameras, each looping assigned clips at a configured FPS and resolution, sending JPEG frames with camera ID, timestamp and sequence number to the ingest REST endpoint. Pre-decode and pre-encode frames into memory at startup so the generator stays cheap. Config: cameras, FPS, resolution, JPEG quality, duration, clip assignment, seed. Expose metrics for sent, accepted, rejected and failed frames and send latency. Add a self-test mode that measures the generator's own max rate without a server.
@@ -92,6 +92,7 @@
 ### 1.9 Demo
 **Prompt:** Add `make demo`: start the stack, run loadgen with 4 cameras for a few minutes, then print answers to a few example structured and semantic queries. Add an integration test in CI that runs a shortened version on CPU with tiny models and a fake or tiny LLM (the fake returns canned plans), with no W&B, AWS or DVC remote access.
 **Done when:** `make demo` works on a fresh clone with only Docker and uv installed; the CI integration job runs it.
+**Considerations:** the demo uses `make data-mini` (about 180 MB from motchallenge.net and Wikimedia Commons). Cache `data/` in CI keyed on the hash of `configs/data/sources.yaml`, so CI does not hit those hosts on every run.
 
 ---
 

@@ -78,7 +78,7 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
 ## 4. Components
 
 ### 4.1 loadgen
-- Replays public video clips as N virtual cameras at a fixed FPS, with per-camera clock, sequence numbers and timestamps.
+- Replays public video clips as N virtual cameras at a fixed FPS, with per-camera clock, sequence numbers and timestamps. Clips come from `make data` (`vms.datasets`, D15): normalized JPEG frames at most 720 px high and 30 fps under `data/clips/<id>/`, each with a `clip.json` (fps, size, scene labels, license, content hash). Sources, checksums and licenses are pinned in `configs/data/sources.yaml`; every benchmark uses the same clips.
 - Pre-decodes and pre-encodes frames so the generator is never the bottleneck. Its own max rate is measured and reported.
 - Drift injection with a schedule: darkening (night), blur, noise, camera shift, occlusion, class-mix change (switch clip). Onset times are logged so drift detection can be scored.
 - Reports sent, acknowledged, rejected and dropped frames plus send latency.

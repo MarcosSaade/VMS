@@ -1,0 +1,269 @@
+# Public video sources for virtual cameras (task 1.1). Read by `python -m vms.datasets`
+# (make data, make data-mini); see docs/RUNBOOK.md, Data, for licenses and how to add a clip.
+#
+# Every source is pinned: zip sequences by archive size plus a sha256 over the selected frames
+# (compute with `python -m vms.datasets pin <clip_id>`), video files by the checksum their host
+# publishes. Scene labels were checked by looking at frames, except where a clip says otherwise.
+# Only static cameras are used. Bump `version` when clips change.
+
+version: 1
+
+processing:
+  max_height: 720      # the workload's 720p frames (ARCHITECTURE 2); downscale only
+  max_fps: 30
+  jpeg_quality: 90
+
+licenses:
+  cc-by-nc-sa-3.0:
+    name: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+    url: https://creativecommons.org/licenses/by-nc-sa/3.0/
+    commercial_use: false
+    share_alike: true
+    notes: MOTChallenge data. Cite the benchmark papers; no commercial use.
+  cc-by-sa-4.0:
+    name: Creative Commons Attribution-ShareAlike 4.0
+    url: https://creativecommons.org/licenses/by-sa/4.0/
+    commercial_use: true
+    share_alike: true
+    notes: Wikimedia Commons uploads by their authors. Attribute the author and link the file page.
+  virat:
+    name: VIRAT Video Data Set Protection Agreement
+    url: https://actev.kitware.com/pub/VIRAT-Video-Data-Set-Protection-Agreement-1-4-11.pdf
+    commercial_use: true
+    share_alike: false
+    requires_acceptance: true
+    notes: >-
+      Every person using the data must sign the agreement. No redistribution to anyone who has
+      not; protect personally identifiable information and never try to identify people. A few
+      frames or short clips may be shown in publications and talks.
+
+clips:
+  - id: mot17-02
+    title: MOT17-02, pedestrian square
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT17 (Milan et al., MOT16: A Benchmark for Multi-Object Tracking, arXiv:1603.00831)"
+    page_url: https://motchallenge.net/data/MOT17/
+    scene:
+      description: Pedestrian square between old buildings, camera at eye level.
+      location: outdoor
+      lighting: day
+      viewpoint: eye_level
+      density: moderate
+      objects: [person, bicycle]
+    source: &mot17
+      kind: zip_sequence
+      url: https://motchallenge.net/data/MOT17.zip
+      archive_bytes: 5860214001
+      frames_prefix: MOT17/train/MOT17-02-FRCNN/img1/
+      fps: 30
+      checksum: sha256:011944193c11155c4350092af2245edb719e787a17a56f9de7dc34cc88fb2cb7
+
+  - id: mot17-04
+    title: MOT17-04, pedestrian street at night
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT17 (Milan et al., MOT16: A Benchmark for Multi-Object Tracking, arXiv:1603.00831)"
+    page_url: https://motchallenge.net/data/MOT17/
+    scene:
+      description: Lit pedestrian street at night seen from high above; a parked car and bicycles.
+      location: outdoor
+      lighting: night
+      viewpoint: elevated
+      density: crowded
+      objects: [person, car, bicycle, motorcycle]
+    source:
+      <<: *mot17
+      frames_prefix: MOT17/train/MOT17-04-FRCNN/img1/
+      checksum: sha256:cbfefbaca7c11a0915c5d1df3cfdf2289132e0c345bfb4b1a6c10e84d5de1461
+
+  - id: mot17-08
+    title: MOT17-08, shopping street
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT17 (Milan et al., MOT16: A Benchmark for Multi-Object Tracking, arXiv:1603.00831)"
+    page_url: https://motchallenge.net/data/MOT17/
+    scene:
+      description: Sunny shopping street with storefronts, people walking close to the camera.
+      location: outdoor
+      lighting: day
+      viewpoint: eye_level
+      density: crowded
+      objects: [person, handbag, backpack]
+    source:
+      <<: *mot17
+      frames_prefix: MOT17/test/MOT17-08-FRCNN/img1/
+      checksum: sha256:3c08db1ae95d3496df78d48ab5b46242cc7192276b58ed90a9022d1ad3c8cb1c
+
+  - id: mot17-09
+    title: MOT17-09, store entrance
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT17 (Milan et al., MOT16: A Benchmark for Multi-Object Tracking, arXiv:1603.00831)"
+    page_url: https://motchallenge.net/data/MOT17/
+    scene:
+      description: Shop entrances under an arcade, people walking in and out.
+      location: outdoor
+      lighting: day
+      viewpoint: eye_level
+      density: sparse
+      objects: [person]
+    source:
+      <<: *mot17
+      frames_prefix: MOT17/train/MOT17-09-FRCNN/img1/
+      checksum: sha256:1ce850e07bdf8235fde39665b365c8a1f40d5a3a7671b26cb547068f83261dcb
+
+  - id: mot20-01
+    title: MOT20-01, train station hall
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT20 (Dendorfer et al., MOT20: A benchmark for multi object tracking in crowded scenes, arXiv:2003.09003)"
+    page_url: https://motchallenge.net/data/MOT20/
+    scene:
+      description: Indoor station concourse from an elevated camera, steady flow of people.
+      location: indoor
+      lighting: day
+      viewpoint: elevated
+      density: moderate
+      objects: [person]
+    source: &mot20
+      kind: zip_sequence
+      url: https://motchallenge.net/data/MOT20.zip
+      archive_bytes: 5028926248
+      frames_prefix: MOT20/train/MOT20-01/img1/
+      fps: 25
+      checksum: sha256:ace4c727dca4bede44a2143bb83c3d2d67f5dbf3e6917c669b594bf1d77215bb
+
+  - id: mot20-03
+    title: MOT20-03, crowded plaza at night (first 30 s)
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT20 (Dendorfer et al., MOT20: A benchmark for multi object tracking in crowded scenes, arXiv:2003.09003)"
+    page_url: https://motchallenge.net/data/MOT20/
+    scene:
+      description: Lit plaza at night from high above, dense crowd.
+      location: outdoor
+      lighting: night
+      viewpoint: elevated
+      density: crowded
+      objects: [person]
+    source:
+      <<: *mot20
+      frames_prefix: MOT20/train/MOT20-03/img1/
+      last_frame: 750
+      checksum: sha256:3a95aea6b9b0743a59bff3c136959a4aa2f064de2616d7f85b0d02c076a79fd3
+
+  - id: commons-roncesvalles
+    title: Roncesvalles Ave pedestrian crossing, Toronto
+    license: cc-by-sa-4.0
+    attribution: "Qviri, Roncesvalles Ave crossing at Galley Ave, PXO Type A lights flashing (2026), Wikimedia Commons, CC BY-SA 4.0"
+    page_url: https://commons.wikimedia.org/wiki/File:Roncesvalles_Ave_crossing_at_Galley_Ave,_PXO_Type_A_lights_flashing,_July_2026.webm
+    scene:
+      description: Street with streetcar tracks under an overcast sky; parked and passing cars, a van, people crossing.
+      location: outdoor
+      lighting: overcast
+      viewpoint: eye_level
+      density: sparse
+      objects: [car, truck, person, traffic light]
+    source:
+      kind: video_file
+      url: https://upload.wikimedia.org/wikipedia/commons/0/06/Roncesvalles_Ave_crossing_at_Galley_Ave%2C_PXO_Type_A_lights_flashing%2C_July_2026.webm
+      file_bytes: 5756718
+      checksum: sha1:2009bed6af30931051b70eaa981e268397b00cb9
+      duration_s: 10  # handheld; the framing starts to drift after about 10.6 s
+
+  # Short trims for make data-mini (CI and laptops): one day, one night, one with vehicles.
+  - id: mot17-09-mini
+    title: MOT17-09, store entrance (first 10 s)
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT17 (Milan et al., MOT16: A Benchmark for Multi-Object Tracking, arXiv:1603.00831)"
+    page_url: https://motchallenge.net/data/MOT17/
+    scene:
+      description: Shop entrances under an arcade, people walking in and out.
+      location: outdoor
+      lighting: day
+      viewpoint: eye_level
+      density: sparse
+      objects: [person]
+    source:
+      <<: *mot17
+      frames_prefix: MOT17/train/MOT17-09-FRCNN/img1/
+      last_frame: 300
+      checksum: sha256:cc31597503bdec2509de9810fa857f06d09ded2910139e0937ec538de12300f5
+
+  - id: mot17-04-mini
+    title: MOT17-04, pedestrian street at night (first 10 s)
+    license: cc-by-nc-sa-3.0
+    attribution: "MOT17 (Milan et al., MOT16: A Benchmark for Multi-Object Tracking, arXiv:1603.00831)"
+    page_url: https://motchallenge.net/data/MOT17/
+    scene:
+      description: Lit pedestrian street at night seen from high above; a parked car and bicycles.
+      location: outdoor
+      lighting: night
+      viewpoint: elevated
+      density: crowded
+      objects: [person, car, bicycle, motorcycle]
+    source:
+      <<: *mot17
+      frames_prefix: MOT17/train/MOT17-04-FRCNN/img1/
+      last_frame: 300
+      checksum: sha256:f8b97d249baed632acb5c564048000acb471ff1b8bb5c9a2baddc9ef207b5615
+
+  - id: virat-000201
+    title: VIRAT ground video VIRAT_S_000201_03_000640_000672
+    license: virat
+    attribution: "VIRAT Video Dataset Release 2.0 (Oh et al., CVPR 2011), Kitware"
+    page_url: https://viratdata.org/
+    scene:
+      description: >-
+        Stationary elevated camera over an outdoor parking lot or street (labels from the dataset
+        documentation; not checked by eye because the agreement must be accepted first).
+      location: outdoor
+      lighting: day
+      viewpoint: elevated
+      density: sparse
+      objects: [person, car]
+    source:
+      kind: video_file
+      url: https://data.kitware.com/api/v1/item/56f585f08d777f753209ca77/download
+      file_bytes: 32878685
+      checksum: sha512:ff45495c6772c3fb0e4c6e5f9fba027a11d4b96dae4e1cde6e5e18c851217fbb7d7bb974ce53ec0d2f8a061ec53571d1cf2f8b5674e5d675bd2c77a432630239
+
+  - id: virat-040000
+    title: VIRAT ground video VIRAT_S_040000_00_000063_000085
+    license: virat
+    attribution: "VIRAT Video Dataset Release 2.0 (Oh et al., CVPR 2011), Kitware"
+    page_url: https://viratdata.org/
+    scene:
+      description: >-
+        Stationary elevated camera over an outdoor parking lot or street (labels from the dataset
+        documentation; not checked by eye because the agreement must be accepted first).
+      location: outdoor
+      lighting: day
+      viewpoint: elevated
+      density: sparse
+      objects: [person, car]
+    source:
+      kind: video_file
+      url: https://data.kitware.com/api/v1/item/56f5882c8d777f753209cced/download
+      file_bytes: 49063526
+      checksum: sha512:ac757ef6261a24172ce94eedc9f540fccca66d8bb57cc92f4ba68e39ddf41deb461f8a449b5a90588dc953b4b0839a8a6cdb61d56aa7f8c2a4fa7617a30e3a95
+
+  - id: virat-050000
+    title: VIRAT ground video VIRAT_S_050000_12_001591_001619
+    license: virat
+    attribution: "VIRAT Video Dataset Release 2.0 (Oh et al., CVPR 2011), Kitware"
+    page_url: https://viratdata.org/
+    scene:
+      description: >-
+        Stationary elevated camera over an outdoor parking lot or street (labels from the dataset
+        documentation; not checked by eye because the agreement must be accepted first).
+      location: outdoor
+      lighting: day
+      viewpoint: elevated
+      density: sparse
+      objects: [person, car]
+    source:
+      kind: video_file
+      url: https://data.kitware.com/api/v1/item/56f58e7c8d777f753209cd93/download
+      file_bytes: 36628890
+      checksum: sha512:b294b8beac9b82e3f9d5ac661b306501465e9e7edc5ff7d2d64a5d73d43d5b62975019f93999d8d3405cbc17221412605b884f7e4679d7c2698b503c4bdafd6d
+
+subsets:
+  full: [mot17-02, mot17-04, mot17-08, mot17-09, mot20-01, mot20-03, commons-roncesvalles,
+         virat-000201, virat-040000, virat-050000]
+  mini: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]

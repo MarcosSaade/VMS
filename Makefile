@@ -84,13 +84,17 @@ demo: ## End-to-end CPU demo on the mini dataset
 
 # --- Data ----------------------------------------------------------------------
 
+# Clips whose license must be accepted first are skipped unless named: make data ACCEPT=virat
+ACCEPT ?=
+DATA_ACCEPT := $(foreach id,$(ACCEPT),--accept-license $(id))
+
 .PHONY: data
-data: ## Download public datasets and weights (checksummed)
-	$(call not_yet,1.1)
+data: ## Fetch, verify and normalize all video clips into data/ (ACCEPT=virat for opt-in clips)
+	$(RUN) python -m vms.datasets fetch --subset full $(DATA_ACCEPT)
 
 .PHONY: data-mini
-data-mini: ## Download the small demo dataset
-	$(call not_yet,1.1)
+data-mini: ## Fetch the small clip subset for CI and laptops (~3 clips)
+	$(RUN) python -m vms.datasets fetch --subset mini
 
 .PHONY: data-pull
 data-pull: ## dvc pull from the default remote (no-op if missing or empty)
