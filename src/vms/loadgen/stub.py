@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import multiprocessing
 import random
+import signal
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -118,6 +119,13 @@ def serve(settings: LoadgenSettings) -> None:
     ]
     for proc in procs:
         proc.start()
+
+    def _terminate(signum: int, frame: object) -> None:
+        raise KeyboardInterrupt
+
+    # Daemon children are only reaped on a normal exit; without this, SIGTERM to the parent
+    # would leave the workers holding the port.
+    signal.signal(signal.SIGTERM, _terminate)
     try:
         for proc in procs:
             proc.join()
@@ -126,4 +134,5 @@ def serve(settings: LoadgenSettings) -> None:
     finally:
         for proc in procs:
             proc.terminate()
+        for proc in procs:
             proc.join()

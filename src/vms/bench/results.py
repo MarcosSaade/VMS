@@ -69,7 +69,8 @@ def _run(cmd: list[str], cwd: Path | None = None) -> str | None:
 
 def git_info(repo: Path | None = None) -> GitInfo:
     sha = _run(["git", "rev-parse", "HEAD"], repo)
-    status = _run(["git", "status", "--porcelain"], repo)
+    # Untracked files (results JSON from earlier runs, local data) do not change what ran.
+    status = _run(["git", "status", "--porcelain", "--untracked-files=no"], repo)
     return GitInfo(sha=sha, dirty=None if status is None else bool(status))
 
 

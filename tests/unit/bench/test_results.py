@@ -1,3 +1,4 @@
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -43,3 +44,24 @@ def test_write_result_names_and_round_trips(tmp_path: Path) -> None:
     path = write_result(tmp_path / "results", result)
     assert path.name == "2026-10-09-loadgen-selftest-01ABC.json"
     assert RunResult.model_validate_json(path.read_text()) == result
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_untracked_files_do_not_make_the_tree_dirty(tmp_path: Path) -> None:
+    """Results files from earlier runs are untracked; they must not mark later runs dirty."""
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "code.py").write_text("x = 1\n")
+    _git(tmp_path, "add", "code.py")
+    _git(tmp_path, "commit", "-qm", "init")
+    (tmp_path / "result.json").write_text("{}")
+    assert git_info(tmp_path).dirty is False
+    (tmp_path / "code.py").write_text("x = 2\n")
+    assert git_info(tmp_path).dirty is True

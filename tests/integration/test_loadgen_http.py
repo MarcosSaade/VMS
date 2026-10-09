@@ -9,8 +9,13 @@ no compose stack, only a free loopback port.
 from __future__ import annotations
 
 import asyncio
+import os
 import random
+import signal
 import socket
+import subprocess
+import sys
+import urllib.request
 from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from typing import Any
@@ -19,6 +24,7 @@ import aiohttp
 import pytest
 from aiohttp import web
 
+from tests.integration.conftest import poll
 from vms.common.clock import SystemClock
 from vms.common.ingest_api import FRAMES_PATH
 from vms.common.metrics import Metrics
@@ -148,3 +154,27 @@ def test_paced_run_against_the_stub() -> None:
         assert received(metrics, "accepted") == 30
 
     run(main)
+
+
+def test_sigterm_stops_every_stub_worker() -> None:
+    """Regression: SIGTERM to a multi-worker stub used to orphan its workers on the port."""
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    env = {**os.environ, "VMS_TELEMETRY__ENABLED": "false"}
+    cmd = [sys.executable, "-m", "vms.loadgen", "stub", "--workers", "2", "--port", str(port)]
+    proc = subprocess.Popen(cmd, env=env, stderr=subprocess.DEVNULL)
+    try:
+        poll(
+            lambda: urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=1),
+            timeout_s=20,
+        )
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        assert proc.wait(timeout=10) is not None
+    with socket.socket() as s:
+        # SO_REUSEADDR tolerates the health check's TIME_WAIT connection, but on Linux bind
+        # still fails with EADDRINUSE while any socket is listening on the port.
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(("127.0.0.1", port))
+        s.listen()
