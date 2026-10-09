@@ -85,6 +85,7 @@ The diagram shows the target design; the current scope (top of this file) builds
 - Pre-decodes and pre-encodes frames so the generator is never the bottleneck. Its own max rate is measured and reported.
 - Drift injection with a schedule: darkening (night), blur, noise, camera shift, occlusion, class-mix change (switch clip). Onset times are logged so drift detection can be scored.
 - Reports sent, acknowledged, rejected and dropped frames plus send latency.
+- **v0 (task 1.2, `vms.loadgen`, D17):** async, one event loop. Frames of the assigned clips are resized to 1280x720 and re-encoded at quality 85 once at startup and shared by all cameras playing a clip. Each camera has a seeded start frame and a seeded phase in [0, 1/fps), so sends spread over the frame interval, and it steps through its clip in real time (clip_fps/fps frames per send, looping). Pacing is open loop: frame k is due at `phase + k/fps` whatever the server does, and a frame due while the camera has `max_in_flight_per_camera` sends outstanding is dropped and counted. Schedule lag (send start minus due time) is the generator's health signal; a run whose lag p99 exceeds `max_schedule_lag_p99_ms` is flagged `generator_ok: false`. `unpaced` mode (closed loop, as fast as the in-flight limit allows) and `selftest` (unpaced, `NullTransport`, no I/O) measure the generator's maximum rate. Transport is a multipart POST per frame (`vms.common.ingest_api`) over pooled keep-alive connections, with optional bounded retries (full jitter; never on 429/503). Metrics `vms_loadgen_{sent,accepted,rejected,dropped}_frames_total`, `vms_loadgen_failed_frames_total{reason}`, `vms_loadgen_send_duration_seconds`, `vms_loadgen_schedule_lag_seconds`, `vms_loadgen_in_flight_requests` on `:9105/metrics`; 1% of frames start a trace (`traceparent` header). Each run writes a results JSON (`vms.bench.results`) with per-repetition steady-state numbers and an aggregate. Drift injection is not built yet (task 9.2). A stub ingest (`python -m vms.loadgen stub`) implements the same contract without storage.
 
 ### 4.2 ingest-gateway
 - Phase 1: REST multipart. Phase 6: gRPC client streaming **(decided by benchmark, D4)**. The public REST API is unaffected.
@@ -256,6 +257,7 @@ Public (REST):
 
 | Endpoint | Purpose |
 |---|---|
+| `POST /v1/frames` | Ingest one frame: multipart `camera_id`, `run_id`, `seq`, `ts_unix_ms`, `jpeg`. 2xx accepted (duplicates included), 429/503 shed, anything else failed (`vms.common.ingest_api`) |
 | `POST /v1/query` | Structured natural-language query, SSE stream |
 | `POST /v1/search/semantic` | CLIP search with optional filters |
 | `POST /v1/search/hybrid` | Hybrid search |

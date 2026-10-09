@@ -1,0 +1,45 @@
+from datetime import UTC, datetime
+from pathlib import Path
+
+from vms.bench.results import (
+    GitInfo,
+    Hardware,
+    RunResult,
+    git_info,
+    hardware,
+    package_versions,
+    write_result,
+)
+
+
+def test_git_info_outside_a_repo(tmp_path: Path) -> None:
+    assert git_info(tmp_path) == GitInfo(sha=None, dirty=None)
+
+
+def test_hardware_and_packages_are_described() -> None:
+    hw = hardware()
+    assert hw.cpu
+    assert hw.logical_cpus is None or hw.logical_cpus >= 1
+    versions = package_versions(("pydantic", "surely-not-installed-pkg"))
+    assert versions["python"].startswith("3.12")
+    assert versions["pydantic"]
+    assert versions["surely-not-installed-pkg"] is None
+
+
+def test_write_result_names_and_round_trips(tmp_path: Path) -> None:
+    result = RunResult(
+        run_id="01ABC",
+        name="loadgen-selftest",
+        kind="loadgen.selftest",
+        started_at=datetime(2026, 10, 9, 12, tzinfo=UTC),
+        ended_at=datetime(2026, 10, 9, 12, 1, tzinfo=UTC),
+        seed=1234,
+        git=GitInfo(sha="abc", dirty=False),
+        hardware=Hardware(cpu="cpu", logical_cpus=4, ram_bytes=1, platform="linux"),
+        packages={"python": "3.12"},
+        config={"cameras": 1},
+        metrics={"sent_fps": 1.0},
+    )
+    path = write_result(tmp_path / "results", result)
+    assert path.name == "2026-10-09-loadgen-selftest-01ABC.json"
+    assert RunResult.model_validate_json(path.read_text()) == result

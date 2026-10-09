@@ -1,0 +1,11 @@
+name: loadgen-selftest
+description: >
+  The generator's own maximum rate with no I/O (NullTransport): scheduling, bookkeeping,
+  metrics and tracing per frame, all cameras unpaced on one event loop. An upper bound; the
+  HTTP client cost is measured by loadgen-stub-max.
+kind: selftest
+repeats: 3
+config:
+  cameras: 20
+  duration_s: 15
+  warmup_s: 3

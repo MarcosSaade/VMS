@@ -100,6 +100,23 @@ data-mini: ## Fetch the small clip subset for CI and laptops (~3 clips)
 data-pull: ## dvc pull from the default remote (no-op if missing or empty)
 	@scripts/data_pull.sh
 
+# --- Load generation ------------------------------------------------------------
+
+SCENARIO ?=
+STUB_WORKERS ?= 1
+
+.PHONY: loadgen
+loadgen: ## Virtual cameras against ingest (SCENARIO=bench/scenarios/<name>.yaml)
+	$(RUN) python -m vms.loadgen run $(if $(SCENARIO),--scenario $(SCENARIO))
+
+.PHONY: loadgen-selftest
+loadgen-selftest: ## Measure the load generator's own max rate (no server)
+	$(RUN) python -m vms.loadgen selftest --scenario bench/scenarios/loadgen-selftest.yaml
+
+.PHONY: loadgen-stub
+loadgen-stub: ## Stub ingest server for loadgen tests (STUB_WORKERS=n processes)
+	$(RUN) python -m vms.loadgen stub --workers $(STUB_WORKERS)
+
 # --- Benchmarks and evaluation -------------------------------------------------
 
 .PHONY: bench

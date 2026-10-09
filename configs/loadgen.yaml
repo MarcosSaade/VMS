@@ -1,0 +1,43 @@
+# Load generator (vms.loadgen). Overrides configs/common.yaml; a scenario's `config:` overrides
+# this file, and VMS_* environment variables override both files (e.g. VMS_CAMERAS=50).
+
+target_url: http://127.0.0.1:8080   # ingest REST base URL; the stub listens here too
+mode: paced                          # paced (fixed FPS, open loop) | unpaced (max rate)
+cameras: 20
+fps: 5.0                             # the workload's analysis rate (ARCHITECTURE 2)
+duration_s: 60
+warmup_s: 5                          # excluded from the summary
+max_schedule_lag_p99_ms: 10          # above this, the run is flagged generator_ok: false
+camera_prefix: cam-
+
+frame:                               # the workload's frames: 1280x720 JPEG, quality 85
+  width: 1280
+  height: 720
+  jpeg_quality: 85
+
+clips:
+  data_dir: data
+  ids: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]   # the make data-mini subset
+  assignment: round_robin
+  max_frames: null
+
+http:
+  request_timeout_s: 5.0
+  connect_timeout_s: 2.0
+  max_in_flight_per_camera: 4
+  max_retries: 0                     # live frames are not retried by default
+  retry_base_s: 0.05
+  retry_max_s: 1.0
+
+stub:
+  host: 127.0.0.1
+  port: 8080
+  latency_ms: 0
+  reject_ratio: 0.0
+  workers: 1                         # processes sharing the port; >1 for max-rate runs
+
+metrics_port: 9105                   # Prometheus /metrics while running; null disables
+results_dir: bench/results
+
+telemetry:
+  sample_ratio: 0.01                 # 1% of frames start a trace; ingest and worker follow it

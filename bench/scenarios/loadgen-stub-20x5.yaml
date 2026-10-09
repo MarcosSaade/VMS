@@ -1,0 +1,13 @@
+name: loadgen-stub-20x5
+description: >
+  Task 1.2 done criterion: 20 cameras at 5 FPS (100 frames/s, 1280x720 JPEG q85) run stably
+  against the stub ingest server (`make loadgen-stub`). Stable means every frame accepted, none
+  dropped, and schedule lag p99 within max_schedule_lag_p99_ms.
+kind: run
+repeats: 3
+config:
+  mode: paced
+  cameras: 20
+  fps: 5.0
+  duration_s: 60
+  warmup_s: 5

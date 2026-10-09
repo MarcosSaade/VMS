@@ -77,6 +77,23 @@ Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); eve
 - Credentials and database names are applied when a volume is first created. After changing `POSTGRES_*` or `S3_*` credentials, run `make down-volumes && make up`, which deletes all stack data.
 - Images are pinned by tag in the compose file. Tempo and the collector get a static busybox `wget` for health checks, because their images have no shell.
 
+### Load generator
+
+`vms.loadgen` replays clips from `make data-mini` (or `make data`) as virtual cameras. Settings are in `configs/loadgen.yaml`; a scenario in `bench/scenarios/` overrides them, and command-line flags override the scenario.
+
+```bash
+make loadgen-stub                       # stub ingest on 127.0.0.1:8080 (STUB_WORKERS=6 for max-rate runs)
+make loadgen                            # 20 cameras x 5 FPS for 60 s against target_url
+make loadgen SCENARIO=bench/scenarios/loadgen-stub-20x5.yaml
+make loadgen-selftest                   # the generator's own max rate, no server
+uv run python -m vms.loadgen run --cameras 50 --fps 5 --duration 120 --target-url http://127.0.0.1:8080
+```
+
+- Results: one JSON per invocation in `bench/results/` (per repetition: sent/accepted/rejected/failed/dropped frames, send latency and schedule lag p50/p95/p99, CPU per frame, `generator_ok`).
+- Live metrics on `http://localhost:9105/metrics` while a run is going (`metrics_port`). Prometheus in the stack does not scrape it yet (task 2.1).
+- Trust check before reading any number: `generator_ok` must be true (schedule lag p99 within `max_schedule_lag_p99_ms`) and `cpu.utilization_cores` well below 1.0. Near 1.0 the single event loop is saturated and the offered load is lower than configured. The measured ceiling is in E-010.
+- Ctrl-C stops scheduling, waits for in-flight sends and writes partial results.
+
 ## Benchmarks
 
 _Placeholder (task 2.3)._ Writing a scenario in `bench/scenarios/`, running it with `make bench`, where results land, and how to promote a number to `docs/BENCHMARKS.md`.
@@ -102,6 +119,8 @@ Symptom, cause and fix entries as issues are met.
 - Old `vms-redis-1` or `vms-mlflow-1` containers after pulling task 0.7: `make up` removes them (`--remove-orphans`); `make down-volumes` also drops their old volumes.
 - `make data` fails with a checksum or size mismatch: the upstream file changed or the download was corrupted. Re-run once (corrupt cached files are re-downloaded). If it persists, the source changed: re-check the clip and re-pin it (see Data).
 - `make data` reports an implausible frame rate for a video file: the container's rate is wrong. Set `source.fps` in `configs/data/sources.yaml` (check it with `ffprobe`).
+- `make loadgen` reports every frame failed with reason `connection`: nothing listens on `target_url`. Start the ingest service or `make loadgen-stub`.
+- `make loadgen` logs "generator fell behind its schedule": the host or the generator is saturated, so the run offered less load than configured. Reduce cameras, close other load on the machine, or run several loadgen processes with different `camera_prefix` values.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.
 
 ## Teardown

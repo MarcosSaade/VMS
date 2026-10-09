@@ -1,0 +1,12 @@
+name: loadgen-stub-max
+description: >
+  The generator's maximum rate over real HTTP (multipart POST to the stub over loopback),
+  unpaced. Run the stub in its own process with enough workers that it is not the limit:
+  `make loadgen-stub STUB_WORKERS=6`. The generator is the bottleneck when its CPU is ~1 core.
+kind: run
+repeats: 3
+config:
+  mode: unpaced
+  cameras: 20
+  duration_s: 20
+  warmup_s: 3
