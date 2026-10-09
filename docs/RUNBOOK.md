@@ -77,6 +77,20 @@ Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); eve
 - Credentials and database names are applied when a volume is first created. After changing `POSTGRES_*` or `S3_*` credentials, run `make down-volumes && make up`, which deletes all stack data.
 - Images are pinned by tag in the compose file. Tempo and the collector get a static busybox `wget` for health checks, because their images have no shell.
 
+### Ingest service and migrations
+
+```bash
+make up            # also applies migrations (make migrate = alembic upgrade head)
+make ingest        # ingest on http://127.0.0.1:8080 (configs/ingest.yaml; VMS_HTTP__PORT to change)
+make loadgen       # 20 cameras x 5 FPS into it
+curl -s localhost:8080/readyz   # {"postgres":"ok","object_store":"ok"}
+```
+
+- Connection settings come from `POSTGRES_*` and `S3_*` in `.env` (`vms.storage.config`); tuning (pool sizes, timeouts, limits) from `configs/ingest.yaml`.
+- Migrations live in `src/vms/storage/migrations/versions/` as hand-written SQL. `uv run alembic current` shows the applied revision, `uv run alembic downgrade -1` rolls one back, `uv run alembic revision -m "..."` starts a new one.
+- What ingest stored: `frames` rows (status `pending` until the worker claims them, task 1.5) and objects under `frames/{camera_id}/{yyyy-mm-dd}/` in the `S3_BUCKET` bucket.
+- Integration tests create and drop a throwaway database (`vms_it_*`) per test and delete the objects they wrote, so they do not touch dev data.
+
 ### Load generator
 
 `vms.loadgen` replays clips from `make data-mini` (or `make data`) as virtual cameras. Settings are in `configs/loadgen.yaml`; a scenario in `bench/scenarios/` overrides them, and command-line flags override the scenario.
@@ -119,6 +133,9 @@ Symptom, cause and fix entries as issues are met.
 - Old `vms-redis-1` or `vms-mlflow-1` containers after pulling task 0.7: `make up` removes them (`--remove-orphans`); `make down-volumes` also drops their old volumes.
 - `make data` fails with a checksum or size mismatch: the upstream file changed or the download was corrupted. Re-run once (corrupt cached files are re-downloaded). If it persists, the source changed: re-check the clip and re-pin it (see Data).
 - `make data` reports an implausible frame rate for a video file: the container's rate is wrong. Set `source.fps` in `configs/data/sources.yaml` (check it with `ffprobe`).
+- `make ingest` starts but `/readyz` returns 503: the named dependency is down or misconfigured. Check `make ps`, then the `POSTGRES_*` / `S3_*` values in `.env` (they must match what the stack was created with).
+- Ingest answers 500 `database_unavailable` with `relation "frames" does not exist`: migrations were not applied. Run `make migrate`.
+- `vms_ingest_orphaned_objects_total` above 0: an object was written but neither recorded nor removed (database and store both failed for that frame). Harmless for correctness; the objects under `frames/` that have no `frames` row can be deleted.
 - `make loadgen` reports every frame failed with reason `connection`: nothing listens on `target_url`. Start the ingest service or `make loadgen-stub`.
 - `make loadgen` logs "generator fell behind its schedule": the host or the generator is saturated, so the run offered less load than configured. Reduce cameras, close other load on the machine, or run several loadgen processes with different `camera_prefix` values.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.

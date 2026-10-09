@@ -58,9 +58,14 @@ check: lint typecheck test ## Lint + typecheck + unit tests
 # --- Local stack ---------------------------------------------------------------
 
 .PHONY: up
-up: ## Start the compose stack and wait until healthy (PROFILES=cpu|gpu)
+up: ## Start the compose stack, wait until healthy, apply migrations (PROFILES=cpu|gpu)
 	$(COMPOSE) up -d --build --remove-orphans --wait --wait-timeout $(STACK_WAIT_TIMEOUT)
+	@$(MAKE) --no-print-directory migrate
 	@scripts/stack_urls.sh $(ENV_FILE)
+
+.PHONY: migrate
+migrate: ## Apply database migrations (alembic upgrade head; POSTGRES_* from .env)
+	$(RUN) alembic upgrade head
 
 .PHONY: down
 down: ## Stop the compose stack (keeps data volumes)
@@ -99,6 +104,12 @@ data-mini: ## Fetch the small clip subset for CI and laptops (~3 clips)
 .PHONY: data-pull
 data-pull: ## dvc pull from the default remote (no-op if missing or empty)
 	@scripts/data_pull.sh
+
+# --- Services -------------------------------------------------------------------
+
+.PHONY: ingest
+ingest: ## Run the ingest service on the host (needs make up)
+	$(RUN) python -m vms.ingest
 
 # --- Load generation ------------------------------------------------------------
 

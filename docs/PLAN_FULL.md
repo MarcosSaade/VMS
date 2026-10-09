@@ -87,11 +87,13 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 **Prompt:** Implement `vms.ingest` as a FastAPI service: accept multipart frames, write the JPEG to the object store (SeaweedFS locally, S3 in the cloud; D12) at `frames/{camera_id}/{date}/{frame_id}.jpg`, insert a `frames` row with status `pending`. Idempotency on `(camera_id, run_id, seq)` or `frame_id`. Health, readiness and metrics endpoints.
 **Done when:** integration test sends frames and finds objects and rows; duplicate sends create no duplicates.
+**Considerations:** Done 2026-10-09 (D18). Object first, then the row with `ON CONFLICT` on `(camera_id, run_id, seq)`; duplicates and races return the original `frame_id`; a failed insert deletes the object. The `frames` table and Alembic were set up here because ingest needs them; 1.4 adds the rest of the schema on top of migration 0001. Multipart parsing is kept as the baseline; whether a raw-body upload is worth it is measured in 2.6 (E-010 hints the multipart parser is costly).
 
 ### 1.4 Schema v1
 
 **Status:** shrunk (2026-10-06 re-scope).
 **Prompt:** Implement the logical schema from `ARCHITECTURE.md` section 4.6 in Postgres with Alembic migrations: cameras (with IANA timezones), zones (polygons), frames, detections, tracks, events and query_log. No `embeddings` table (CLIP is deferred). Load cameras and zones from YAML config, naming them to match the few-shot bank (entrance, checkout, parking_lot, loading_dock) or updating the bank. Create a read-only role for the query service. Keep indexes simple (this is the baseline), and keep the validator allowlist in `configs/query.yaml` in step with the migrations.
+**Note:** Alembic and migration 0001 (`frames`) already exist from 1.3, with a `fresh_db` integration fixture; add the other tables as new revisions.
 **Done when:** `alembic upgrade head` and downgrade work on a fresh DB; repository layer has tests; the few-shot SQL integration test runs against the migrated schema instead of temporary tables.
 
 ### 1.5 Worker v0

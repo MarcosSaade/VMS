@@ -1,0 +1,28 @@
+# Ingest service (vms.ingest). Overrides configs/common.yaml; VMS_* environment variables
+# override this file (e.g. VMS_HTTP__PORT=8081). Database and object-store connection settings
+# come from POSTGRES_* and S3_* in .env.
+
+http:
+  host: 127.0.0.1
+  port: 8080                   # loadgen's default target_url
+  graceful_shutdown_s: 10
+
+limits:
+  max_jpeg_bytes: 4194304      # 4 MiB; a 1280x720 q85 frame is ~165 KB
+  max_future_skew_s: 300
+
+db:                            # psycopg async pool
+  min_size: 1
+  max_size: 10
+  connect_timeout_s: 5
+  acquire_timeout_s: 2
+  statement_timeout_ms: 2000
+
+objects:                       # boto3 in a bounded thread pool
+  max_concurrency: 16
+  connect_timeout_s: 2
+  read_timeout_s: 5
+  max_attempts: 3              # incl. the first try; standard mode, backoff with jitter
+
+telemetry:
+  sample_ratio: 0.01           # root spans only; frames traced by loadgen are always followed

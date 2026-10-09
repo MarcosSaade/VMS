@@ -6,7 +6,7 @@
 
 **Checkpoint C1 (end of this plan).** Every task below is ticked: the system runs end to end on CPU with a UI and dashboards; it has a measured baseline with a bottleneck analysis; structured-query and detection quality are evaluated with bootstrap confidence intervals; a precision ladder shows accuracy against latency; drift detection is scored on delay against false-alarm rate; and the README and write-up present it all. At C1, stop and decide whether to continue at all. Deferred work comes back only through the scope-lock rule.
 
-**Estimate.** 30 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). The biggest schedule risk is the GPU spot quota (request pending since 2026-10-04): Phase 5 and 9.5 need a GPU, and both have a CPU fallback in `PLAN_FULL.md`.
+**Estimate.** 29 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). The biggest schedule risk is the GPU spot quota (request pending since 2026-10-04): Phase 5 and 9.5 need a GPU, and both have a CPU fallback in `PLAN_FULL.md`.
 
 **Order of work.** Phase 1, then 2.1 to 2.3, then Phase 3, then 2.4 to 2.6 (first GPU session), then Phase 5, then Phase 9, then Phase 11. Phase numbers are kept for stable IDs, so this order differs from the numbering.
 
@@ -33,7 +33,7 @@
   - Understand it: how is each clip pinned, and why is VIRAT opt-in?
 - [x] 1.2 Loadgen v0: N virtual cameras at fixed FPS over REST
   - Understand it: how do you know the load generator is not the bottleneck?
-- [ ] 1.3 Ingest v0: REST, JPEG to object store, frame rows to Postgres, idempotent on `(camera_id, run_id, seq)` (D17)
+- [x] 1.3 Ingest v0: REST, JPEG to object store, frame rows to Postgres, idempotent on `(camera_id, run_id, seq)` (D17)
   - Understand it: what happens when the same frame is sent twice, or the object store write succeeds but the DB insert fails?
 - [ ] 1.4 Schema v1 and migrations (SHRINK: no `embeddings` table)
   - Understand it: why are detections and events append-only while tracks are updated, and what does the read-only role prevent?

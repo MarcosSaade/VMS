@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-_ISOLATED_PREFIXES = ("VMS_", "OTEL_")
+_ISOLATED_PREFIXES = ("VMS_", "OTEL_", "POSTGRES_", "S3_", "AWS_")
 
 
 @pytest.fixture(autouse=True)

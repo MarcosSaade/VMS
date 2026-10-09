@@ -11,16 +11,14 @@ import urllib.request
 import uuid
 from typing import Any
 
-import boto3
 import psycopg
 import pytest
-from botocore.config import Config
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
-from tests.integration.conftest import HTTP_TIMEOUT_S, StackSettings, get_json, poll
+from tests.integration.conftest import StackSettings, get_json, poll
 
 pytestmark = pytest.mark.integration
 
@@ -31,18 +29,6 @@ def test_postgres_has_pgvector(stack: StackSettings) -> None:
             "SELECT 1 FROM pg_available_extensions WHERE name = 'vector'"
         ).fetchone()
     assert available is not None, "pgvector extension is not installable"
-
-
-@pytest.fixture
-def s3(stack: StackSettings) -> Any:
-    return boto3.client(
-        "s3",
-        endpoint_url=stack.s3_endpoint_url,
-        aws_access_key_id=stack.s3_access_key_id,
-        aws_secret_access_key=stack.s3_secret_access_key,
-        region_name="us-east-1",  # signing Region for the local endpoint only
-        config=Config(connect_timeout=HTTP_TIMEOUT_S, read_timeout=HTTP_TIMEOUT_S),
-    )
 
 
 def test_object_store_buckets_and_round_trip(stack: StackSettings, s3: Any) -> None:

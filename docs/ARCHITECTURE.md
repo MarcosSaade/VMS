@@ -92,6 +92,7 @@ The diagram shows the target design; the current scope (top of this file) builds
 - Writes the JPEG to the object store (`frames/{camera_id}/{yyyy-mm-dd}/{frame_id}.jpg`), records frame metadata, and publishes a small message (frame ref) to the queue.
 - `frame_id` is a ULID (time sortable, unique). Writes are idempotent on `frame_id`.
 - Backpressure: when queue lag exceeds a threshold, reject with `RESOURCE_EXHAUSTED` (or HTTP 429). Load shedding policy is configurable and measured.
+- **v0 (task 1.3, `vms.ingest`, D18):** FastAPI on uvicorn, one process, run on the host (`make ingest`). `POST /v1/frames` (contract in `vms.common.ingest_api`) validates the form (safe-character `camera_id`/`run_id`, JPEG magic bytes, size cap enforced from a required Content-Length before parsing, capture time at most 5 min in the future), then writes the object at `frames/{camera_id}/{yyyy-mm-dd}/{frame_id}.jpg` (capture date, UTC) and only then inserts the `frames` row with status `pending`, `ON CONFLICT (camera_id, run_id, seq) DO NOTHING`. 201 for a new frame; 200 with the original `frame_id` and `duplicate: true` for a repeat, whose freshly written object is deleted; 500 when the store or database fails, after deleting the object (a failed delete is counted in `vms_ingest_orphaned_objects_total`). A row never points at a missing object. Postgres through a psycopg async pool (statement timeout 2 s, acquire timeout 2 s); the object store through boto3 in a 16-thread pool (connect 2 s, read 5 s, 3 attempts with jittered backoff). Metrics `vms_ingest_frames_total{outcome}`, `vms_ingest_stage_duration_seconds{stage=object_put|db_insert|cleanup}`, `vms_ingest_capture_to_receive_seconds`, `vms_ingest_request_duration_seconds{route,status}`, `vms_ingest_received_jpeg_bytes_total`; spans continue loadgen's `traceparent`. `/readyz` checks Postgres and the bucket. No backpressure yet (deferred with 6.3); no container image yet (task 1.9).
 
 ### 4.3 queue
 *Scope note: deferred. In this plan the worker claims `pending` frames from Postgres with `SELECT ... FOR UPDATE SKIP LOCKED`, per camera (D3 default); no Redis, no Kafka.*
@@ -129,7 +130,7 @@ Logical schema (types simplified; all timestamps UTC, each camera has an IANA ti
 ```
 cameras(camera_id, name, site, timezone, created_at)
 zones(zone_id, camera_id, name, polygon)
-frames(frame_id, camera_id, ts, object_key, width, height, brightness, blur_var, model_version)
+frames(frame_id, camera_id, run_id, seq, ts, received_at, object_key, size_bytes, status, width, height, brightness, blur_var, model_version)   -- UNIQUE (camera_id, run_id, seq); status pending|processing|done|failed
 detections(ts, camera_id, frame_id, track_id, class_name, confidence, x1, y1, x2, y2, model_version)
 tracks(track_id, camera_id, class_name, first_seen, last_seen, n_frames)
 events(event_id, ts, camera_id, track_id, zone_id, event_type)       -- zone_enter, zone_exit, loiter
