@@ -1,0 +1,302 @@
+{
+  "schema_version": 1,
+  "run_id": "01M4GKA7GNXHJX3ABMV91AKYJ1",
+  "name": "loadgen-stub-20x5",
+  "kind": "loadgen.run",
+  "started_at": "2026-10-09T15:08:11.669344Z",
+  "ended_at": "2026-10-09T15:11:11.676570Z",
+  "seed": 1234,
+  "git": {
+    "sha": "c5cff6cdab69ea80d050ea981dea299371236768",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439496704,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0"
+  },
+  "config": {
+    "service": "loadgen",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 0.01
+    },
+    "target_url": "http://127.0.0.1:8080",
+    "mode": "paced",
+    "cameras": 20,
+    "fps": 5.0,
+    "duration_s": 60.0,
+    "warmup_s": 5.0,
+    "camera_prefix": "cam-",
+    "max_schedule_lag_p99_ms": 10.0,
+    "frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "clips": {
+      "data_dir": "data",
+      "ids": [
+        "mot17-09-mini",
+        "mot17-04-mini",
+        "commons-roncesvalles"
+      ],
+      "assignment": "round_robin",
+      "max_frames": null
+    },
+    "http": {
+      "request_timeout_s": 5.0,
+      "connect_timeout_s": 2.0,
+      "max_in_flight_per_camera": 4,
+      "max_retries": 0,
+      "retry_base_s": 0.05,
+      "retry_max_s": 1.0
+    },
+    "stub": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "latency_ms": 0.0,
+      "reject_ratio": 0.0,
+      "workers": 1
+    },
+    "metrics_port": 9105,
+    "results_dir": "bench/results"
+  },
+  "scenario": {
+    "name": "loadgen-stub-20x5",
+    "description": "Task 1.2 done criterion: 20 cameras at 5 FPS (100 frames/s, 1280x720 JPEG q85) run stably against the stub ingest server (`make loadgen-stub`). Stable means every frame accepted, none dropped, and schedule lag p99 within max_schedule_lag_p99_ms.\n",
+    "kind": "run",
+    "repeats": 3,
+    "config": {
+      "mode": "paced",
+      "cameras": 20,
+      "fps": 5.0,
+      "duration_s": 60,
+      "warmup_s": 5
+    }
+  },
+  "metrics": {
+    "transport": "http",
+    "repetitions": [
+      {
+        "steady_s": 55.0,
+        "offered_fps": 100.0,
+        "sent_fps": 100.0,
+        "accepted_fps": 100.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 5500,
+          "accepted": 5500,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 8.6,
+          "p95": 18.489,
+          "p99": 23.826,
+          "mean": 9.852,
+          "max": 67.269
+        },
+        "schedule_lag_ms": {
+          "p50": 0.75,
+          "p95": 1.733,
+          "p99": 2.188,
+          "mean": 0.809,
+          "max": 26.745
+        },
+        "seed": 1234,
+        "elapsed_s": 60.0,
+        "drain_s": 0.006,
+        "cpu": {
+          "seconds": 10.13,
+          "utilization_cores": 0.169,
+          "us_per_frame": 1688.3
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 54.995,
+        "offered_fps": 100.0,
+        "sent_fps": 100.01,
+        "accepted_fps": 100.01,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 5500,
+          "accepted": 5500,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 7.97,
+          "p95": 17.358,
+          "p99": 25.005,
+          "mean": 9.06,
+          "max": 56.646
+        },
+        "schedule_lag_ms": {
+          "p50": 0.701,
+          "p95": 1.476,
+          "p99": 2.066,
+          "mean": 0.742,
+          "max": 2.978
+        },
+        "seed": 1235,
+        "elapsed_s": 59.995,
+        "drain_s": 0.003,
+        "cpu": {
+          "seconds": 9.831,
+          "utilization_cores": 0.164,
+          "us_per_frame": 1638.5
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 54.977,
+        "offered_fps": 100.0,
+        "sent_fps": 100.04,
+        "accepted_fps": 100.04,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 5500,
+          "accepted": 5500,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 9.601,
+          "p95": 16.829,
+          "p99": 23.613,
+          "mean": 9.917,
+          "max": 67.942
+        },
+        "schedule_lag_ms": {
+          "p50": 0.81,
+          "p95": 1.968,
+          "p99": 2.753,
+          "mean": 0.888,
+          "max": 4.667
+        },
+        "seed": 1236,
+        "elapsed_s": 59.977,
+        "drain_s": 0.004,
+        "cpu": {
+          "seconds": 9.313,
+          "utilization_cores": 0.155,
+          "us_per_frame": 1552.2
+        },
+        "generator_ok": true
+      }
+    ],
+    "aggregate": {
+      "sent_fps": {
+        "mean": 100.017,
+        "std": 0.021,
+        "min": 100.0,
+        "max": 100.04
+      },
+      "accepted_fps": {
+        "mean": 100.017,
+        "std": 0.021,
+        "min": 100.0,
+        "max": 100.04
+      },
+      "send_latency_ms.p50": {
+        "mean": 8.724,
+        "std": 0.823,
+        "min": 7.97,
+        "max": 9.601
+      },
+      "send_latency_ms.p95": {
+        "mean": 17.559,
+        "std": 0.848,
+        "min": 16.829,
+        "max": 18.489
+      },
+      "send_latency_ms.p99": {
+        "mean": 24.148,
+        "std": 0.75,
+        "min": 23.613,
+        "max": 25.005
+      },
+      "schedule_lag_ms.p99": {
+        "mean": 2.336,
+        "std": 0.367,
+        "min": 2.066,
+        "max": 2.753
+      },
+      "cpu.utilization_cores": {
+        "mean": 0.163,
+        "std": 0.007,
+        "min": 0.155,
+        "max": 0.169
+      },
+      "cpu.us_per_frame": {
+        "mean": 1626.333,
+        "std": 68.861,
+        "min": 1552.2,
+        "max": 1688.3
+      }
+    },
+    "clips": {
+      "mot17-09-mini": {
+        "frames": 300,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-04-mini": {
+        "frames": 300,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "commons-roncesvalles": {
+        "frames": 298,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 29.833
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": ""
+}

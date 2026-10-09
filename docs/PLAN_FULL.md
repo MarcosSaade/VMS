@@ -81,10 +81,11 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 **Prompt:** Implement `vms.loadgen`: async, N virtual cameras, each looping assigned clips at a configured FPS and resolution, sending JPEG frames with camera ID, timestamp and sequence number to the ingest REST endpoint. Pre-decode and pre-encode frames into memory at startup so the generator stays cheap. Config: cameras, FPS, resolution, JPEG quality, duration, clip assignment, seed. Expose metrics for sent, accepted, rejected and failed frames and send latency. Add a self-test mode that measures the generator's own max rate without a server.
 **Done when:** 20 cameras at 5 FPS run stably against a stub server on a laptop; self-test rate recorded in `EXPERIMENTS.md`.
+**Considerations:** Done 2026-10-09 (D17). Open-loop pacing with a per-camera in-flight cap and counted drops; schedule lag flags a saturated generator. Self-test 36.4k frames/s with no I/O (E-009); one process tops out near 1,250 frames/s over multipart HTTP (E-010); 20x5 against the stub was stable in 3 of 3 reps (E-011). The ingest contract adds `run_id`, so 1.3's idempotency key is `(camera_id, run_id, seq)`. Multipart parsing looked expensive in aiohttp (E-010); 1.3 should measure a raw-body variant.
 
 ### 1.3 Ingest v0
 
-**Prompt:** Implement `vms.ingest` as a FastAPI service: accept multipart frames, write the JPEG to the object store (SeaweedFS locally, S3 in the cloud; D12) at `frames/{camera_id}/{date}/{frame_id}.jpg`, insert a `frames` row with status `pending`. Idempotency on `(camera_id, seq)` or `frame_id`. Health, readiness and metrics endpoints.
+**Prompt:** Implement `vms.ingest` as a FastAPI service: accept multipart frames, write the JPEG to the object store (SeaweedFS locally, S3 in the cloud; D12) at `frames/{camera_id}/{date}/{frame_id}.jpg`, insert a `frames` row with status `pending`. Idempotency on `(camera_id, run_id, seq)` or `frame_id`. Health, readiness and metrics endpoints.
 **Done when:** integration test sends frames and finds objects and rows; duplicate sends create no duplicates.
 
 ### 1.4 Schema v1

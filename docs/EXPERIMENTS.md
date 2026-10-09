@@ -58,3 +58,23 @@ Outcome: static-camera checks stay manual (look at frames). MOT20 is kept as sta
 Tried: the compose stack after task 0.7 removed Redis and MLflow (same laptop as E-002; `docker stats` at idle, not a benchmark).
 Result: about 365 MiB in total (Grafana 167, SeaweedFS 75, OTel collector 38, Prometheus 38, Postgres 24, Tempo 23 MiB), down from about 1.0 GiB (E-002). `make up` from empty volumes: 18 s. 21 Python packages dropped from the environment (mlflow-skinny, wandb, redis and their dependencies).
 Outcome: keep; D16.
+
+### E-009 | 2026-10-09 | ingest
+Tried: loadgen self-test (task 1.2): 20 cameras unpaced on one event loop, NullTransport (no I/O), 1280x720 q85 frames, 3 x 15 s after 3 s warmup, tracing at 1%. i7-1355U, 12 threads, 15 GiB; other projects' containers also running. Commit c5cff6c.
+Result: 36.4k frames/s (std 1.75k; 34.4k to 37.6k), 27 us CPU per frame, 1.0 core (the single loop is saturated). bench/results/2026-10-09-loadgen-selftest-01M4GK6TJTHH0D2T3JW9KHWK28.json
+Outcome: the generator core is ~360x the 20x5 target; the per-frame cost that matters is the HTTP client (E-010).
+
+### E-010 | 2026-10-09 | ingest
+Tried: loadgen max rate over real HTTP: unpaced multipart POSTs over loopback to the stub ingest (6 worker processes, so the stub is not the limit), 20 cameras x 4 in flight, 3 x 20 s. Same host as E-009.
+Result: 1,252 frames/s (std 44; 1,205 to 1,293), 0.80 ms CPU per frame, 0.985 cores: the generator is the bottleneck. A 1-worker stub saturated first at ~670 frames/s. Ad hoc probe (scratch script, not a reported number): aiohttp server-side multipart parsing took ~1.7 ms per 200 KB frame vs ~0.04 ms for a raw body. bench/results/2026-10-09-loadgen-stub-max-01M4GK893V2X7WP677GQEXG8GW.json
+Outcome: one loadgen process tops out near 1,250 frames/s (~250 cameras at 5 FPS); keep offered load below ~70% of that, or shard cameras across processes. Multipart cost is an input to 1.3 and D4: measure raw-body ingest there with a scenario.
+
+### E-011 | 2026-10-09 | ingest
+Tried: task 1.2 done criterion: 20 cameras x 5 FPS paced (100 frames/s, 1280x720 q85, ~165 KB) against a 1-worker stub, 3 x 60 s after 5 s warmup. Same host as E-009.
+Result: stable: 100.0 frames/s offered and accepted in every rep (16,500 of 16,500 steady-state frames), 0 dropped, 0 failed. Send latency p50 8.7 ms, p95 17.6, p99 24.1. Schedule lag p99 2.3 ms (limit 10; one rep had a 27 ms max). Loadgen 0.16 cores, 1.6 ms CPU per frame, twice the unpaced figure (idle wakeups per frame; not investigated). bench/results/2026-10-09-loadgen-stub-20x5-01M4GKA7GNXHJX3ABMV91AKYJ1.json
+Outcome: done criterion met; generator_ok in every rep.
+
+### E-012 | 2026-10-09 | ingest
+Tried: the first recording of E-009 to E-011 (commit 48b9814).
+Result: two harness bugs. (1) Every results file after the first in a session said dirty: true, because untracked results files counted as changes. (2) SIGTERM to the 6-worker stub left its workers on port 8080; the 1-worker stub then failed to bind, so the "20x5 vs 1-worker stub" run actually hit the leftover 6-worker stub (latency p50 6.4 ms instead of 8.7 ms).
+Outcome: both fixed with regression tests (c5cff6c); all three scenarios re-run, earlier files discarded. Benchmark scripts now check that the port is free before starting a stub.
