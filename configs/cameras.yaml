@@ -1,0 +1,41 @@
+# Camera catalog: cameras and zones, synced into Postgres by `python -m vms.storage bootstrap`
+# (make migrate). Upsert only: rows removed here stay in the database (see vms.storage.catalog).
+#
+# - camera_id: what the camera sends frames as. The ids match loadgen's naming with 4 cameras
+#   (cam-001..cam-004, configs/loadgen.yaml camera_prefix), used by the demo (task 1.9).
+# - name: what questions and QueryPlan filters use; matches the few-shot bank
+#   (eval/fewshot/structured.v1.jsonl). Zone names are unique across the catalog.
+# - timezone: IANA name; "today" and "this morning" are computed in it.
+# - polygon: [x, y] points normalized to the frame (0..1, origin top-left), simple, non-zero
+#   area. Placeholders until the zone logic is tuned on the demo clips (task 1.6).
+
+version: 1
+
+cameras:
+  - camera_id: cam-001
+    name: entrance
+    site: demo-store
+    timezone: Europe/London
+    zones:
+      - name: front_door
+        polygon: [[0.35, 0.45], [0.65, 0.45], [0.65, 1.0], [0.35, 1.0]]
+
+  - camera_id: cam-002
+    name: checkout
+    site: demo-store
+    timezone: Europe/London
+    zones:
+      - name: register_1
+        polygon: [[0.05, 0.40], [0.45, 0.40], [0.45, 0.95], [0.05, 0.95]]
+      - name: register_2
+        polygon: [[0.55, 0.40], [0.95, 0.40], [0.95, 0.95], [0.55, 0.95]]
+
+  - camera_id: cam-003
+    name: parking_lot
+    site: demo-store
+    timezone: Europe/London
+
+  - camera_id: cam-004
+    name: loading_dock
+    site: demo-store
+    timezone: Europe/London

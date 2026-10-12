@@ -129,14 +129,16 @@ Logical schema (types simplified; all timestamps UTC, each camera has an IANA ti
 
 ```
 cameras(camera_id, name, site, timezone, created_at)
-zones(zone_id, camera_id, name, polygon)
+zones(zone_id, camera_id, name, polygon)       -- zone_id '<camera_id>:<name>'; polygon [[x, y], ...] normalized 0..1
 frames(frame_id, camera_id, run_id, seq, ts, received_at, object_key, size_bytes, status, width, height, brightness, blur_var, model_version)   -- UNIQUE (camera_id, run_id, seq); status pending|processing|done|failed
-detections(ts, camera_id, frame_id, track_id, class_name, confidence, x1, y1, x2, y2, model_version)
+detections(frame_id, det_idx, ts, camera_id, track_id, class_name, confidence, x1, y1, x2, y2, model_version)   -- PK (frame_id, det_idx); box in pixels
 tracks(track_id, camera_id, class_name, first_seen, last_seen, n_frames)
 events(event_id, ts, camera_id, track_id, zone_id, event_type)       -- zone_enter, zone_exit, loiter
-embeddings(frame_id, camera_id, ts, vector[512], model_version)
+embeddings(frame_id, camera_id, ts, vector[512], model_version)   -- deferred with CLIP; not migrated
 query_log(query_id, ts, mode, engine, question, query_plan, compiled_sql, latency_ms, tokens, success, error_type, feedback)
 ```
+
+Schema v1 is migrations 0001 to 0003 in `src/vms/storage/migrations/versions/` (D19). Cameras and zones come from `configs/cameras.yaml` (synced by `python -m vms.storage bootstrap`, run by `make migrate`). Pipeline-written tables (frames, detections, tracks, events) carry no foreign keys; only zones reference cameras. Each time-series table has one `(camera_id, ts)` index (tracks: `(camera_id, last_seen)`), the deliberate baseline. The query service reads through the `vms_query_reader` role, which holds SELECT on exactly the validator's allowlisted columns (section 11).
 
 Notes that shape D1: column stores excel at time-range aggregates and compression but are poor at updates, so mutable track state may stay in Postgres. Detection and event tables are append-only. Because the LLM emits a `QueryPlan`, not SQL, model accuracy does not depend on the SQL dialect. What D1 weighs instead is compiler complexity and plan-to-SQL result equivalence across backends: each viable backend needs a compiler, with equivalence tests showing the same plan returns the same result set on every backend.
 
@@ -313,7 +315,7 @@ Targets may be revised with evidence; record any change in `docs/DECISIONS.md`.
 ├── Makefile
 ├── pyproject.toml, uv.lock
 ├── .dvc/, *.dvc          # DVC config and pointers for large artifacts
-├── configs/              # YAML config per service and environment
+├── configs/              # YAML config per service and environment; cameras.yaml (camera catalog)
 ├── proto/                # gRPC definitions
 ├── src/vms/
 │   ├── common/           # config, logging, telemetry, ids, clock, shared schemas
@@ -345,7 +347,7 @@ Data and artifacts: small files (eval JSONL, configs, few-shot banks) stay in gi
 
 ## 11. Security
 
-- The query-service DB role is read-only, with statement timeouts and row limits.
+- The query service logs in as `POSTGRES_READONLY_USER`, a member of `vms_query_reader`: SELECT on exactly the columns in the validator's allowlist (column-level grants, so `query_log`, `frames.status` and any new table are unreadable), no write privilege, `default_transaction_read_only` on, and no TEMPORARY on the database. The allowlist is thus enforced by the validator before execution and by Postgres during it; tests check the grants, the config and the migrated schema agree. Statement timeouts and row limits are set by the query service (task 1.7).
 - User questions are untrusted input. Plan engine: LLM output must pass `QueryPlan` schema and semantic validation, and the compiler emits parameterized SQL, so user values never become SQL text. Both the plan and free-form SQL engines run the `sqlglot` validator on the final SQL as defense in depth, and all SQL runs on the read-only role.
 - Rate limiting on the public API.
 - Secrets live only in `.env` (gitignored) or a secret manager; `.env.example` documents every variable.

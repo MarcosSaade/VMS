@@ -35,7 +35,7 @@
   - Understand it: how do you know the load generator is not the bottleneck?
 - [x] 1.3 Ingest v0: REST, JPEG to object store, frame rows to Postgres, idempotent on `(camera_id, run_id, seq)` (D17)
   - Understand it: what happens when the same frame is sent twice, or the object store write succeeds but the DB insert fails?
-- [ ] 1.4 Schema v1 and migrations (SHRINK: no `embeddings` table)
+- [x] 1.4 Schema v1 and migrations (SHRINK: no `embeddings` table)
   - Understand it: why are detections and events append-only while tracks are updated, and what does the read-only role prevent?
 - [ ] 1.5 Worker v0: polls Postgres with `SKIP LOCKED`, in-process PyTorch YOLO11 at batch size 1 (SHRINK: no CLIP)
   - Understand it: what does `SKIP LOCKED` guarantee with two workers, and what breaks tracking if one camera's frames are processed out of order?

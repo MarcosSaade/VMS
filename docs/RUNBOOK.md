@@ -69,7 +69,7 @@ Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); eve
 | Prometheus | http://localhost:9090 | `PROMETHEUS_PORT` | Scrape config: `deploy/compose/prometheus/prometheus.yml`. Retention `PROMETHEUS_RETENTION` (15d). |
 | Tempo | http://localhost:3200 | `TEMPO_PORT` | Query API; traces arrive only through the collector. |
 | OTel collector | localhost:4317 (gRPC), 4318 (HTTP) | `OTEL_GRPC_PORT`, `OTEL_HTTP_PORT` | Point `OTEL_EXPORTER_OTLP_ENDPOINT` here. |
-| Postgres + pgvector | localhost:5432 | `POSTGRES_PORT` | User/DB from `POSTGRES_*`. `vector` is available; migrations (task 1.4) create it. |
+| Postgres + pgvector | localhost:5432 | `POSTGRES_PORT` | User/DB from `POSTGRES_*`. The `vector` extension is available but not created: embeddings are deferred. |
 | Object store (SeaweedFS, S3 API) | http://localhost:8333 | `S3_PORT` | Credentials `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`; bucket `S3_BUCKET` is created at startup. |
 
 - Port taken on the host: set the `*_PORT` variable in `.env` and update the matching URL (`S3_ENDPOINT_URL` for `S3_PORT`), then `make up`.
@@ -77,10 +77,10 @@ Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); eve
 - Credentials and database names are applied when a volume is first created. After changing `POSTGRES_*` or `S3_*` credentials, run `make down-volumes && make up`, which deletes all stack data.
 - Images are pinned by tag in the compose file. Tempo and the collector get a static busybox `wget` for health checks, because their images have no shell.
 
-### Ingest service and migrations
+### Ingest service, migrations and the camera catalog
 
 ```bash
-make up            # also applies migrations (make migrate = alembic upgrade head)
+make up            # also runs make migrate: alembic upgrade head + python -m vms.storage bootstrap
 make ingest        # ingest on http://127.0.0.1:8080 (configs/ingest.yaml; VMS_HTTP__PORT to change)
 make loadgen       # 20 cameras x 5 FPS into it
 curl -s localhost:8080/readyz   # {"postgres":"ok","object_store":"ok"}
@@ -88,6 +88,10 @@ curl -s localhost:8080/readyz   # {"postgres":"ok","object_store":"ok"}
 
 - Connection settings come from `POSTGRES_*` and `S3_*` in `.env` (`vms.storage.config`); tuning (pool sizes, timeouts, limits) from `configs/ingest.yaml`.
 - Migrations live in `src/vms/storage/migrations/versions/` as hand-written SQL. `uv run alembic current` shows the applied revision, `uv run alembic downgrade -1` rolls one back, `uv run alembic revision -m "..."` starts a new one.
+- `make migrate` is idempotent; re-run it after editing `configs/cameras.yaml` or rotating `POSTGRES_READONLY_PASSWORD`. Bootstrap (connecting as `POSTGRES_USER`) creates or updates the query service's login `POSTGRES_READONLY_USER` as a member of `vms_query_reader` (SELECT on the validator's allowlisted columns only, read-only by default), then upserts cameras and zones from `configs/cameras.yaml`.
+- Camera catalog: camera and zone names are what questions use and must stay unique (zone names across all cameras); polygons are normalized 0..1 frame coordinates. Upsert only: a camera or zone removed from the YAML stays in the database and bootstrap logs it as stale; delete it by hand (`DELETE FROM cameras WHERE camera_id = ...`, which also deletes its zones) if it really is gone. Renaming a zone creates a new zone id (`<camera_id>:<name>`).
+- Ingest accepts frames from any camera id, catalogued or not (load tests use `cam-001`..`cam-NNN`); queries only see cameras in the catalog because they join `cameras` by name.
+- Check what the query login can read: `psql -U vms_query -h localhost vms -c '\dp'`, or try `SELECT status FROM frames` as it (permission denied).
 - What ingest stored: `frames` rows (status `pending` until the worker claims them, task 1.5) and objects under `frames/{camera_id}/{yyyy-mm-dd}/` in the `S3_BUCKET` bucket.
 - Integration tests create and drop a throwaway database (`vms_it_*`) per test and delete the objects they wrote, so they do not touch dev data.
 

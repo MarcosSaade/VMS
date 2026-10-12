@@ -141,3 +141,26 @@ def alembic_config(stack: StackSettings, db: str) -> AlembicConfig:
     config = AlembicConfig(str(REPO_ROOT / "alembic.ini"))
     config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     return config
+
+
+@pytest.fixture
+def reader_dsn(stack: StackSettings, fresh_db: str) -> Iterator[str]:
+    """A throwaway read-only login (as `make migrate` creates for the query service) on
+    `fresh_db`. Yields a libpq DSN; the role is dropped afterwards."""
+    from pydantic import SecretStr
+
+    from vms.storage.roles import ensure_query_login
+
+    user = f"vms_it_reader_{new_ulid().lower()}"
+    password = new_ulid()
+    with psycopg.connect(f"{stack.postgres_dsn} dbname={fresh_db}", autocommit=True) as conn:
+        ensure_query_login(conn, user, SecretStr(password))
+    try:
+        yield (
+            f"host={stack.postgres_host} port={stack.postgres_port} dbname={fresh_db} "
+            f"user={user} password={password} connect_timeout=5"
+        )
+    finally:
+        admin = f"{stack.postgres_dsn} dbname=postgres"
+        with psycopg.connect(admin, autocommit=True) as conn:
+            conn.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(user)))

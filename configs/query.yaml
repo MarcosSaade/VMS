@@ -9,9 +9,9 @@ sql:
   max_sql_chars: 20000
 
   # Queryable schema (ARCHITECTURE 4.6): table -> column -> type. This is the validator's
-  # allowlist and the source of the schema summary in prompts. Keep it in step with the
-  # migrations (task 1.4). embeddings (served by semantic search) and query_log are left out on
-  # purpose.
+  # allowlist and the source of the schema summary in prompts. Postgres enforces the same list:
+  # migration 0003 grants the query reader SELECT on exactly these columns (D19), and tests fail
+  # if the two, or the migrated column types, disagree. query_log is left out on purpose.
   tables:
     cameras:
       camera_id: text

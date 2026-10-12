@@ -58,14 +58,15 @@ check: lint typecheck test ## Lint + typecheck + unit tests
 # --- Local stack ---------------------------------------------------------------
 
 .PHONY: up
-up: ## Start the compose stack, wait until healthy, apply migrations (PROFILES=cpu|gpu)
+up: ## Start the compose stack, wait until healthy, migrate and bootstrap the DB (PROFILES=cpu|gpu)
 	$(COMPOSE) up -d --build --remove-orphans --wait --wait-timeout $(STACK_WAIT_TIMEOUT)
 	@$(MAKE) --no-print-directory migrate
 	@scripts/stack_urls.sh $(ENV_FILE)
 
 .PHONY: migrate
-migrate: ## Apply database migrations (alembic upgrade head; POSTGRES_* from .env)
+migrate: ## Apply migrations, then the read-only login and camera catalog (POSTGRES_* from .env)
 	$(RUN) alembic upgrade head
+	$(RUN) python -m vms.storage bootstrap
 
 .PHONY: down
 down: ## Stop the compose stack (keeps data volumes)
