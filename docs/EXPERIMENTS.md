@@ -88,3 +88,8 @@ Outcome: one CPU worker with yolo11s serves ~2 cameras at 5 FPS, short of the 4x
 Tried: E-013 with only the weights changed to yolo11n. Same host and commit.
 Result: 20.0 frames/s (std 1.07); infer p50/p95 39/50 ms; total p95 65 ms; 13.2 detections/frame (fewer than yolo11s; no mAP yet, task 3.4). bench/results/2026-10-12-worker-model-cpu-n-01M4QT70RZG5SB1GTPH058VAXT.json
 Outcome: yolo11n just matches the 20 frames/s demo load model-only, with no headroom once DB and object-store time are added. Input to 1.9 (demo model and FPS) and to the CPU ladder (5.2).
+
+### E-015 | 2026-10-12 | tracking
+Tried: demo smoke run (not a benchmark): ingest + one yolo11n worker + loadgen, 4 catalogued cameras x 5 FPS for 30 s on the data-mini clips, dev database, laptop.
+Result: tracks lasting hours (mean duration 2.3 to 6.6 h per camera). Cause: 30 frames per camera left pending since a 1.3 smoke run (2026-10-09) were processed first, and ByteTrack's lost-track buffer counts frames, so it joined objects across the 3-day gap. After a reset on any gap longer than buffer_s (regression test added), a re-run on a fresh database gave 329 tracks, max duration 29.8 s; zone events on all three zones (75 enters, 57 exits; visits still open at the end have no exit); the worker drained 20 s after loadgen stopped.
+Outcome: keep the time-gap reset (D21). The dev database still holds tracks from the buggy run.

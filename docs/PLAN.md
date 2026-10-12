@@ -39,7 +39,7 @@
   - Understand it: why are detections and events append-only while tracks are updated, and what does the read-only role prevent?
 - [x] 1.5 Worker v0: polls Postgres with `SKIP LOCKED`, in-process PyTorch YOLO11 at batch size 1 (SHRINK: no CLIP)
   - Understand it: what does `SKIP LOCKED` guarantee with two workers, and what breaks tracking if one camera's frames are processed out of order?
-- [ ] 1.6 Tracking (ByteTrack) and zone enter/exit events (SHRINK: loiter optional)
+- [x] 1.6 Tracking (ByteTrack) and zone enter/exit events (SHRINK: loiter optional)
   - Understand it: how is a zone event decided, and what happens at the boundary when a box jitters?
 - [ ] 1.7 Query service v0: typed `QueryPlan` planner, validation and repair, Postgres compiler, SQL validator, read-only execution, `query_log` (SHRINK: JSON responses, no semantic search, no cache)
   - Understand it: trace one question from text to SQL; where can it fail, and what does the user see for each failure?

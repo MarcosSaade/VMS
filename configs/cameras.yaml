@@ -7,7 +7,8 @@
 #   (eval/fewshot/structured.v1.jsonl). Zone names are unique across the catalog.
 # - timezone: IANA name; "today" and "this morning" are computed in it.
 # - polygon: [x, y] points normalized to the frame (0..1, origin top-left), simple, non-zero
-#   area. Placeholders until the zone logic is tuned on the demo clips (task 1.6).
+#   area; edges count as inside. Positions are placeholders, not drawn from the scenes: they do
+#   produce enters and exits on the demo clips (E-015). Redraw them on frame overlays for 1.9.
 
 version: 1
 

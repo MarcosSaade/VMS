@@ -12,7 +12,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from vms.common.clock import SystemClock
-from vms.common.ids import new_ulid
+from vms.common.ids import UlidGenerator, new_ulid
 from vms.common.observability import Observability, init_observability
 from vms.common.settings import load_settings
 from vms.storage.config import ObjectStoreSettings, PostgresSettings
@@ -67,6 +67,9 @@ def build_app(settings: WorkerSettings, obs: Observability, detector: Detector) 
         obs.metrics,
         worker_id=worker_id(),
         clock=SystemClock(),
+        ids=UlidGenerator(),
+        tracker_settings=settings.tracker,
+        zone_settings=settings.zones,
         tracer=obs.tracer,
     )
     stop = asyncio.Event()

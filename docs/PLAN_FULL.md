@@ -110,6 +110,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Status:** shrunk (2026-10-06 re-scope).
 **Prompt:** Add per-camera ByteTrack tracking in the worker (the tracker built into ultralytics or the one in `supervision`), write `track_id` on detections, maintain the `tracks` table, and emit zone enter and exit events from zone polygons. Loiter is optional: add it only if it costs under an hour. Test with synthetic trajectories.
 **Done when:** tracks and events appear for demo clips; unit tests cover enter/exit edge cases (track lost and re-found, boundary jitter).
+**Status note:** Done 2026-10-12 (D21). Ultralytics ByteTrack (added `lap`), bottom-centre anchors, 2-frame debounce, loiter included (30 s). Detector threshold lowered to 0.1 for ByteTrack's second round; detections under 0.25 are stored only when tracked. A time gap longer than the tracker buffer starts a new tracker session (bug found in the demo run, E-015). Zone polygons in `configs/cameras.yaml` are still placeholders: redraw them on frame overlays in 1.9.
 **Considerations:** tracking requires in-order processing per camera; note it in `ARCHITECTURE.md`.
 
 ### 1.7 Query service v0

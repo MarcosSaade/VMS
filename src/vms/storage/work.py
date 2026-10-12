@@ -64,6 +64,30 @@ class DetectionRow:
 
 
 @dataclass(frozen=True)
+class TrackUpdate:
+    """One frame's sighting of a track: creates the track or extends it."""
+
+    track_id: str
+    class_name: str
+
+
+@dataclass(frozen=True)
+class EventRow:
+    event_id: str
+    ts: datetime
+    track_id: str
+    zone_id: str
+    event_type: str  # zone_enter | zone_exit | loiter
+
+
+@dataclass(frozen=True)
+class ZoneRow:
+    zone_id: str
+    name: str
+    polygon: tuple[tuple[float, float], ...]  # normalized frame coordinates
+
+
+@dataclass(frozen=True)
 class FrameResult:
     frame_id: str
     camera_id: str
@@ -75,6 +99,8 @@ class FrameResult:
     blur_var: float
     model_version: str
     detections: tuple[DetectionRow, ...]
+    tracks: tuple[TrackUpdate, ...] = ()
+    events: tuple[EventRow, ...] = ()
 
 
 class FailOutcome(StrEnum):
@@ -118,6 +144,10 @@ class WorkQueue(Protocol):
 
     async def backlog(self) -> int:
         """Pending frames across all cameras."""
+        ...
+
+    async def zones(self, camera_id: str) -> list[ZoneRow]:
+        """The camera's zones from the catalog (empty for uncatalogued cameras)."""
         ...
 
     async def ready(self) -> bool: ...
@@ -197,6 +227,25 @@ VALUES (%(frame_id)s, %(det_idx)s, %(ts)s, %(camera_id)s, %(track_id)s, %(class_
         %(confidence)s, %(x1)s, %(y1)s, %(x2)s, %(y2)s, %(model_version)s)
 ON CONFLICT (frame_id, det_idx) DO NOTHING
 """
+
+# Tracks are the one updated table: a sighting extends last_seen and counts the frame. Safe
+# against doubling because it runs only inside a winning, fenced completion.
+UPSERT_TRACK_SQL = """
+INSERT INTO tracks (track_id, camera_id, class_name, first_seen, last_seen, n_frames)
+VALUES (%(track_id)s, %(camera_id)s, %(class_name)s, %(ts)s, %(ts)s, 1)
+ON CONFLICT (track_id) DO UPDATE
+SET first_seen = least(tracks.first_seen, EXCLUDED.first_seen),
+    last_seen = greatest(tracks.last_seen, EXCLUDED.last_seen),
+    n_frames = tracks.n_frames + 1
+"""
+
+INSERT_EVENT_SQL = """
+INSERT INTO events (event_id, ts, camera_id, track_id, zone_id, event_type)
+VALUES (%(event_id)s, %(ts)s, %(camera_id)s, %(track_id)s, %(zone_id)s, %(event_type)s)
+ON CONFLICT (event_id) DO NOTHING
+"""
+
+ZONES_SQL = "SELECT zone_id, name, polygon FROM zones WHERE camera_id = %(camera_id)s ORDER BY 1"
 
 FAIL_SQL = """
 UPDATE frames
@@ -306,6 +355,7 @@ class PostgresWorkQueue:
                 if won is None:
                     return False  # lost the claim; the transaction writes nothing
                 await self._insert_detections(conn, result)
+                await self._write_tracks_and_events(conn, result)
         except Exception as exc:
             raise FrameStoreError(f"{type(exc).__name__}: {exc}") from exc
         return True
@@ -333,6 +383,43 @@ class PostgresWorkQueue:
         ]
         async with conn.cursor() as cur:
             await cur.executemany(INSERT_DETECTION_SQL, rows)
+
+    @staticmethod
+    async def _write_tracks_and_events(conn: AsyncConnection[Any], result: FrameResult) -> None:
+        async with conn.cursor() as cur:
+            if result.tracks:
+                await cur.executemany(
+                    UPSERT_TRACK_SQL,
+                    [
+                        {
+                            "track_id": t.track_id,
+                            "camera_id": result.camera_id,
+                            "class_name": t.class_name,
+                            "ts": result.ts,
+                        }
+                        # A track appears once per frame; dedupe so n_frames counts frames.
+                        for t in {t.track_id: t for t in result.tracks}.values()
+                    ],
+                )
+            if result.events:
+                await cur.executemany(
+                    INSERT_EVENT_SQL,
+                    [
+                        {
+                            "event_id": e.event_id,
+                            "ts": e.ts,
+                            "camera_id": result.camera_id,
+                            "track_id": e.track_id,
+                            "zone_id": e.zone_id,
+                            "event_type": e.event_type,
+                        }
+                        for e in result.events
+                    ],
+                )
+
+    async def zones(self, camera_id: str) -> list[ZoneRow]:
+        rows = await self._rows(ZONES_SQL, {"camera_id": camera_id})
+        return [ZoneRow(r[0], r[1], tuple((float(x), float(y)) for x, y in r[2])) for r in rows]
 
     async def fail(
         self, worker_id: str, frame_id: str, error: str, *, retry: bool, max_attempts: int

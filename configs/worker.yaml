@@ -21,10 +21,27 @@ detector:                      # in-process PyTorch, batch size 1 (Phase 1 basel
   weights: yolo11s             # configs/models.yaml
   device: cpu                  # cpu | cuda
   imgsz: 640
-  conf: 0.25
+  conf: 0.1                    # low on purpose: ByteTrack's second round uses unsure boxes;
+                               # tracker.store_min_conf decides what is stored
   iou: 0.7
   max_det: 300
   torch_threads: null          # null: PyTorch default (one per physical core)
+
+tracker:                       # ByteTrack per camera (vms.worker.tracking)
+  fps: 5.0                     # cameras' analysis rate; turns buffer_s into frames
+  high_thresh: 0.25
+  low_thresh: 0.1
+  new_track_thresh: 0.25
+  match_thresh: 0.8
+  fuse_score: true
+  buffer_s: 2.0                # a lost track is kept (and keeps its zone state) this long
+  classes: [person, bicycle, car, motorcycle, bus, truck]
+  store_min_conf: 0.25         # weaker detections are stored only when part of a track
+
+zones:                         # enter / exit / loiter (vms.worker.zones)
+  min_frames: 2                # consecutive frames on the new side to confirm a crossing
+  loiter_s: 30
+  refresh_s: 60
 
 db:
   min_size: 1

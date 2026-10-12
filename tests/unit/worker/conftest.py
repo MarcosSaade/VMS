@@ -15,13 +15,16 @@ import pytest
 from numpy.typing import NDArray
 
 from vms.common.clock import FakeClock
+from vms.common.ids import UlidGenerator
 from vms.common.metrics import Metrics
 from vms.storage.frames import FrameStoreError
 from vms.storage.objects import ObjectStoreError
-from vms.storage.work import ClaimedFrame, FailOutcome, FrameResult
+from vms.storage.work import ClaimedFrame, FailOutcome, FrameResult, ZoneRow
 from vms.worker.detector import Detection
 from vms.worker.service import Worker
 from vms.worker.settings import QueueSettings
+from vms.worker.tracking import TrackerSettings
+from vms.worker.zones import ZoneSettings
 
 T0 = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
 
@@ -51,6 +54,7 @@ class FakeQueue:
     leases: dict[str, str] = field(default_factory=dict)  # camera -> worker
     results: dict[str, FrameResult] = field(default_factory=dict)
     fail_ops: set[str] = field(default_factory=set)  # operations that raise FrameStoreError
+    zone_rows: dict[str, list[ZoneRow]] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
 
     def add(self, camera_id: str, seq: int, ts_s: float, key: str | None = None) -> str:
@@ -138,6 +142,10 @@ class FakeQueue:
         self._op("backlog")
         return sum(r.status == "pending" for r in self.rows.values())
 
+    async def zones(self, camera_id: str) -> list[ZoneRow]:
+        self._op("zones")
+        return list(self.zone_rows.get(camera_id, []))
+
     async def ready(self) -> bool:
         return True
 
@@ -167,6 +175,7 @@ class FakeDetector:
     error: Exception | None = None
     seen: list[tuple[int, ...]] = field(default_factory=list)
     on_detect: Callable[[], None] | None = None
+    script: list[list[Detection]] = field(default_factory=list)  # per call, then `detections`
 
     @property
     def model_version(self) -> str:
@@ -178,6 +187,8 @@ class FakeDetector:
             self.on_detect()
         if self.error is not None:
             raise self.error
+        if self.script:
+            return list(self.script.pop(0))
         return list(self.detections)
 
 
@@ -213,6 +224,8 @@ def harness() -> Harness:
     clock = FakeClock(T0 + timedelta(seconds=60))
     metrics = Metrics("worker")
     settings = QueueSettings(max_cameras=2, claim_batch=2, max_attempts=2)
+    counter = iter(range(1, 1_000_000))
+    ids = UlidGenerator(clock, randbytes=lambda n: next(counter).to_bytes(n, "big"))
     worker = Worker(
         queue,
         fetcher,
@@ -221,6 +234,9 @@ def harness() -> Harness:
         metrics,
         worker_id="w1",
         clock=clock,
+        ids=ids,
+        tracker_settings=TrackerSettings(fps=5.0, buffer_s=1.0),
+        zone_settings=ZoneSettings(min_frames=2, loiter_s=2.0, refresh_s=60.0),
         executor=InlineExecutor(),
     )
     return Harness(worker, queue, fetcher, detector, clock, metrics)

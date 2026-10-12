@@ -15,9 +15,25 @@ claim was lost (this worker stalled past its lease and another took the camera) 
 without writing. If even reporting a failure to the database fails, the worker requeues its
 own in-flight frames at the start of the next step.
 
-Frames of one camera are processed in capture order by one worker, which tracking (1.6)
-relies on. A frame captured before one already processed for its camera (it reached ingest
-late, or was retried) is still detected and stored, and counted as late.
+Tracking and zones (task 1.6). Each leased camera has a `CameraState` in this worker: a
+ByteTrack tracker, the zone state machine and the camera's zones (reloaded every
+`zones.refresh_s`). After detection, still in the inference thread, the frame's detections go
+through the tracker, tracked anchors through the zones, and the result carries track ids on
+detections, one track sighting per tracked object and any zone events, all written in the
+frame's fenced transaction. A camera's state is dropped when its lease is lost, so a camera
+coming back starts a new tracker session (new track ids).
+
+A pause longer than `tracker.buffer_s` between two tracked frames of a camera starts a new
+tracker session: ByteTrack counts its buffer in frames, so it would otherwise join objects
+across the pause.
+
+The tracker must see frames in capture order. A frame captured no later than the last one
+tracked for its camera (it reached ingest late, or is a retry of a frame whose write failed)
+is detected and stored without tracking, and counted as late. If a frame's write fails after
+the tracker has seen it, that frame's track sightings and events are lost with it.
+
+Low-confidence detections (below `tracker.store_min_conf`) feed the tracker's second round
+but are stored only when they belong to a track.
 """
 
 from __future__ import annotations
@@ -39,6 +55,7 @@ from opentelemetry import context as otel_context
 from opentelemetry import trace
 
 from vms.common.clock import Clock
+from vms.common.ids import UlidGenerator
 from vms.common.logs import get_logger
 from vms.common.metrics import Metrics
 from vms.storage.frames import FrameStoreError
@@ -46,13 +63,17 @@ from vms.storage.objects import ObjectStoreError
 from vms.storage.work import (
     ClaimedFrame,
     DetectionRow,
+    EventRow,
     FailOutcome,
     FrameResult,
+    TrackUpdate,
     WorkQueue,
 )
-from vms.worker.detector import Detector
+from vms.worker.detector import Detection, Detector
 from vms.worker.settings import QueueSettings
 from vms.worker.stats import input_stats
+from vms.worker.tracking import CameraTracker, TrackedBox, TrackerSettings
+from vms.worker.zones import ZoneDef, ZoneEvent, ZoneSettings, ZoneTracker, anchor
 
 log = get_logger(__name__)
 
@@ -64,6 +85,21 @@ FRESHNESS_BUCKETS_S = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 30
 
 class FrameFetcher(Protocol):
     async def get(self, key: str) -> bytes: ...
+
+
+class Tracker(Protocol):
+    def update(self, detections: list[Detection]) -> list[TrackedBox]: ...
+
+
+@dataclass
+class CameraState:
+    """What this worker remembers about one leased camera."""
+
+    session: str  # part of every track id, new for each tracker
+    tracker: Tracker
+    zones: ZoneTracker
+    zones_loaded_at: float  # monotonic; -inf forces a load
+    last_key: tuple[datetime, int] | None = None  # (ts, seq) of the last tracked frame
 
 
 class Outcome(StrEnum):
@@ -85,6 +121,9 @@ class Analysis:
     contrast: float
     blur_var: float
     detections: tuple[DetectionRow, ...]
+    tracks: tuple[TrackUpdate, ...]
+    zone_events: tuple[ZoneEvent, ...]
+    tracked: bool
     timings_s: dict[str, float]
 
 
@@ -99,6 +138,10 @@ class Worker:
         *,
         worker_id: str,
         clock: Clock,
+        ids: UlidGenerator,
+        tracker_settings: TrackerSettings | None = None,
+        zone_settings: ZoneSettings | None = None,
+        tracker_factory: Callable[[TrackerSettings], Tracker] = CameraTracker,
         executor: Executor | None = None,
         tracer: trace.Tracer | None = None,
     ) -> None:
@@ -108,6 +151,11 @@ class Worker:
         self._detector = detector
         self._settings = settings
         self._clock = clock
+        self._ids = ids
+        self._tracking = tracker_settings or TrackerSettings()
+        self._zone_settings = zone_settings or ZoneSettings()
+        self._tracker_factory = tracker_factory
+        self._cameras: dict[str, CameraState] = {}
         # One inference thread: batch size 1, frames in order, and PyTorch already uses
         # several cores inside one call.
         self._executor = executor or ThreadPoolExecutor(1, thread_name_prefix="infer")
@@ -118,12 +166,22 @@ class Worker:
         self._last_leases = float("-inf")
         self._last_backlog = float("-inf")
         self._requeue_pending = False
-        self._last_ts: dict[str, tuple[datetime, int]] = {}
 
         self._frames = metrics.counter("frames", "total", "Frames by outcome", ["outcome"])
         self._detections = metrics.counter("detections", "total", "Detections written")
         self._late = metrics.counter(
-            "late_frames", "total", "Frames captured before one already processed for the camera"
+            "late_frames",
+            "total",
+            "Frames not tracked: captured no later than the last tracked frame of the camera",
+        )
+        self._zone_events = metrics.counter(
+            "zone_events", "total", "Zone events written", ["event_type"]
+        )
+        self._resets = metrics.counter(
+            "tracker_resets", "total", "New tracker sessions after a pause longer than the buffer"
+        )
+        self._track_sightings = metrics.counter(
+            "track_sightings", "total", "Tracked objects written (one per track per frame)"
         )
         self._errors = metrics.counter(
             "loop_errors", "total", "Queue operations that failed (database)", ["op"]
@@ -200,6 +258,11 @@ class Worker:
 
     async def _renew_and_acquire(self) -> None:
         self._held = set(await self._queue.renew(self.worker_id, self._settings.lease_ttl_s))
+        lost = set(self._cameras) - self._held
+        for camera_id in lost:  # another worker has it now; its history is not ours to continue
+            del self._cameras[camera_id]
+        if lost:
+            log.warning("lost camera leases", extra={"cameras": sorted(lost)})
         await self._acquire()
 
     async def _acquire(self) -> None:
@@ -221,6 +284,7 @@ class Worker:
             # The leases expire on their own after lease_ttl_s.
             log.warning("release failed", extra={"error": str(exc)})
         self._held.clear()
+        self._cameras.clear()
         self._leased.set(0)
         if self._owns_executor:
             self._executor.shutdown(wait=True)
@@ -233,11 +297,21 @@ class Worker:
             attributes={"camera_id": frame.camera_id, "frame_id": frame.frame_id},
         ):
             self._wait.observe(max(0.0, (self._clock.now() - frame.received_at).total_seconds()))
-            self._check_order(frame)
+            state = await self._camera_state(frame.camera_id)
+            key = (frame.ts, frame.seq)
+            track = state.last_key is None or key > state.last_key
+            if not track:
+                self._late.inc()
+            elif state.last_key is not None and (
+                (frame.ts - state.last_key[0]).total_seconds() > self._tracking.buffer_s
+            ):
+                self._reset_tracker(state)
             try:
                 with self._timed("fetch"):
                     jpeg = await self._fetcher.get(frame.object_key)
-                analysis = await self._in_thread(self._analyze, jpeg)
+                analysis = await self._in_thread(
+                    lambda data: self._analyze(data, frame, state if track else None), jpeg
+                )
             except DecodeError as exc:
                 return await self._fail(frame, f"decode: {exc}", retry=False)
             except ObjectStoreError as exc:
@@ -259,6 +333,11 @@ class Worker:
                 blur_var=analysis.blur_var,
                 model_version=self._detector.model_version,
                 detections=analysis.detections,
+                tracks=analysis.tracks,
+                events=tuple(
+                    EventRow(self._ids.new(), e.ts, e.track_id, e.zone_id, e.event_type)
+                    for e in analysis.zone_events
+                ),
             )
             try:
                 with self._timed("write"):
@@ -271,11 +350,15 @@ class Worker:
                 return Outcome.LOST
             self._frames.labels(outcome=Outcome.DONE).inc()
             self._detections.inc(len(result.detections))
+            self._track_sightings.inc(len(result.tracks))
+            for event in result.events:
+                self._zone_events.labels(event_type=event.event_type).inc()
             self._freshness.observe(max(0.0, (self._clock.now() - frame.ts).total_seconds()))
             return Outcome.DONE
 
-    def _analyze(self, jpeg: bytes) -> Analysis:
-        """Decode, input statistics and detection; runs in the inference thread."""
+    def _analyze(self, jpeg: bytes, frame: ClaimedFrame, state: CameraState | None) -> Analysis:
+        """Decode, input statistics, detection and (if `state`) tracking and zones; runs in the
+        inference thread. `state` is None for frames that must not be tracked (late)."""
         timings: dict[str, float] = {}
         with self._stage_timer(timings, "decode"):
             image = decode_jpeg(jpeg)
@@ -283,14 +366,86 @@ class Worker:
             stats = input_stats(image)
         with self._stage_timer(timings, "infer"):
             found = self._detector.detect(image)
-        detections = tuple(
-            DetectionRow(i, d.class_name, d.confidence, d.x1, d.y1, d.x2, d.y2)
-            for i, d in enumerate(found)
-        )
         height, width = image.shape[:2]
-        return Analysis(
-            width, height, stats.brightness, stats.contrast, stats.blur_var, detections, timings
+
+        track_of: dict[int, str] = {}  # detection index -> global track id
+        zone_events: list[ZoneEvent] = []
+        if state is not None:
+            with self._stage_timer(timings, "track"):
+                for box in state.tracker.update(found):
+                    track_of[box.det_index] = f"{frame.camera_id}:{state.session}:{box.local_id}"
+                state.last_key = (frame.ts, frame.seq)
+                anchors = {
+                    track_id: anchor(d.x1, d.y1, d.x2, d.y2, width, height)
+                    for i, track_id in track_of.items()
+                    for d in (found[i],)
+                }
+                zone_events = state.zones.update(frame.ts, anchors)
+
+        min_conf = self._tracking.store_min_conf
+        kept = [i for i, d in enumerate(found) if d.confidence >= min_conf or i in track_of]
+        detections = tuple(
+            DetectionRow(
+                n,
+                found[i].class_name,
+                found[i].confidence,
+                found[i].x1,
+                found[i].y1,
+                found[i].x2,
+                found[i].y2,
+                track_of.get(i),
+            )
+            for n, i in enumerate(kept)
         )
+        tracks = tuple(TrackUpdate(t, found[i].class_name) for i, t in track_of.items())
+        return Analysis(
+            width,
+            height,
+            stats.brightness,
+            stats.contrast,
+            stats.blur_var,
+            detections,
+            tracks,
+            tuple(zone_events),
+            state is not None,
+            timings,
+        )
+
+    def _reset_tracker(self, state: CameraState) -> None:
+        """Start a new tracker session after a pause longer than the tracker's buffer.
+
+        ByteTrack's buffer counts frames, not seconds, so across a pause (camera offline, a
+        backlog of old frames) it would join objects seen before it to whatever is there after.
+        The zone tracker needs no reset: it expires tracks by capture time and closes their
+        visits at their last sighting.
+        """
+        state.session = self._ids.new()[-8:].lower()
+        state.tracker = self._tracker_factory(self._tracking)
+        self._resets.inc()
+
+    async def _camera_state(self, camera_id: str) -> CameraState:
+        """This worker's state for a camera, created on its first frame; zones are (re)loaded
+        when stale. A failed zone load keeps the zones already known and retries next frame."""
+        state = self._cameras.get(camera_id)
+        if state is None:
+            state = CameraState(
+                session=self._ids.new()[-8:].lower(),
+                tracker=self._tracker_factory(self._tracking),
+                zones=ZoneTracker((), self._zone_settings, self._tracking.buffer_s),
+                zones_loaded_at=float("-inf"),
+            )
+            self._cameras[camera_id] = state
+        now = self._clock.monotonic()
+        if now - state.zones_loaded_at >= self._zone_settings.refresh_s:
+            try:
+                rows = await self._queue.zones(camera_id)
+            except FrameStoreError as exc:
+                self._errors.labels(op="zones").inc()
+                log.warning("zone load failed", extra={"camera_id": camera_id, "error": str(exc)})
+            else:
+                state.zones.set_zones(ZoneDef(r.zone_id, r.name, r.polygon) for r in rows)
+                state.zones_loaded_at = now
+        return state
 
     async def _fail(self, frame: ClaimedFrame, error: str, retry: bool) -> Outcome:
         try:
@@ -318,14 +473,6 @@ class Worker:
             extra={"frame_id": frame.frame_id, "outcome": outcome, "error": error},
         )
         return outcome
-
-    def _check_order(self, frame: ClaimedFrame) -> None:
-        key = (frame.ts, frame.seq)
-        last = self._last_ts.get(frame.camera_id)
-        if last is not None and key < last:
-            self._late.inc()
-        else:
-            self._last_ts[frame.camera_id] = key
 
     async def _in_thread(self, fn: Callable[[bytes], T], arg: bytes) -> T:
         ctx = otel_context.get_current()

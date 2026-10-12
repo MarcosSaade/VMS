@@ -187,3 +187,180 @@ def test_decode_jpeg_rejects_garbage() -> None:
 
 def test_outcome_values_match_metric_labels() -> None:
     assert {o.value for o in Outcome} == {"done", "retry", "failed", "lost"}
+
+
+# --- Tracking and zones -----------------------------------------------------------------
+
+from vms.storage.work import ZoneRow  # noqa: E402
+from vms.worker.detector import Detection  # noqa: E402
+
+# Frames are 64x48 (conftest.jpeg); a person box whose bottom centre walks right.
+LOWER_RIGHT = ZoneRow("cam-a:door", "door", ((0.5, 0.5), (1.0, 0.5), (1.0, 1.0), (0.5, 1.0)))
+
+
+def person(x: float, conf: float = 0.9) -> Detection:
+    return Detection("person", conf, x, 20.0, x + 8.0, 40.0)  # anchor y = 40/48 = 0.83
+
+
+def process_all(h: Harness) -> None:
+    """Step until two idle steps in a row (the first idle step may only lease cameras)."""
+    idle = 0
+    while idle < 2:
+        idle = 0 if run(h.worker.step()) else idle + 1
+
+
+def test_detections_get_stable_track_ids_and_tracks_are_reported(h: Harness) -> None:
+    for seq in range(4):
+        h.queue.add("cam-a", seq, seq * 0.2)
+    h.detector.script = [
+        [person(4 + 2 * f), Detection("traffic light", 0.9, 50, 1, 54, 9)] for f in range(4)
+    ]
+    process_all(h)
+
+    track_ids = {
+        d.track_id
+        for r in h.queue.results.values()
+        for d in r.detections
+        if d.class_name == "person"
+    }
+    assert len(track_ids) == 1
+    (track_id,) = track_ids
+    camera, session, local = track_id.split(":")
+    assert (camera, local) == ("cam-a", "1")
+    assert len(session) == 8
+    # Untracked classes are stored without a track.
+    lights = [
+        d for r in h.queue.results.values() for d in r.detections if d.class_name == "traffic light"
+    ]
+    assert len(lights) == 4
+    assert all(d.track_id is None for d in lights)
+    assert [t.track_id for r in h.queue.results.values() for t in r.tracks] == [track_id] * 4
+    assert h.sample("vms_worker_track_sightings_total") == 4
+
+
+def test_weak_detections_are_stored_only_when_tracked(h: Harness) -> None:
+    for seq in range(3):
+        h.queue.add("cam-a", seq, seq * 0.2)
+    lone_weak = Detection("person", 0.15, 50, 0, 58, 10)
+    h.detector.script = [
+        [person(4), lone_weak],
+        [person(6, conf=0.15), lone_weak],  # the tracked person turns weak for one frame
+        [person(8), lone_weak],
+    ]
+    process_all(h)
+    stored = [
+        [(d.confidence, d.track_id is not None) for d in h.queue.results[f"cam-a-{i}"].detections]
+        for i in range(3)
+    ]
+    assert stored == [
+        [(0.9, True)],
+        [(0.15, True)],  # kept: it belongs to a track
+        [(0.9, True)],
+    ]
+
+
+def test_zone_events_are_written_with_the_frame(h: Harness) -> None:
+    h.queue.zone_rows["cam-a"] = [LOWER_RIGHT]
+    # Anchor x = (x + 4) / 64: 0.44, 0.47, then 0.53, 0.56, 0.59 (inside). Small steps, as
+    # real motion at 5 FPS: ByteTrack matches by box overlap, so a jump would start a new track.
+    xs = [24, 26, 30, 32, 34]
+    for seq in range(len(xs)):
+        h.queue.add("cam-a", seq, seq * 0.2)
+    h.detector.script = [[person(x)] for x in xs]
+    process_all(h)
+
+    events = [
+        (r.frame_id, e.event_type, e.zone_id, e.ts)
+        for r in h.queue.results.values()
+        for e in r.events
+    ]
+    ((frame_id, kind, zone_id, ts),) = events
+    # Confirmed on frame 3 (min_frames=2), timestamped at frame 2, the first one inside.
+    assert (frame_id, kind, zone_id) == ("cam-a-3", "zone_enter", "cam-a:door")
+    assert ts == h.queue.rows["cam-a-2"].frame.ts
+    event_ids = [e.event_id for r in h.queue.results.values() for e in r.events]
+    assert len(event_ids[0]) == 26  # a ULID
+    assert h.sample("vms_worker_zone_events_total", event_type="zone_enter") == 1
+
+
+def test_late_and_retried_frames_are_stored_but_not_tracked(h: Harness) -> None:
+    h.queue.add("cam-a", 5, 1.0)
+    run(h.worker.step())
+    h.queue.add("cam-a", 4, 0.8)  # arrived after a later frame was tracked
+    run(h.worker.step())
+    late = h.queue.results["cam-a-4"]
+    assert late.detections
+    assert all(d.track_id is None for d in late.detections)
+    assert late.tracks == ()
+
+    # A frame whose write failed comes back: the tracker has already seen it.
+    h.queue.add("cam-a", 6, 1.2)
+    h.queue.fail_ops = {"complete"}
+    run(h.worker.step())
+    h.queue.fail_ops = set()
+    run(h.worker.step())
+    assert h.queue.status("cam-a-6") == "done"
+    assert h.queue.results["cam-a-6"].tracks == ()
+    assert h.sample("vms_worker_late_frames_total") == 2
+
+
+def test_losing_a_lease_drops_the_camera_state(h: Harness) -> None:
+    h.queue.add("cam-a", 0, 0.0)
+    process_all(h)
+    first = h.queue.results["cam-a-0"].detections[0].track_id
+    assert first is not None
+
+    h.queue.leases["cam-a"] = "w2"  # another worker took it over
+    h.clock.advance(5.0)  # next renew notices
+    run(h.worker.step())
+    h.queue.leases.pop("cam-a")  # and later gave it back
+    h.queue.add("cam-a", 1, 0.2)
+    process_all(h)
+    second = h.queue.results["cam-a-1"].detections[0].track_id
+    assert second is not None
+    assert second.split(":")[1] != first.split(":")[1]  # a new tracker session
+
+
+def test_zones_are_reloaded_on_cadence_and_a_failed_load_is_not_fatal(h: Harness) -> None:
+    h.queue.add("cam-a", 0, 0.0)
+    h.queue.fail_ops = {"zones"}
+    process_all(h)
+    assert h.queue.status("cam-a-0") == "done"
+    assert h.sample("vms_worker_loop_errors_total", op="zones") == 1
+
+    h.queue.fail_ops = set()
+    h.queue.add("cam-a", 1, 0.2)
+    process_all(h)  # retried at once because no load has succeeded yet
+    loads = h.queue.calls.count("zones")
+    h.queue.add("cam-a", 2, 0.4)
+    process_all(h)
+    assert h.queue.calls.count("zones") == loads  # refresh_s not elapsed
+    h.clock.advance(60.0)
+    h.queue.add("cam-a", 3, 0.6)
+    process_all(h)
+    assert h.queue.calls.count("zones") == loads + 1
+
+
+def test_a_time_gap_longer_than_the_buffer_starts_a_new_tracker(h: Harness) -> None:
+    # ByteTrack's buffer counts frames, not time: without a reset it would join an object
+    # seen before a pause (camera offline, old backlog) to whatever is there afterwards.
+    h.queue.zone_rows["cam-a"] = [LOWER_RIGHT]
+    times = [0.0, 0.2, 0.4, 3600.0, 3600.2, 3600.4]  # one hour offline
+    for seq, ts in enumerate(times):
+        h.queue.add("cam-a", seq, ts)
+    h.detector.script = [[person(40)] for _ in times]  # same place before and after
+    process_all(h)
+
+    ids = [h.queue.results[f"cam-a-{i}"].detections[0].track_id for i in range(len(times))]
+    assert ids[0] == ids[1] == ids[2]
+    assert ids[3] == ids[4] == ids[5]
+    assert ids[0] != ids[3]
+    # The first visit is closed at its last sighting; the new track enters afresh.
+    events = [(e.track_id, e.event_type, e.ts) for r in h.queue.results.values() for e in r.events]
+    t = {i: h.queue.rows[f"cam-a-{i}"].frame.ts for i in range(len(times))}
+    assert events == [
+        (ids[0], "zone_enter", t[0]),
+        (ids[0], "zone_exit", t[2]),
+        (ids[3], "zone_enter", t[3]),
+    ]
+    assert h.sample("vms_worker_tracker_resets_total") == 1

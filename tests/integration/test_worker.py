@@ -27,7 +27,14 @@ from vms.loadgen.schedule import plan_cameras
 from vms.loadgen.settings import LoadgenSettings
 from vms.loadgen.transport import HttpTransport
 from vms.storage.frames import PoolTuning
-from vms.storage.work import DetectionRow, FailOutcome, FrameResult, PostgresWorkQueue
+from vms.storage.work import (
+    DetectionRow,
+    EventRow,
+    FailOutcome,
+    FrameResult,
+    PostgresWorkQueue,
+    TrackUpdate,
+)
 from vms.worker.weights import ensure_weights, load_models_config
 
 pytestmark = pytest.mark.integration
@@ -232,6 +239,49 @@ def test_release_hands_back_frames_and_leases(stack: StackSettings, fresh_db: st
     assert fetch(stack, fresh_db, "SELECT DISTINCT attempts FROM frames") == [(0,)]
 
 
+def test_tracks_are_upserted_and_events_appended_in_the_fenced_write(
+    stack: StackSettings, fresh_db: str
+) -> None:
+    insert_frames(stack, fresh_db, ["cam-a"], 3)
+    with psycopg.connect(dsn(stack, fresh_db), autocommit=True) as conn:
+        conn.execute("INSERT INTO cameras VALUES ('cam-a', 'entrance', 's', 'UTC')")
+        conn.execute(
+            "INSERT INTO zones VALUES ('cam-a:door', 'cam-a', 'door', "
+            "'[[0, 0], [1, 0], [1, 1], [0, 1]]')"
+        )
+
+    async def body(q1: PostgresWorkQueue) -> None:
+        assert [z.zone_id for z in await q1.zones("cam-a")] == ["cam-a:door"]
+        assert (await q1.zones("cam-a"))[0].polygon[1] == (1.0, 0.0)
+        assert await q1.zones("cam-unknown") == []
+        await q1.acquire_cameras("w1", 1, TTL_S, 3)
+        for f in await q1.claim("w1", 3):
+            enter = EventRow(f"e{f.seq}", f.ts, "cam-a:s:1", "cam-a:door", "zone_enter")
+            tracked = FrameResult(
+                frame_id=f.frame_id,
+                camera_id="cam-a",
+                ts=f.ts,
+                width=64,
+                height=48,
+                brightness=1.0,
+                contrast=1.0,
+                blur_var=1.0,
+                model_version="test@0",
+                detections=(DetectionRow(0, "person", 0.9, 0, 0, 1, 1, "cam-a:s:1"),),
+                tracks=(TrackUpdate("cam-a:s:1", "person"),),
+                events=(enter,) if f.seq == 1 else (),
+            )
+            assert await q1.complete("w1", tracked)
+
+    with_queues(stack, fresh_db, 1, body)
+    track = fetch(stack, fresh_db, "SELECT class_name, first_seen, last_seen, n_frames FROM tracks")
+    assert track == [("person", T0, T0 + timedelta(seconds=0.4), 3)]
+    assert fetch(stack, fresh_db, "SELECT event_id, zone_id, event_type FROM events") == [
+        ("e1", "cam-a:door", "zone_enter")
+    ]
+    assert fetch(stack, fresh_db, "SELECT DISTINCT track_id FROM detections") == [("cam-a:s:1",)]
+
+
 # --- End to end ---------------------------------------------------------------------------
 
 
@@ -265,6 +315,14 @@ def test_loadgen_to_detections_with_yolo11n(
     asyncio.run(send())  # type: ignore[arg-type]
     sent = fetch(stack, fresh_db, "SELECT count(*) FROM frames")[0][0]
     assert sent == 8
+    # The first camera is catalogued with a zone covering the whole frame.
+    zoned, plain = plans[0].camera_id, plans[1].camera_id
+    with psycopg.connect(dsn(stack, fresh_db), autocommit=True) as conn:
+        conn.execute("INSERT INTO cameras VALUES (%s, 'entrance', 's', 'UTC')", (zoned,))
+        conn.execute(
+            "INSERT INTO zones VALUES (%s, %s, 'all', '[[0, 0], [1, 0], [1, 1], [0, 1]]')",
+            (f"{zoned}:all", zoned),
+        )
 
     worker_env = {"VMS_DETECTOR__WEIGHTS": "yolo11n", "VMS_QUEUE__POLL_MAX_S": "0.2"}
     with service("vms.worker", stack, fresh_db, worker_env) as url:
@@ -297,6 +355,20 @@ def test_loadgen_to_detections_with_yolo11n(
     # bus.jpg: one bus and four people per frame with yolo11n at conf 0.25 (upstream example).
     assert by_class.get("bus", 0) == 8
     assert by_class.get("person", 0) >= 3 * 8
+    # Static scene: every tracked object is tracked in all 4 frames of its camera, and on the
+    # zoned camera each one enters the zone once (confirmed on frame 2, stamped at frame 1).
+    tracks = fetch(
+        stack, fresh_db, "SELECT camera_id, n_frames, count(*) FROM tracks GROUP BY 1, 2"
+    )
+    assert {(c, n) for c, n, _ in tracks} == {(zoned, 4), (plain, 4)}
+    n_tracks = {c: k for c, _, k in tracks}
+    assert n_tracks[zoned] == n_tracks[plain] >= 5  # the bus and at least four people
+    events = fetch(
+        stack, fresh_db, "SELECT camera_id, event_type, count(*) FROM events GROUP BY 1, 2"
+    )
+    assert events == [(zoned, "zone_enter", n_tracks[zoned])]
+    untracked = fetch(stack, fresh_db, "SELECT count(*) FROM detections WHERE track_id IS NULL")
+    assert untracked == [(0,)]  # bus.jpg has only tracked classes above the store threshold
     # Same image, deterministic model: every frame has identical detections.
     per_frame = fetch(
         stack,

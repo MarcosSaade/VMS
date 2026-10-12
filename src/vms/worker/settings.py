@@ -12,6 +12,8 @@ from vms.common.settings import ServiceSettings
 from vms.storage.frames import PoolTuning
 from vms.storage.objects import ObjectStoreTuning
 from vms.worker.detector import DetectorSettings
+from vms.worker.tracking import TrackerSettings
+from vms.worker.zones import ZoneSettings
 
 
 class _Section(BaseModel):
@@ -51,5 +53,14 @@ class WorkerSettings(ServiceSettings):
     http: HttpServerSettings = Field(default_factory=HttpServerSettings)
     queue: QueueSettings = Field(default_factory=QueueSettings)
     detector: DetectorSettings = Field(default_factory=DetectorSettings)
+    tracker: TrackerSettings = Field(default_factory=TrackerSettings)
+    zones: ZoneSettings = Field(default_factory=ZoneSettings)
     db: PoolTuning = Field(default_factory=PoolTuning)
     objects: ObjectStoreTuning = Field(default_factory=ObjectStoreTuning)
+
+    @model_validator(mode="after")
+    def _detector_feeds_tracker(self) -> WorkerSettings:
+        # Boxes the detector drops never reach ByteTrack's low-confidence round.
+        if self.detector.conf > self.tracker.low_thresh:
+            raise ValueError("detector.conf must not exceed tracker.low_thresh")
+        return self
