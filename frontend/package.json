@@ -1,0 +1,20 @@
+{
+  "name": "vms-ui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Minimal VMS UI: camera wall and structured query box (task 1.8).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "screenshots": "node scripts/screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1",
+    "typescript": "6.0.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.1"
+  }
+}

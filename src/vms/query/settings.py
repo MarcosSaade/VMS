@@ -78,6 +78,8 @@ class QuerySettings(ServiceSettings):
     log_db: PoolTuning = Field(default_factory=PoolTuning)
     objects: ObjectStoreTuning = Field(default_factory=ObjectStoreTuning)
     catalog_ttl_s: float = Field(default=30.0, ge=0)
+    # Built frontend (Vite output); served at "/" when it exists.
+    ui_dir: Path = Path("frontend/dist")
     sql: SqlValidatorSettings = Field(default_factory=SqlValidatorSettings)
     assets: QueryAssets = Field(default_factory=QueryAssets)
     llm: LlmTuning = Field(default_factory=LlmTuning)

@@ -43,7 +43,7 @@
   - Understand it: how is a zone event decided, and what happens at the boundary when a box jitters?
 - [x] 1.7 Query service v0: typed `QueryPlan` planner, validation and repair, Postgres compiler, SQL validator, read-only execution, `query_log` (SHRINK: JSON responses, no semantic search, no cache)
   - Understand it: trace one question from text to SQL; where can it fail, and what does the user see for each failure?
-- [ ] 1.8 Minimal UI: live camera tiles, query box with answer and chart or table, plan JSON and compiled SQL panel (SHRINK: no feedback buttons, no semantic mode)
+- [x] 1.8 Minimal UI: live camera tiles, query box with answer and chart or table, plan JSON and compiled SQL panel (SHRINK: no feedback buttons, no semantic mode)
   - Understand it: what does the UI call, and how does it show an abstention or a validator rejection?
 - [ ] 1.9 `make demo` end to end on CPU, plus integration test
   - Understand it: what exactly does the demo prove, and what does it fake (LLM, models)?

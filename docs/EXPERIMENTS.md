@@ -108,3 +108,8 @@ Outcome: `llm.response_format` made configurable (D22). Exact plan match underco
 Tried: logging and prompting plans with `model_dump(exclude_defaults=True)` (compact JSON).
 Result: a unit test found the time range's `kind` dropped (it has a default, and it is the union discriminator), so the dumped plan did not parse back. It affected the few-shot examples rendered into the planner prompt (they taught a format that fails validation), canned replies with time ranges, and plans in responses and query_log. Found before any planner run.
 Outcome: `QueryPlan.compact()` keeps `kind`; a test round-trips every few-shot plan.
+
+### E-019 | 2026-10-12 | frontend
+Tried: building the application image (`deploy/docker/Dockerfile`: node 22 UI stage + python 3.12 slim with `uv sync --locked --no-dev`) and the UI, in the cloud container (not a benchmark).
+Result: image 974 MB compressed, 4.31 GB unpacked (CPU PyTorch, Ultralytics and their dependencies); cold build 3 min 36 s, rebuild after a source change seconds (dependency layer cached). UI bundle 10.4 KB JS, 4.7 KB CSS. `npm install` with Node 22's npm 10.9.4 crashed in arborist (`Cannot read properties of null (reading 'edgesOut')`) resolving Vite's optional peers; npm 11.20.0 wrote the lockfile, and npm 10's `npm ci` installs from it.
+Outcome: keep one image for now (D23); a slim query image is the lever if build time matters. Regenerate frontend/package-lock.json with npm 11 (`npx npm@11 install`).

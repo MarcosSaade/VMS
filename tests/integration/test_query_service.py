@@ -203,3 +203,16 @@ def test_reader_row_cap(reader_dsn: str, seeded_db: dict[str, Any]) -> None:
     rows = asyncio.run(_execute(reader(reader_dsn), "SELECT track_id FROM tracks", max_rows=3))
     assert len(rows.rows) == 3
     assert rows.truncated is True
+
+
+def test_live_view_shows_the_latest_processed_frame(
+    query_url: str, seeded_db: dict[str, Any]
+) -> None:
+    with urllib.request.urlopen(f"{query_url}/v1/live", timeout=HTTP_TIMEOUT_S) as response:
+        cameras = {c["name"]: c for c in json.load(response)["cameras"]}
+    parking = cameras["parking_lot"]
+    assert parking["frame"]["frame_id"] == seeded_db["frame_id"]
+    assert parking["frame"]["detections"][0]["class_name"] == "car"
+    assert parking["frame"]["detections"][0]["box"] == [1.0, 2.0, 30.0, 40.0]
+    assert cameras["entrance"]["frame"] is None  # no frames from it
+    assert [z["name"] for z in cameras["entrance"]["zones"]] == ["front_door"]

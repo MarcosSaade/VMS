@@ -75,3 +75,7 @@ frontend/dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Frontend: dependencies and build output (npm ci; npm run build)
+/frontend/node_modules/
+/frontend/dist/
