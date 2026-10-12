@@ -1,5 +1,36 @@
 # Query service. Overrides configs/common.yaml; VMS_* environment variables override this file
-# (e.g. VMS_SQL__MAX_LIMIT=500).
+# (e.g. VMS_SQL__MAX_LIMIT=500). Database and object-store connections come from POSTGRES_*,
+# POSTGRES_READONLY_* and S3_* in .env; the LLM from LLM_* (see .env.example).
+
+http:
+  host: 127.0.0.1
+  port: 8070
+  graceful_shutdown_s: 10
+
+reader:                       # read-only login that runs compiled SQL (ARCHITECTURE 11)
+  min_size: 1
+  max_size: 8
+  connect_timeout_s: 5
+  acquire_timeout_s: 2
+  statement_timeout_ms: 5000  # cancels runaway queries; the error type is "timeout"
+
+log_db:                       # schema owner, INSERT into query_log only
+  min_size: 0
+  max_size: 2
+  connect_timeout_s: 5
+  acquire_timeout_s: 2
+  statement_timeout_ms: 2000
+
+objects:                      # frame images for GET /v1/frames/{id}/image
+  max_concurrency: 4
+  connect_timeout_s: 2
+  read_timeout_s: 5
+  max_attempts: 3
+
+catalog_ttl_s: 30             # cameras and zones are re-read from Postgres at most this often
+
+telemetry:
+  sample_ratio: 1.0           # every question is traced
 
 sql:
   dialect: postgres

@@ -41,7 +41,7 @@
   - Understand it: what does `SKIP LOCKED` guarantee with two workers, and what breaks tracking if one camera's frames are processed out of order?
 - [x] 1.6 Tracking (ByteTrack) and zone enter/exit events (SHRINK: loiter optional)
   - Understand it: how is a zone event decided, and what happens at the boundary when a box jitters?
-- [ ] 1.7 Query service v0: typed `QueryPlan` planner, validation and repair, Postgres compiler, SQL validator, read-only execution, `query_log` (SHRINK: JSON responses, no semantic search, no cache)
+- [x] 1.7 Query service v0: typed `QueryPlan` planner, validation and repair, Postgres compiler, SQL validator, read-only execution, `query_log` (SHRINK: JSON responses, no semantic search, no cache)
   - Understand it: trace one question from text to SQL; where can it fail, and what does the user see for each failure?
 - [ ] 1.8 Minimal UI: live camera tiles, query box with answer and chart or table, plan JSON and compiled SQL panel (SHRINK: no feedback buttons, no semantic mode)
   - Understand it: what does the UI call, and how does it show an abstention or a validator rejection?

@@ -90,7 +90,7 @@ curl -s localhost:8080/readyz   # {"postgres":"ok","object_store":"ok"}
 - Migrations live in `src/vms/storage/migrations/versions/` as hand-written SQL. `uv run alembic current` shows the applied revision, `uv run alembic downgrade -1` rolls one back, `uv run alembic revision -m "..."` starts a new one.
 - `make migrate` is idempotent; re-run it after editing `configs/cameras.yaml` or rotating `POSTGRES_READONLY_PASSWORD`. Bootstrap (connecting as `POSTGRES_USER`) creates or updates the query service's login `POSTGRES_READONLY_USER` as a member of `vms_query_reader` (SELECT on the validator's allowlisted columns only, read-only by default), then upserts cameras and zones from `configs/cameras.yaml`.
 - Camera catalog: camera and zone names are what questions use and must stay unique (zone names across all cameras); polygons are normalized 0..1 frame coordinates. Upsert only: a camera or zone removed from the YAML stays in the database and bootstrap logs it as stale; delete it by hand (`DELETE FROM cameras WHERE camera_id = ...`, which also deletes its zones) if it really is gone. Renaming a zone creates a new zone id (`<camera_id>:<name>`).
-- Ingest accepts frames from any camera id, catalogued or not (load tests use `cam-001`..`cam-NNN`); queries only see cameras in the catalog because they join `cameras` by name.
+- Ingest accepts frames from any camera id, catalogued or not (load tests use `cam-001`..`cam-NNN`); queries only see cameras in the catalog: the compiler restricts every query to catalog camera ids.
 - Check what the query login can read: `psql -U vms_query -h localhost vms -c '\dp'`, or try `SELECT status FROM frames` as it (permission denied).
 - What ingest stored: `frames` rows (status `pending` until a worker claims them) and objects under `frames/{camera_id}/{yyyy-mm-dd}/` in the `S3_BUCKET` bucket.
 - Integration tests create and drop a throwaway database (`vms_it_*`) per test and delete the objects they wrote, so they do not touch dev data.
@@ -112,6 +112,24 @@ make bench-model   # model-only latency (bench/scenarios/worker-model-cpu.yaml);
 - A frame that keeps failing ends as `status = 'failed'` with the reason in `frames.error`. To retry failed frames after a fix: `UPDATE frames SET status = 'pending', attempts = 0, error = NULL WHERE status = 'failed'`.
 - Ultralytics runs offline (`YOLO_OFFLINE=1`, `YOLO_AUTOINSTALL=0`, set by `vms.worker.detector`): no usage analytics, no packages installed at runtime. Weights and the package are AGPL-3.0 (see `configs/models.yaml`).
 - PyTorch comes from the CPU wheel index (`pyproject.toml`, `[tool.uv.sources]`). GPU sessions install the CUDA build (task 2.4).
+
+### Query service
+
+```bash
+make query         # http://127.0.0.1:8070 (configs/query.yaml; VMS_HTTP__PORT to change)
+curl -s localhost:8070/v1/query -H 'Content-Type: application/json' \
+  -d '{"question": "How many people did each camera see in the last hour?"}' | jq
+uv run python -m vms.query plan "How many cars were in the parking lot today?"   # plan + SQL, no database
+uv run python -m vms.query plan --compare configs/demo/canned_plans.v1.jsonl    # plan the demo questions, report matches
+```
+
+- Which LLM plans: `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` in `.env` (`vms.query.llm`). With `LLM_MODEL` empty the service uses the canned planner, which answers only the questions in `configs/demo/canned_plans.v1.jsonl` and abstains (`unsupported`) on anything else; the startup log says so. `VMS_LLM__PROVIDER=canned|openai` forces one.
+  - Ollama: `ollama pull qwen2.5:7b`, then `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=qwen2.5:7b`, no key. Ollama supports JSON-schema structured output (the default, `llm.response_format: json_schema`).
+  - Hosted OpenAI-compatible APIs: set `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`. DeepSeek (`https://api.deepseek.com`) rejects `json_schema`; set `VMS_LLM__RESPONSE_FORMAT=json_object`.
+- The response is one JSON object for every outcome: `status` (`ok`, `abstained`, `error`), `answer`, `result_kind`, `columns`/`rows`, `plan`, `compiled_sql` (the validated SQL that ran, with `%(pN)s` placeholders) and `params`, `error` (`type`, `detail`, plan `errors`), `timings_ms` per stage, `tokens`, `llm`. HTTP 200 for answers and abstentions; 422 `invalid_plan`; 503 `planner_unavailable`; 504 `timeout`; 500 `compile_error`, `sql_rejected`, `execution_error`.
+- Compiled SQL runs as `POSTGRES_READONLY_USER` with `reader.statement_timeout_ms` (5 s) and the row cap `sql.max_limit` (1000). Frame images: `GET /v1/frames/{frame_id}/image` (the service reads the object store; browsers need no S3 access). Cameras and zones: `GET /v1/catalog`, re-read from Postgres every `catalog_ttl_s`.
+- Every question is a row in `query_log` (written as `POSTGRES_USER`; the read-only login cannot read it): `SELECT ts, question, success, error_type, latency_ms, timings, llm FROM query_log ORDER BY ts DESC LIMIT 20`.
+- Metrics on `/metrics`: `vms_query_requests_total{status,error_type}`, `vms_query_stage_duration_seconds{stage}`, `vms_query_llm_tokens_total`, `vms_query_plan_repairs_total`, `vms_query_query_log_failures_total`.
 
 ### Load generator
 
@@ -160,6 +178,9 @@ Symptom, cause and fix entries as issues are met.
 - `make ingest` starts but `/readyz` returns 503: the named dependency is down or misconfigured. Check `make ps`, then the `POSTGRES_*` / `S3_*` values in `.env` (they must match what the stack was created with).
 - Ingest answers 500 `database_unavailable` with `relation "frames" does not exist`: migrations were not applied. Run `make migrate`.
 - `vms_ingest_orphaned_objects_total` above 0: an object was written but neither recorded nor removed (database and store both failed for that frame). Harmless for correctness; the objects under `frames/` that have no `frames` row can be deleted.
+- Query service answers 503 `planner_unavailable`: the LLM at `LLM_BASE_URL` is unreachable or timing out (`llm.timeout_s`, after `llm.max_retries`). Check `curl $LLM_BASE_URL/models`, or unset `LLM_MODEL` to use the canned planner.
+- Query service answers 422 `invalid_plan` for most questions with a hosted model: the provider may ignore or reject `json_schema`; look at `error.errors` in the response and try `VMS_LLM__RESPONSE_FORMAT=json_object`.
+- Query service `/readyz` returns 503 with `postgres: unavailable`: the read-only login is missing or its password differs from `.env`. Run `make migrate`.
 - `make loadgen` reports every frame failed with reason `connection`: nothing listens on `target_url`. Start the ingest service or `make loadgen-stub`.
 - `make loadgen` logs "generator fell behind its schedule": the host or the generator is saturated, so the run offered less load than configured. Reduce cameras, close other load on the machine, or run several loadgen processes with different `camera_prefix` values.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.

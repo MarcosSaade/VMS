@@ -98,3 +98,13 @@ Outcome: keep the time-gap reset (D21). The dev database still holds tracks from
 Tried: E-013 and E-014 with only the detector threshold changed, 0.25 -> 0.1 (the tracking default, D21). Same host and scenarios; commit 8d270be.
 Result: yolo11s 9.79 frames/s (std 0.22; was 9.81), infer p50 89 ms; yolo11n 18.8 frames/s (std 1.9; was 20.0, std 1.07), infer p50 40 ms. Raw detections per frame 27.8 and 23.2 (were 16.7 and 13.2) before the storage rule. bench/results/2026-10-12-worker-model-cpu-01M4QVF9ZAKC9HXMTFERF164VV.json, bench/results/2026-10-12-worker-model-cpu-n-01M4QVGTE15P83D77JXS71K9VF.json
 Outcome: no measurable latency cost from the lower threshold (yolo11n difference inside run-to-run noise on a busy laptop). BENCHMARKS now shows the 0.1 runs.
+
+### E-017 | 2026-10-12 | llm
+Tried: planner smoke run, not an eval: `python -m vms.query plan --compare configs/demo/canned_plans.v1.jsonl` with DeepSeek (`deepseek-flash`, `LLM_BASE_URL=https://api.deepseek.com`), planner.v1 prompt with all 29 few-shots, cloud container, commit d98dc94 plus the uncommitted 1.7c work.
+Result: `json_schema` response_format rejected by the API ("unavailable"); with `json_object`: 10/10 valid plans, no repairs; 8/10 identical to the canned plans, the other 2 equivalent (zones register_1/2 instead of camera checkout; limit 20 instead of 12). ~4.5k prompt tokens per question; latency 1.2 to 3.6 s (p50 ~1.8 s, n=10). Output not committed (ad hoc smoke).
+Outcome: `llm.response_format` made configurable (D22). Exact plan match undercounts correct answers: score execution results in 3.2. The planner alone is above the 1.5 s query p95 SLO with this hosted model.
+
+### E-018 | 2026-10-12 | query
+Tried: logging and prompting plans with `model_dump(exclude_defaults=True)` (compact JSON).
+Result: a unit test found the time range's `kind` dropped (it has a default, and it is the union discriminator), so the dumped plan did not parse back. It affected the few-shot examples rendered into the planner prompt (they taught a format that fails validation), canned replies with time ranges, and plans in responses and query_log. Found before any planner run.
+Outcome: `QueryPlan.compact()` keeps `kind`; a test round-trips every few-shot plan.

@@ -4,6 +4,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from tests.unit.query.conftest import REPO_ROOT
+from vms.query.fewshots import load_fewshots
 from vms.query.plan import (
     PLAN_LIMIT_MAX,
     SCHEMA_VERSION,
@@ -327,3 +329,23 @@ def test_json_schema_is_serializable_and_closed() -> None:
     assert set(schema["$defs"]["Intent"]["enum"]) == {i.value for i in Intent}
     time_range = schema["$defs"]["Filters"]["properties"]["time_range"]
     assert "discriminator" in json.dumps(time_range)
+
+
+def test_compact_round_trips_every_fewshot_plan() -> None:
+    plans = [e.plan for e in load_fewshots(REPO_ROOT / "eval/fewshot/structured.v1.jsonl")]
+    for plan in plans:
+        compact = plan.compact()
+        assert QueryPlan.model_validate(compact) == plan, compact
+        assert QueryPlan.model_validate_json(plan.compact_json()) == plan
+        assert "schema_version" not in compact  # defaults are left out
+
+
+def test_compact_keeps_the_time_range_discriminator() -> None:
+    plan = QueryPlan.model_validate(
+        {
+            "intent": "count",
+            "target": "tracks",
+            "filters": {"time_range": {"kind": "named", "name": "today"}},
+        }
+    )
+    assert plan.compact()["filters"] == {"time_range": {"kind": "named", "name": "today"}}
