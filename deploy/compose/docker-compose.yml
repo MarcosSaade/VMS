@@ -274,10 +274,12 @@ services:
         - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8070/readyz', timeout=2)"
     restart: unless-stopped
 
-# Optional CA for builds behind a TLS-intercepting proxy (EXTRA_CA_CERT in .env); empty by default.
+# Optional CA for builds behind a TLS-intercepting proxy (EXTRA_CA_CERT in .env). The default
+# is an empty file inside the repo: BuildKit's bake (used by `compose build`) refuses secret files
+# outside the project without an extra grant, so /dev/null does not work there (E-023).
 secrets:
   extra_ca:
-    file: ${EXTRA_CA_CERT:-/dev/null}
+    file: ${EXTRA_CA_CERT:-../docker/no-extra-ca.pem}
 
 volumes:
   postgres-data:

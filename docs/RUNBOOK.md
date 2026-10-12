@@ -173,7 +173,7 @@ make ui-check      # frontend typecheck + vitest (CI runs the same in the fronte
 - Camera wall empty ("waiting for frames"): nothing has been processed for that camera yet; it needs ingest, a worker and frames from loadgen (`make demo`). Tiles show how long ago their frame was captured: a growing age means the worker is behind.
 - Example chips are the canned planner's questions (`configs/demo/canned_plans.v1.jsonl`); with a real LLM any question works.
 - The containerized query service reaches an LLM on the host at `http://host.docker.internal:11434/v1` (the compose default for `LLM_BASE_URL`). On Linux, Ollama listens on 127.0.0.1 by default and is unreachable from containers: start it with `OLLAMA_HOST=0.0.0.0`, or run `make query` on the host instead.
-- Image builds behind a TLS-intercepting proxy: set `EXTRA_CA_CERT` in `.env` to the proxy's CA file; compose passes it to the build as a secret (never stored in the image).
+- Image builds behind a TLS-intercepting proxy: copy the proxy's CA into the repo (`.certs/proxy-ca.pem`, gitignored) and set `EXTRA_CA_CERT=../../.certs/proxy-ca.pem` in `.env` (relative to `deploy/compose/`); compose passes it to the build as a secret, never stored in the image. A file outside the repo fails with "additional privileges requested" on newer Compose (E-023).
 - Screenshots for the README: `cd frontend && CHROMIUM_PATH=/path/to/chrome npm run screenshots -- http://localhost:8070 ../docs/images` while the demo runs.
 
 ### Load generator
