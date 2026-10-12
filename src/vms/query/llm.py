@@ -229,6 +229,9 @@ def _error_text(data: Any) -> str:
 UNKNOWN_QUESTION_PLAN = QueryPlan.model_validate(
     {"intent": "abstain", "abstain_reason": "unsupported"}
 )
+# Reply `model` when the canned client has no stored plan, so callers can tell "no LLM to ask"
+# apart from a stored plan that abstains.
+CANNED_NO_MATCH_MODEL = "canned:no-match"
 
 
 class CannedLlm:
@@ -267,7 +270,9 @@ class CannedLlm:
 
     async def complete(self, messages: Sequence[ChatMessage], schema: dict[str, Any]) -> LlmReply:
         question = next((m.content for m in messages if m.role == "user"), "")
-        plan = self._plans.get(normalize_question(question), UNKNOWN_QUESTION_PLAN)
+        plan = self._plans.get(normalize_question(question))
+        if plan is None:
+            return LlmReply(text=UNKNOWN_QUESTION_PLAN.compact_json(), model=CANNED_NO_MATCH_MODEL)
         return LlmReply(text=plan.compact_json(), model="canned")
 
     async def aclose(self) -> None:

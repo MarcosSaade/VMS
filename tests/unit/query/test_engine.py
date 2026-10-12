@@ -22,7 +22,8 @@ from vms.common.metrics import Metrics
 from vms.query.app import create_app
 from vms.query.engine import CatalogCache, ErrorType, PlanEngine, QueryResponse, QueryStatus
 from vms.query.fewshots import load_fewshots
-from vms.query.llm import LlmError
+from vms.query.llm import CannedLlm, LlmClient, LlmError
+from vms.query.plan import QueryPlan
 from vms.query.planner import Planner
 from vms.query.prompts import PLANNER_FIELDS, PromptTemplate
 from vms.query.settings import PlannerSettings, QuerySettings, SqlValidatorSettings
@@ -48,7 +49,7 @@ class Harness:
     def __init__(
         self,
         settings: QuerySettings,
-        llm: ScriptedLlm,
+        llm: LlmClient,
         results: list[QueryRows | Exception] | None = None,
         *,
         log_fails: bool = False,
@@ -152,6 +153,33 @@ def test_visual_query_is_unsupported(query_settings: QuerySettings) -> None:
     assert r.abstain_reason == "unsupported"
     assert "CLIP" in r.answer
     assert h.reader.executed == []
+
+
+def test_canned_planner_says_no_llm_for_questions_it_has_no_plan_for(
+    query_settings: QuerySettings,
+) -> None:
+    """Without LLM_MODEL the canned planner abstains on any non-example question. That is not
+    the question's fault, so the answer must say no LLM is configured instead of blaming the
+    query shape (which read as a bug in the UI)."""
+    llm = CannedLlm(
+        {"How many people at the entrance today?": QueryPlan.model_validate(COUNT_PEOPLE)}
+    )
+    h = Harness(query_settings, llm, [QueryRows(["n"], [(7,)], False)])
+    r = h.ask("how many cars were seen in parking lot")
+    assert r.status is QueryStatus.ABSTAINED
+    assert r.abstain_reason is None
+    assert "LLM_MODEL" in r.answer
+    assert "query shape" not in r.answer
+    assert h.reader.executed == []
+    assert h.ask().status is QueryStatus.OK  # stored questions still answer
+
+
+def test_canned_plan_that_abstains_keeps_its_reason(query_settings: QuerySettings) -> None:
+    plan = QueryPlan.model_validate({"intent": "abstain", "abstain_reason": "unsupported"})
+    h = Harness(query_settings, CannedLlm({"Compare today with yesterday": plan}))
+    r = h.ask("Compare today with yesterday")
+    assert r.abstain_reason == "unsupported"
+    assert "query shape" in r.answer
 
 
 def test_invalid_plan_after_repair(query_settings: QuerySettings) -> None:

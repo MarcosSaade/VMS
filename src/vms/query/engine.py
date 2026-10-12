@@ -278,7 +278,7 @@ class PlanEngine:
             repaired=result.repaired,
         )
 
-        refusal = abstention(plan)
+        refusal = abstention(plan, result.model)
         if refusal is not None:
             return QueryResponse(
                 **base,

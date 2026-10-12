@@ -181,7 +181,7 @@ def plan_questions(questions: list[str], compare: dict[str, dict[str, Any]]) -> 
                     valid += 1
                     line.update(plan=result.plan.compact(), repaired=result.repaired)
                     line["tokens"] = result.tokens
-                    if abstention(result.plan) is None:
+                    if abstention(result.plan, result.model) is None:
                         compiled = compiler.compile(result.plan, clock.now())
                         line["sql"] = validator.validate(compiled.sql).sql
                     if question in compare:

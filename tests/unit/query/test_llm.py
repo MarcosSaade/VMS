@@ -17,6 +17,7 @@ from pydantic import SecretStr
 
 from tests.unit.query.conftest import REPO_ROOT
 from vms.query.llm import (
+    CANNED_NO_MATCH_MODEL,
     CannedLlm,
     ChatMessage,
     LlmEndpointSettings,
@@ -155,6 +156,7 @@ def test_canned_answers_known_questions_and_abstains_otherwise(tmp_path: Path) -
     assert QueryPlan.model_validate_json(known.text) == QueryPlan.model_validate(plan)
     unknown = asyncio.run(llm.complete([ChatMessage("user", "something else")], SCHEMA))
     assert json.loads(unknown.text) == {"intent": "abstain", "abstain_reason": "unsupported"}
+    assert (known.model, unknown.model) == ("canned", CANNED_NO_MATCH_MODEL)
 
 
 def test_canned_file_errors_name_the_line(tmp_path: Path) -> None:

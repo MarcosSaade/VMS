@@ -26,7 +26,7 @@ from pydantic import ValidationError
 from vms.common.clock import Clock
 from vms.query.catalog import QueryCatalog
 from vms.query.fewshots import FewShotExample
-from vms.query.llm import ChatMessage, LlmClient, LlmError
+from vms.query.llm import CANNED_NO_MATCH_MODEL, ChatMessage, LlmClient, LlmError
 from vms.query.plan import AbstainReason, Intent, QueryPlan, plan_json_schema
 from vms.query.prompts import PromptTemplate
 from vms.query.semantic import validate_plan
@@ -60,6 +60,7 @@ class PlanAttempt:
     raw: str
     errors: list[str]
     tokens: int
+    model: str = ""
 
 
 @dataclass
@@ -75,6 +76,11 @@ class PlanResult:
     def tokens(self) -> int:
         return sum(a.tokens for a in self.attempts)
 
+    @property
+    def model(self) -> str:
+        """The model that produced the accepted plan, as the LLM client reported it."""
+        return self.attempts[-1].model if self.attempts else ""
+
 
 ABSTAIN_MESSAGES = {
     AbstainReason.AMBIGUOUS: "The question can be read in several ways with different answers. "
@@ -86,6 +92,10 @@ ABSTAIN_MESSAGES = {
     AbstainReason.DISALLOWED: "This request is not allowed: the query service only reads "
     "analytics data.",
 }
+NO_LLM_MESSAGE = (
+    "No LLM is configured, so only the example questions can be answered. Set LLM_MODEL "
+    "(and LLM_BASE_URL) in .env to an OpenAI-compatible model to ask anything else."
+)
 VISUAL_SEARCH_MESSAGE = (
     "Visual search (describing what things look like) needs CLIP, which is not available yet."
 )
@@ -93,16 +103,20 @@ VISUAL_SEARCH_MESSAGE = (
 
 @dataclass(frozen=True)
 class Abstention:
-    reason: AbstainReason
+    reason: AbstainReason | None  # None: no model judged the question (canned, no stored plan)
     message: str
 
 
-def abstention(plan: QueryPlan) -> Abstention | None:
+def abstention(plan: QueryPlan, model: str = "") -> Abstention | None:
     """Why the service will not run this plan, or None if it will.
 
     A plan with `visual_query` is valid but needs CLIP ranking, which is deferred, so it is
     answered as an `unsupported` abstention rather than silently dropping the visual part.
+    `model` is `PlanResult.model`: the canned client's no-match reply abstains without any
+    model having judged the question, so it gets no reason and says that no LLM is configured.
     """
+    if model == CANNED_NO_MATCH_MODEL:
+        return Abstention(None, NO_LLM_MESSAGE)
     if plan.intent is Intent.ABSTAIN:
         assert plan.abstain_reason is not None
         return Abstention(plan.abstain_reason, ABSTAIN_MESSAGES[plan.abstain_reason])
@@ -213,7 +227,7 @@ class Planner:
                 errors = validate_plan(
                     plan, catalog, now, self._settings, max_limit=self._sql.max_limit
                 )
-            attempts.append(PlanAttempt(reply.text, errors, reply.tokens))
+            attempts.append(PlanAttempt(reply.text, errors, reply.tokens, reply.model))
             if plan is not None and not errors:
                 return PlanResult(plan, attempts)
             messages += [
