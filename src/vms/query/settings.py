@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from vms.common.settings import ServiceSettings
 from vms.query.llm import LlmTuning
+from vms.storage.frames import PoolTuning
+from vms.storage.objects import ObjectStoreTuning
 
 
 class _Section(BaseModel):
@@ -58,7 +60,24 @@ class PlannerSettings(_Section):
     max_future_start_hours: float = Field(default=24.0, ge=0)
 
 
+class HttpServerSettings(_Section):
+    host: str = "127.0.0.1"
+    port: int = Field(default=8070, ge=1, le=65535)
+    graceful_shutdown_s: float = Field(default=10.0, gt=0)
+
+
+def _reader_pool() -> PoolTuning:
+    return PoolTuning(statement_timeout_ms=5000)
+
+
 class QuerySettings(ServiceSettings):
+    http: HttpServerSettings = Field(default_factory=HttpServerSettings)
+    # Read-only login that runs compiled SQL; statement_timeout_ms bounds every query.
+    reader: PoolTuning = Field(default_factory=_reader_pool)
+    # Schema-owner login that only inserts into query_log.
+    log_db: PoolTuning = Field(default_factory=PoolTuning)
+    objects: ObjectStoreTuning = Field(default_factory=ObjectStoreTuning)
+    catalog_ttl_s: float = Field(default=30.0, ge=0)
     sql: SqlValidatorSettings = Field(default_factory=SqlValidatorSettings)
     assets: QueryAssets = Field(default_factory=QueryAssets)
     llm: LlmTuning = Field(default_factory=LlmTuning)

@@ -18,6 +18,7 @@ absolute ranges in each camera's IANA timezone with the injected clock, never th
 from __future__ import annotations
 
 import datetime as dt
+import json
 from enum import StrEnum
 from typing import Annotated, Any, Final, Literal
 
@@ -319,6 +320,21 @@ class QueryPlan(_Model):
             if key is GroupKey.CLASS_NAME and target is Target.FRAMES:
                 errors.append("group_by 'class_name' is not valid for target 'frames'")
         return errors
+
+    def compact(self) -> dict[str, Any]:
+        """The plan as JSON-ready data without default values (prompts, logs, responses).
+
+        The time range keeps its `kind`: it is the union's discriminator, and a plan without it
+        does not parse back. Round-tripping `QueryPlan.model_validate(plan.compact())` returns
+        an equal plan.
+        """
+        data = self.model_dump(mode="json", exclude_defaults=True)
+        if self.filters.time_range is not None:
+            data["filters"]["time_range"] = self.filters.time_range.model_dump(mode="json")
+        return data
+
+    def compact_json(self) -> str:
+        return json.dumps(self.compact(), separators=(", ", ": "))
 
 
 class ResultKind(StrEnum):

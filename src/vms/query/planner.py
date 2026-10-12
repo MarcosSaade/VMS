@@ -156,9 +156,7 @@ def local_now(catalog: QueryCatalog, now: dt.datetime) -> str:
 
 
 def examples_block(examples: list[FewShotExample]) -> str:
-    return "\n".join(
-        f"Q: {e.question}\nA: {e.plan.model_dump_json(exclude_defaults=True)}" for e in examples
-    )
+    return "\n".join(f"Q: {e.question}\nA: {e.plan.compact_json()}" for e in examples)
 
 
 class Planner:

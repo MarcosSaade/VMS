@@ -116,6 +116,10 @@ ingest: ## Run the ingest service on the host (needs make up)
 worker: ## Run the inference worker on the host (needs make up; fetches weights on first run)
 	$(RUN) python -m vms.worker run
 
+.PHONY: query
+query: ## Run the query service on the host (needs make up; LLM from LLM_* in .env, else canned)
+	$(RUN) python -m vms.query serve
+
 .PHONY: models
 models: ## Fetch and verify the pinned detector weights into models/weights/
 	$(RUN) python -m vms.worker weights

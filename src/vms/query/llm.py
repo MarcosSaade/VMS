@@ -267,7 +267,7 @@ class CannedLlm:
     async def complete(self, messages: Sequence[ChatMessage], schema: dict[str, Any]) -> LlmReply:
         question = next((m.content for m in messages if m.role == "user"), "")
         plan = self._plans.get(normalize_question(question), UNKNOWN_QUESTION_PLAN)
-        return LlmReply(text=plan.model_dump_json(exclude_defaults=True), model="canned")
+        return LlmReply(text=plan.compact_json(), model="canned")
 
     async def aclose(self) -> None:
         return None
