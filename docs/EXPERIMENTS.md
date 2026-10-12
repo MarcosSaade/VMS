@@ -128,3 +128,8 @@ Outcome: comments for variables that may be empty moved to their own lines in .e
 Tried: the shortened `make demo` in CI (run 38261052259, commit b80f36e), the first run on a machine without the `vms/app:local` image.
 Result: failed at step 3: compose tried to pull `vms/app:local` for ingest and worker (which reuse the query service's image and have no build section) before building it ("pull access denied"). Every earlier run here had the image already. Reproduced locally by deleting the image.
 Outcome: ingest and worker get `pull_policy: never`, and `make demo` and `make app` build the image explicitly before `up`. Re-run here without the image: exit 0.
+
+### E-023 | 2026-10-12 | infra
+Tried: the shortened `make demo` in CI after E-022 (run 38264465076, commit fbc1af8).
+Result: failed at step 3 before building: `compose build` (BuildKit bake) refused the build secret's default file `/dev/null` ("additional privileges requested: pass --allow=fs.read=/dev/null"): bake grants no reads outside the project. The local Compose v5.6.0 does not enforce this, even with COMPOSE_BAKE=true, so it passed here.
+Outcome: the default secret is an empty file in the repo (deploy/docker/no-extra-ca.pem); a user CA goes under .certs/ (gitignored). Verified only by the next CI run, since the failure does not reproduce locally.

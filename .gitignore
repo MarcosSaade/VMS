@@ -79,3 +79,6 @@ frontend/dist/
 # Frontend: dependencies and build output (npm ci; npm run build)
 /frontend/node_modules/
 /frontend/dist/
+
+# Local CA files for builds behind a TLS-intercepting proxy (EXTRA_CA_CERT)
+/.certs/
