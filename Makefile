@@ -65,7 +65,8 @@ up: ## Start the compose stack, wait until healthy, migrate and bootstrap the DB
 
 .PHONY: app
 app: ## Build and start the containerized query service + UI on http://localhost:8070 (after make up)
-	$(COMPOSE) --profile app up -d --build --wait --wait-timeout $(STACK_WAIT_TIMEOUT) query
+	$(COMPOSE) --profile app build query
+	$(COMPOSE) --profile app up -d --wait --wait-timeout $(STACK_WAIT_TIMEOUT) query
 	@echo "UI and query API: http://localhost:$${QUERY_PORT:-8070}"
 
 .PHONY: migrate
