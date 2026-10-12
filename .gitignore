@@ -32,6 +32,10 @@ htmlcov/
 *.jpeg
 *.png
 *.webp
+# README images are the exception (AGENTS.md section 7)
+!docs/images/*.png
+!docs/images/*.jpg
+!docs/images/*.webp
 
 # Model weights and exported models (fetched by script or DVC-tracked)
 *.pt

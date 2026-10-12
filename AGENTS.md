@@ -95,7 +95,7 @@ Rules:
 - Every reported number comes from a script run through `make` or `python -m vms...`. No results from notebooks or ad hoc shell sessions.
 - Every benchmark, eval and training run writes a results JSON with: run ID, git SHA and dirty flag, fully resolved config, hardware (GPU model, driver, CUDA, CPU, RAM), key package versions, seed, start and end time, metrics, and cloud cost if any. Small results are committed under `bench/results/` or `eval/results/`; large artifacts are tracked with DVC (below).
 - The results JSON files in the repo are the record of every run and the source of truth for reported numbers. There is no experiment tracker (MLflow and W&B were removed, D16); add one only through a decision record backed by a measured need.
-- Data and artifacts: small files (eval JSONL, configs) stay in git. Large artifacts we produce (synthetic datasets, training data, LoRA adapters, fine-tuned weights, large eval snapshots) are tracked with DVC (local remote by default, S3 remote in the cloud). Public third-party datasets and pretrained weights are fetched by scripts with checksums and license notes. Never commit videos, images or weights to git.
+- Data and artifacts: small files (eval JSONL, configs) stay in git. Large artifacts we produce (synthetic datasets, training data, LoRA adapters, fine-tuned weights, large eval snapshots) are tracked with DVC (local remote by default, S3 remote in the cloud). Public third-party datasets and pretrained weights are fetched by scripts with checksums and license notes. Never commit videos, images or weights to git, with one exception: images shown in `README.md` (screenshots, diagrams, result charts) are committed under `docs/images/`, kept small (compressed PNG/SVG, well under 1 MB each).
 - A fresh clone must work with `make setup && make up && make demo` on a CPU-only machine without AWS or DVC remote access (the demo uses `make data-mini`). Keep this true at all times.
 
 ## 8. Benchmarking and evaluation rules
@@ -135,7 +135,7 @@ Rules:
 
 - Conventional commits: `feat:`, `fix:`, `perf:`, `test:`, `bench:`, `docs:`, `refactor:`, `chore:`.
 - One logical change per commit; commit after each green task.
-- Never commit secrets, datasets, frames or weights. Never rewrite pushed history.
+- Never commit secrets, datasets, frames or weights (README images under `docs/images/` are the one exception, see section 7). Never rewrite pushed history.
 
 ## 12. Initiative and judgment
 
