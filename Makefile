@@ -112,6 +112,14 @@ data-pull: ## dvc pull from the default remote (no-op if missing or empty)
 ingest: ## Run the ingest service on the host (needs make up)
 	$(RUN) python -m vms.ingest
 
+.PHONY: worker
+worker: ## Run the inference worker on the host (needs make up; fetches weights on first run)
+	$(RUN) python -m vms.worker run
+
+.PHONY: models
+models: ## Fetch and verify the pinned detector weights into models/weights/
+	$(RUN) python -m vms.worker weights
+
 # --- Load generation ------------------------------------------------------------
 
 SCENARIO ?=
@@ -130,6 +138,10 @@ loadgen-stub: ## Stub ingest server for loadgen tests (STUB_WORKERS=n processes)
 	$(RUN) python -m vms.loadgen stub --workers $(STUB_WORKERS)
 
 # --- Benchmarks and evaluation -------------------------------------------------
+
+.PHONY: bench-model
+bench-model: ## Model-only worker latency (SCENARIO=bench/scenarios/worker-model-cpu.yaml)
+	$(RUN) python -m vms.worker bench --scenario $(or $(SCENARIO),bench/scenarios/worker-model-cpu.yaml)
 
 .PHONY: bench
 bench: ## Run a benchmark scenario

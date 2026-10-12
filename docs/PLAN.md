@@ -37,7 +37,7 @@
   - Understand it: what happens when the same frame is sent twice, or the object store write succeeds but the DB insert fails?
 - [x] 1.4 Schema v1 and migrations (SHRINK: no `embeddings` table)
   - Understand it: why are detections and events append-only while tracks are updated, and what does the read-only role prevent?
-- [ ] 1.5 Worker v0: polls Postgres with `SKIP LOCKED`, in-process PyTorch YOLO11 at batch size 1 (SHRINK: no CLIP)
+- [x] 1.5 Worker v0: polls Postgres with `SKIP LOCKED`, in-process PyTorch YOLO11 at batch size 1 (SHRINK: no CLIP)
   - Understand it: what does `SKIP LOCKED` guarantee with two workers, and what breaks tracking if one camera's frames are processed out of order?
 - [ ] 1.6 Tracking (ByteTrack) and zone enter/exit events (SHRINK: loiter optional)
   - Understand it: how is a zone event decided, and what happens at the boundary when a box jitters?

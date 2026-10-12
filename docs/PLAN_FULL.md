@@ -103,6 +103,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Prompt:** Implement `vms.worker` v0: claim `pending` frames from Postgres with `SELECT ... FOR UPDATE SKIP LOCKED`, fetch the JPEG, run YOLO11 (start with `s`) in-process with PyTorch at batch size 1, write detections, compute input statistics (brightness, contrast, Laplacian variance) into `frames`, mark the frame done. Device configurable (CPU or CUDA). Record model versions. Use an injected model interface so unit tests run with fakes. No CLIP.
 **Done when:** frames flow from loadgen to stored detections; unit tests use fakes; an integration test with a tiny model passes on CPU.
 **Considerations:** polling Postgres is the queue (D3 default). It is the baseline every later number is measured against. Frames of one camera must be processed in order for tracking, so claim per camera.
+**Status note:** Done 2026-10-12 (D20). Per-camera order is kept by camera leases (`camera_leases`, migration 0004) rather than claims alone, because tracker state lives in one worker. Completion is fenced on `claimed_by`. Weights are pinned in `configs/models.yaml` (`make models`); PyTorch is the CPU build. Model-only CPU latency is in E-013 (`make bench-model`). For 1.6: the worker counts late frames but processes them anyway; the tracker must skip or handle frames older than its state; `DetectionRow.track_id` is ready to fill.
 
 ### 1.6 Tracking and zone events
 

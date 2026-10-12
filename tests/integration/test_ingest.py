@@ -7,13 +7,6 @@ objects it wrote, so the dev database and bucket are left as they were.
 from __future__ import annotations
 
 import asyncio
-import os
-import signal
-import socket
-import subprocess
-import sys
-import urllib.request
-from collections.abc import Iterator
 from typing import Any
 
 import cv2
@@ -21,9 +14,8 @@ import numpy as np
 import psycopg
 import pytest
 
-from tests.integration.conftest import REPO_ROOT, StackSettings, poll
+from tests.integration.conftest import StackSettings
 from vms.common.clock import SystemClock
-from vms.common.ids import new_ulid
 from vms.common.metrics import Metrics
 from vms.loadgen.frames import LoadedClip
 from vms.loadgen.recorder import Recorder
@@ -42,52 +34,6 @@ def _jpeg(value: int) -> bytes:
 
 
 CLIP = LoadedClip("c", 30.0, 64, 48, tuple(_jpeg(v) for v in range(0, 240, 8)))
-
-
-@pytest.fixture
-def ingest_url(stack: StackSettings, fresh_db: str) -> Iterator[str]:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        port = s.getsockname()[1]
-    env = {
-        **os.environ,
-        "POSTGRES_HOST": stack.postgres_host,
-        "POSTGRES_PORT": str(stack.postgres_port),
-        "POSTGRES_DB": fresh_db,
-        "VMS_HTTP__PORT": str(port),
-        "VMS_TELEMETRY__ENABLED": "false",
-    }
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "vms.ingest"], cwd=REPO_ROOT, env=env, stderr=subprocess.PIPE
-    )
-    url = f"http://127.0.0.1:{port}"
-    try:
-        poll(lambda: urllib.request.urlopen(f"{url}/readyz", timeout=1), timeout_s=30)
-        yield url
-    finally:
-        proc.terminate()
-        _, stderr = proc.communicate(timeout=15)
-        # uvicorn re-raises SIGTERM after a graceful shutdown, so the exit status is -SIGTERM;
-        # what matters is that the lifespan shutdown ran (pool and clients closed).
-        log = stderr.decode()
-        assert proc.returncode in (0, -signal.SIGTERM), log[-2000:]
-        assert "Application shutdown complete" in log, log[-2000:]
-
-
-@pytest.fixture
-def prefix(s3: Any, stack: StackSettings) -> Iterator[str]:
-    """A unique camera-id prefix; every object under it is deleted afterwards."""
-    value = f"it{new_ulid().lower()}-"
-    yield value
-    keys = [
-        o["Key"]
-        for page in s3.get_paginator("list_objects_v2").paginate(
-            Bucket=stack.s3_bucket, Prefix=f"frames/{value}"
-        )
-        for o in page.get("Contents", [])
-    ]
-    for key in keys:
-        s3.delete_object(Bucket=stack.s3_bucket, Key=key)
 
 
 def rows(stack: StackSettings, db: str) -> list[tuple[Any, ...]]:

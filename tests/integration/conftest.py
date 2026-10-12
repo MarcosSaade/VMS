@@ -7,9 +7,15 @@ overrides apply to both.
 from __future__ import annotations
 
 import json
+import os
+import signal
+import socket
+import subprocess
+import sys
 import time
 import urllib.request
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -164,3 +170,66 @@ def reader_dsn(stack: StackSettings, fresh_db: str) -> Iterator[str]:
         admin = f"{stack.postgres_dsn} dbname=postgres"
         with psycopg.connect(admin, autocommit=True) as conn:
             conn.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(user)))
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return int(s.getsockname()[1])
+
+
+@contextmanager
+def service(module: str, stack: StackSettings, db: str, env: dict[str, str]) -> Iterator[str]:
+    """Run `python -m <module>` against `db` until the block exits; yields its base URL.
+
+    Waits for /readyz, and on exit sends SIGTERM and checks the shutdown was graceful.
+    """
+    port = free_port()
+    proc = subprocess.Popen(
+        [sys.executable, "-m", module],
+        cwd=REPO_ROOT,
+        env={
+            **os.environ,
+            "POSTGRES_HOST": stack.postgres_host,
+            "POSTGRES_PORT": str(stack.postgres_port),
+            "POSTGRES_DB": db,
+            "VMS_HTTP__PORT": str(port),
+            "VMS_TELEMETRY__ENABLED": "false",
+            **env,
+        },
+        stderr=subprocess.PIPE,
+    )
+    url = f"http://127.0.0.1:{port}"
+    try:
+        poll(lambda: urllib.request.urlopen(f"{url}/readyz", timeout=1), timeout_s=60)
+        yield url
+    finally:
+        proc.terminate()
+        _, stderr = proc.communicate(timeout=30)
+        # uvicorn re-raises SIGTERM after a graceful shutdown, so the exit status is -SIGTERM;
+        # what matters is that the lifespan shutdown ran (pool and clients closed).
+        log = stderr.decode()
+        assert proc.returncode in (0, -signal.SIGTERM), log[-2000:]
+        assert "Application shutdown complete" in log, log[-2000:]
+
+
+@pytest.fixture
+def ingest_url(stack: StackSettings, fresh_db: str) -> Iterator[str]:
+    with service("vms.ingest", stack, fresh_db, {}) as url:
+        yield url
+
+
+@pytest.fixture
+def prefix(s3: Any, stack: StackSettings) -> Iterator[str]:
+    """A unique camera-id prefix; every object under it is deleted afterwards."""
+    value = f"it{new_ulid().lower()}-"
+    yield value
+    keys = [
+        o["Key"]
+        for page in s3.get_paginator("list_objects_v2").paginate(
+            Bucket=stack.s3_bucket, Prefix=f"frames/{value}"
+        )
+        for o in page.get("Contents", [])
+    ]
+    for key in keys:
+        s3.delete_object(Bucket=stack.s3_bucket, Key=key)

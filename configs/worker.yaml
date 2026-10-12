@@ -1,0 +1,43 @@
+# Inference worker (vms.worker). Overrides configs/common.yaml; VMS_* environment variables
+# override this file (e.g. VMS_DETECTOR__DEVICE=cuda). Database and object-store connection
+# settings come from POSTGRES_* and S3_* in .env.
+
+http:                          # /healthz, /readyz, /metrics
+  host: 127.0.0.1
+  port: 8090
+
+queue:                         # Postgres as the queue (D3), camera leases (D20)
+  max_cameras: 16
+  lease_ttl_s: 30
+  renew_every_s: 5
+  claim_batch: 4
+  max_attempts: 3
+  poll_min_s: 0.05
+  poll_max_s: 1.0
+  backlog_every_s: 5
+  shutdown_grace_s: 10
+
+detector:                      # in-process PyTorch, batch size 1 (Phase 1 baseline)
+  weights: yolo11s             # configs/models.yaml
+  device: cpu                  # cpu | cuda
+  imgsz: 640
+  conf: 0.25
+  iou: 0.7
+  max_det: 300
+  torch_threads: null          # null: PyTorch default (one per physical core)
+
+db:
+  min_size: 1
+  max_size: 4
+  connect_timeout_s: 5
+  acquire_timeout_s: 2
+  statement_timeout_ms: 5000
+
+objects:
+  max_concurrency: 4
+  connect_timeout_s: 2
+  read_timeout_s: 5
+  max_attempts: 3
+
+telemetry:
+  sample_ratio: 0.01

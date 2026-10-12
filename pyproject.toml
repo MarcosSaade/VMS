@@ -21,6 +21,9 @@ dependencies = [
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
     "sqlglot>=30.21.0",
+    "torch>=2.14.1",
+    "torchvision>=0.29.1",
+    "ultralytics>=8.4.175",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -42,6 +45,20 @@ build-backend = "uv_build"
 
 [tool.uv]
 default-groups = ["dev"]
+# ultralytics requires opencv-python, which installs the same `cv2` module as the headless build
+# we use (no GUI libraries, smaller); two copies overwrite each other. Drop the GUI build.
+override-dependencies = ["opencv-python; sys_platform == 'never'"]
+
+# CPU-only PyTorch wheels by default (~10x smaller than the CUDA build PyPI serves on Linux), so
+# a fresh clone works on a laptop. GPU sessions install the CUDA build (task 2.4).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [tool.ruff]
 line-length = 100

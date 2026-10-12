@@ -92,8 +92,23 @@ curl -s localhost:8080/readyz   # {"postgres":"ok","object_store":"ok"}
 - Camera catalog: camera and zone names are what questions use and must stay unique (zone names across all cameras); polygons are normalized 0..1 frame coordinates. Upsert only: a camera or zone removed from the YAML stays in the database and bootstrap logs it as stale; delete it by hand (`DELETE FROM cameras WHERE camera_id = ...`, which also deletes its zones) if it really is gone. Renaming a zone creates a new zone id (`<camera_id>:<name>`).
 - Ingest accepts frames from any camera id, catalogued or not (load tests use `cam-001`..`cam-NNN`); queries only see cameras in the catalog because they join `cameras` by name.
 - Check what the query login can read: `psql -U vms_query -h localhost vms -c '\dp'`, or try `SELECT status FROM frames` as it (permission denied).
-- What ingest stored: `frames` rows (status `pending` until the worker claims them, task 1.5) and objects under `frames/{camera_id}/{yyyy-mm-dd}/` in the `S3_BUCKET` bucket.
+- What ingest stored: `frames` rows (status `pending` until a worker claims them) and objects under `frames/{camera_id}/{yyyy-mm-dd}/` in the `S3_BUCKET` bucket.
 - Integration tests create and drop a throwaway database (`vms_it_*`) per test and delete the objects they wrote, so they do not touch dev data.
+
+### Inference worker
+
+```bash
+make models        # fetch and verify yolo11n and yolo11s into models/weights/ (else the worker does it on start)
+make worker        # one worker on the host: probes on http://127.0.0.1:8090 (configs/worker.yaml)
+VMS_DETECTOR__WEIGHTS=yolo11n make worker    # the smaller model; VMS_DETECTOR__DEVICE=cuda on a GPU
+make bench-model   # model-only latency (bench/scenarios/worker-model-cpu.yaml); SCENARIO=... for another
+```
+
+- Several workers can run at once (each `make worker` in its own shell with a different `VMS_HTTP__PORT`). Each leases up to `queue.max_cameras` cameras; a camera stays with one worker while its lease is renewed.
+- Progress: `SELECT status, count(*) FROM frames GROUP BY 1`; `SELECT * FROM camera_leases` shows which worker holds which camera and until when. `/metrics` has `vms_worker_frames_total{outcome}`, `vms_worker_backlog_frames`, `vms_worker_stage_duration_seconds{stage}` and `vms_worker_capture_to_done_seconds` (freshness).
+- A frame that keeps failing ends as `status = 'failed'` with the reason in `frames.error`. To retry failed frames after a fix: `UPDATE frames SET status = 'pending', attempts = 0, error = NULL WHERE status = 'failed'`.
+- Ultralytics runs offline (`YOLO_OFFLINE=1`, `YOLO_AUTOINSTALL=0`, set by `vms.worker.detector`): no usage analytics, no packages installed at runtime. Weights and the package are AGPL-3.0 (see `configs/models.yaml`).
+- PyTorch comes from the CPU wheel index (`pyproject.toml`, `[tool.uv.sources]`). GPU sessions install the CUDA build (task 2.4).
 
 ### Load generator
 
@@ -132,6 +147,8 @@ _Placeholder (tasks 2.2, 9.4)._ Dashboards, alerts, drift response procedure, sc
 
 Symptom, cause and fix entries as issues are met.
 
+- Frames stay `processing` and nothing advances: a worker died holding leases. Its cameras move to another worker once `expires_at` in `camera_leases` passes (`queue.lease_ttl_s`, default 30 s), and any running worker resets the frames then. With no worker running, nothing moves: start one.
+- Worker `/readyz` never turns ready right after start: it loads and warms the model first (a few seconds on CPU; the first run also downloads the weights).
 - `make up` fails with "port is already allocated" or "address already in use": another process holds a default port. Change the `*_PORT` variable and its URL in `.env` (see Running locally).
 - `make up` reports `dependency failed to start: container vms-<service>-1 is unhealthy`: run `make ps`, then `make logs SERVICE=<service>`. `docker inspect vms-<service>-1 --format '{{json .State.Health}}'` shows the health check output.
 - Old `vms-redis-1` or `vms-mlflow-1` containers after pulling task 0.7: `make up` removes them (`--remove-orphans`); `make down-volumes` also drops their old volumes.

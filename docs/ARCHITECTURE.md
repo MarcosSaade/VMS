@@ -95,7 +95,7 @@ The diagram shows the target design; the current scope (top of this file) builds
 - **v0 (task 1.3, `vms.ingest`, D18):** FastAPI on uvicorn, one process, run on the host (`make ingest`). `POST /v1/frames` (contract in `vms.common.ingest_api`) validates the form (safe-character `camera_id`/`run_id`, JPEG magic bytes, size cap enforced from a required Content-Length before parsing, capture time at most 5 min in the future), then writes the object at `frames/{camera_id}/{yyyy-mm-dd}/{frame_id}.jpg` (capture date, UTC) and only then inserts the `frames` row with status `pending`, `ON CONFLICT (camera_id, run_id, seq) DO NOTHING`. 201 for a new frame; 200 with the original `frame_id` and `duplicate: true` for a repeat, whose freshly written object is deleted; 500 when the store or database fails, after deleting the object (a failed delete is counted in `vms_ingest_orphaned_objects_total`). A row never points at a missing object. Postgres through a psycopg async pool (statement timeout 2 s, acquire timeout 2 s); the object store through boto3 in a 16-thread pool (connect 2 s, read 5 s, 3 attempts with jittered backoff). Metrics `vms_ingest_frames_total{outcome}`, `vms_ingest_stage_duration_seconds{stage=object_put|db_insert|cleanup}`, `vms_ingest_capture_to_receive_seconds`, `vms_ingest_request_duration_seconds{route,status}`, `vms_ingest_received_jpeg_bytes_total`; spans continue loadgen's `traceparent`. `/readyz` checks Postgres and the bucket. No backpressure yet (deferred with 6.3); no container image yet (task 1.9).
 
 ### 4.3 queue
-*Scope note: deferred. In this plan the worker claims `pending` frames from Postgres with `SELECT ... FOR UPDATE SKIP LOCKED`, per camera (D3 default); no Redis, no Kafka.*
+*Scope note: deferred. In this plan the `frames` table is the queue (D3 default); no Redis, no Kafka. Workers lease cameras in `camera_leases` (TTL, renewed by the holder) and claim pending frames of their leased cameras with `FOR UPDATE SKIP LOCKED`, oldest first. Completion is fenced on `claimed_by`; a dead worker's cameras and in-flight frames are taken over when its lease expires; frames fail after `max_attempts` (D20). The backlog is exported as `vms_worker_backlog_frames`.*
 - Decouples ingest from GPU work and absorbs bursts. Candidates: Redis Streams, Apache Kafka (KRaft mode, single broker for local runs and benchmarks) **(decided by benchmark, D3)**.
 - **Keyed or partitioned by `camera_id`** so a camera's frames are processed in order by one consumer at a time. Tracking depends on this. It is also the main constraint on how workers scale.
 - At-least-once delivery. Messages are acked only after results are durably written. Poison messages go to a dead-letter stream.
@@ -108,6 +108,7 @@ The diagram shows the target design; the current scope (top of this file) builds
 - Computes cheap input statistics per frame (brightness, contrast, Laplacian variance for blur) for drift monitoring.
 - Writes detections, track updates, events and embeddings (per the sampling policy) in batches, directly to the stores or through the event topic if D3 adopts one.
 - Phase 1 runs models in-process with PyTorch at batch size 1. Phase 5 moves inference to Triton.
+- **v0 as built (task 1.5, D20):** `vms.worker` leases up to `max_cameras` cameras, claims `claim_batch` frames per query, and per frame: fetches the JPEG, then decodes, computes brightness, contrast and Laplacian variance, and runs Ultralytics YOLO11 (`yolo11s` by default, weights pinned by sha256 in `configs/models.yaml`) in one inference thread; then writes detections and marks the frame done in one transaction fenced on its claim. `model_version` is `<weights>@<sha256 prefix>`. Undecodable frames fail at once; object-store, model and database errors retry up to `max_attempts`. Late frames (captured before one already processed for the camera) are stored and counted. Probes on `/healthz`, `/readyz`, `/metrics` (port 8090); SIGTERM finishes the current frame and hands back leases and claimed frames. Model-only CPU latency is benchmarked by `make bench-model`.
 
 ### 4.5 Triton Inference Server
 *Scope note: deferred. The precision ladder (PyTorch, ONNX Runtime, TensorRT FP16 and INT8) is measured in-process for YOLO11 only, and the worker runs the chosen backend in-process (D5).*
@@ -130,7 +131,8 @@ Logical schema (types simplified; all timestamps UTC, each camera has an IANA ti
 ```
 cameras(camera_id, name, site, timezone, created_at)
 zones(zone_id, camera_id, name, polygon)       -- zone_id '<camera_id>:<name>'; polygon [[x, y], ...] normalized 0..1
-frames(frame_id, camera_id, run_id, seq, ts, received_at, object_key, size_bytes, status, width, height, brightness, blur_var, model_version)   -- UNIQUE (camera_id, run_id, seq); status pending|processing|done|failed
+frames(frame_id, camera_id, run_id, seq, ts, received_at, object_key, size_bytes, status, width, height, brightness, contrast, blur_var, model_version, claimed_by, claimed_at, attempts, processed_at, error)   -- UNIQUE (camera_id, run_id, seq); status pending|processing|done|failed
+camera_leases(camera_id, worker_id, acquired_at, expires_at)   -- which worker processes a camera (D20)
 detections(frame_id, det_idx, ts, camera_id, track_id, class_name, confidence, x1, y1, x2, y2, model_version)   -- PK (frame_id, det_idx); box in pixels
 tracks(track_id, camera_id, class_name, first_seen, last_seen, n_frames)
 events(event_id, ts, camera_id, track_id, zone_id, event_type)       -- zone_enter, zone_exit, loiter
@@ -138,7 +140,7 @@ embeddings(frame_id, camera_id, ts, vector[512], model_version)   -- deferred wi
 query_log(query_id, ts, mode, engine, question, query_plan, compiled_sql, latency_ms, tokens, success, error_type, feedback)
 ```
 
-Schema v1 is migrations 0001 to 0003 in `src/vms/storage/migrations/versions/` (D19). Cameras and zones come from `configs/cameras.yaml` (synced by `python -m vms.storage bootstrap`, run by `make migrate`). Pipeline-written tables (frames, detections, tracks, events) carry no foreign keys; only zones reference cameras. Each time-series table has one `(camera_id, ts)` index (tracks: `(camera_id, last_seen)`), the deliberate baseline. The query service reads through the `vms_query_reader` role, which holds SELECT on exactly the validator's allowlisted columns (section 11).
+Schema v1 is migrations 0001 to 0003 (0004 adds the worker's claim columns, a partial index on pending frames and `camera_leases`) in `src/vms/storage/migrations/versions/` (D19). Cameras and zones come from `configs/cameras.yaml` (synced by `python -m vms.storage bootstrap`, run by `make migrate`). Pipeline-written tables (frames, detections, tracks, events) carry no foreign keys; only zones reference cameras. Each time-series table has one `(camera_id, ts)` index (tracks: `(camera_id, last_seen)`), the deliberate baseline. The query service reads through the `vms_query_reader` role, which holds SELECT on exactly the validator's allowlisted columns (section 11).
 
 Notes that shape D1: column stores excel at time-range aggregates and compression but are poor at updates, so mutable track state may stay in Postgres. Detection and event tables are append-only. Because the LLM emits a `QueryPlan`, not SQL, model accuracy does not depend on the SQL dialect. What D1 weighs instead is compiler complexity and plan-to-SQL result equivalence across backends: each viable backend needs a compiler, with equivalence tests showing the same plan returns the same result set on every backend.
 
@@ -231,9 +233,9 @@ Every service builds on the same small modules, each behind an interface so test
 
 **Write path:** loadgen -> ingest (store JPEG, insert frame row, publish ref) -> queue -> worker (batch, infer, track, write) -> ack.
 - Delivery: at-least-once; idempotent writes keyed on `frame_id` (and `(frame_id, detection_idx)`), so redelivery causes no duplicates.
-- Ordering: per camera, via queue keying.
+- Ordering: per camera, via camera leases (D20): one worker holds a camera and claims its frames in capture order. Frames that reach ingest late are processed out of order and counted (`vms_worker_late_frames_total`).
 - Overload: backpressure at ingest, measured shedding above rated capacity, never silent loss.
-- Shutdown: workers drain in-flight batches before exit.
+- Shutdown: workers finish the current frame, then hand back claimed frames and leases before exit.
 
 **Read paths:** query-service -> (LLM planner -> plan validation -> compiler -> SQL validator -> detection store) | (Triton CLIP text -> vector store) | hybrid (plan with visual query -> filtered ANN or prefilter + rerank) -> object store presigned URLs for frames.
 

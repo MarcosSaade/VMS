@@ -11,6 +11,7 @@ from tests.integration.conftest import StackSettings, alembic_config
 pytestmark = pytest.mark.integration
 
 SCHEMA_V1 = {"frames", "cameras", "zones", "detections", "tracks", "events", "query_log"}
+HEAD = {*SCHEMA_V1, "camera_leases", "alembic_version"}  # 0004 adds the worker leases
 
 
 def tables(stack: StackSettings, db: str) -> set[str]:
@@ -33,10 +34,12 @@ def reader_grants(stack: StackSettings, db: str) -> int:
 
 def test_upgrade_downgrade_upgrade(stack: StackSettings, fresh_db: str) -> None:
     config = alembic_config(stack, fresh_db)
-    assert tables(stack, fresh_db) == SCHEMA_V1 | {"alembic_version"}
+    assert tables(stack, fresh_db) == HEAD
     granted = reader_grants(stack, fresh_db)
     assert granted > 0
 
+    command.downgrade(config, "0003")
+    assert tables(stack, fresh_db) == SCHEMA_V1 | {"alembic_version"}
     command.downgrade(config, "0002")
     assert reader_grants(stack, fresh_db) == 0  # revoked, though the role itself is kept
     command.downgrade(config, "0001")
@@ -45,7 +48,7 @@ def test_upgrade_downgrade_upgrade(stack: StackSettings, fresh_db: str) -> None:
     assert tables(stack, fresh_db) == {"alembic_version"}
 
     command.upgrade(config, "head")
-    assert tables(stack, fresh_db) == SCHEMA_V1 | {"alembic_version"}
+    assert tables(stack, fresh_db) == HEAD
     assert reader_grants(stack, fresh_db) == granted
 
 

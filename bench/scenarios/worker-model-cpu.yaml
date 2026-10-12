@@ -1,0 +1,16 @@
+name: worker-model-cpu
+description: >
+  Model-only latency of the worker's per-frame work on CPU at batch size 1: JPEG decode, input
+  statistics, and YOLO11s detection (pre-processing, forward pass, NMS) on the data-mini clips
+  as loadgen sends them (1280x720, q85). No database, object store or HTTP. Baseline for the
+  CPU precision ladder (5.2) and for how many camera-FPS one CPU worker can serve.
+kind: model
+repeats: 3
+bench:
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  frames_per_clip: 50
+  warmup_frames: 10
+config:
+  detector:
+    weights: yolo11s
+    device: cpu
