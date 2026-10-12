@@ -44,7 +44,6 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
 from enum import StrEnum
 from typing import Protocol, TypeVar, cast
 
@@ -70,10 +69,11 @@ from vms.storage.work import (
     WorkQueue,
 )
 from vms.worker.detector import Detection, Detector
+from vms.worker.pipeline import CameraState, TrackedFrame, Tracker, track_frame
 from vms.worker.settings import QueueSettings
 from vms.worker.stats import input_stats
-from vms.worker.tracking import CameraTracker, TrackedBox, TrackerSettings
-from vms.worker.zones import ZoneDef, ZoneEvent, ZoneSettings, ZoneTracker, anchor
+from vms.worker.tracking import CameraTracker, TrackerSettings
+from vms.worker.zones import ZoneDef, ZoneEvent, ZoneSettings, ZoneTracker
 
 log = get_logger(__name__)
 
@@ -85,21 +85,6 @@ FRESHNESS_BUCKETS_S = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 30
 
 class FrameFetcher(Protocol):
     async def get(self, key: str) -> bytes: ...
-
-
-class Tracker(Protocol):
-    def update(self, detections: list[Detection]) -> list[TrackedBox]: ...
-
-
-@dataclass
-class CameraState:
-    """What this worker remembers about one leased camera."""
-
-    session: str  # part of every track id, new for each tracker
-    tracker: Tracker
-    zones: ZoneTracker
-    zones_loaded_at: float  # monotonic; -inf forces a load
-    last_key: tuple[datetime, int] | None = None  # (ts, seq) of the last tracked frame
 
 
 class Outcome(StrEnum):
@@ -368,47 +353,41 @@ class Worker:
             found = self._detector.detect(image)
         height, width = image.shape[:2]
 
-        track_of: dict[int, str] = {}  # detection index -> global track id
-        zone_events: list[ZoneEvent] = []
         if state is not None:
             with self._stage_timer(timings, "track"):
-                for box in state.tracker.update(found):
-                    track_of[box.det_index] = f"{frame.camera_id}:{state.session}:{box.local_id}"
-                state.last_key = (frame.ts, frame.seq)
-                anchors = {
-                    track_id: anchor(d.x1, d.y1, d.x2, d.y2, width, height)
-                    for i, track_id in track_of.items()
-                    for d in (found[i],)
-                }
-                zone_events = state.zones.update(frame.ts, anchors)
-
-        min_conf = self._tracking.store_min_conf
-        kept = [i for i, d in enumerate(found) if d.confidence >= min_conf or i in track_of]
-        detections = tuple(
-            DetectionRow(
-                n,
-                found[i].class_name,
-                found[i].confidence,
-                found[i].x1,
-                found[i].y1,
-                found[i].x2,
-                found[i].y2,
-                track_of.get(i),
-            )
-            for n, i in enumerate(kept)
-        )
-        tracks = tuple(TrackUpdate(t, found[i].class_name) for i, t in track_of.items())
+                tracked = self._track(found, frame, state, width, height)
+        else:
+            tracked = self._track(found, frame, None, width, height)
         return Analysis(
             width,
             height,
             stats.brightness,
             stats.contrast,
             stats.blur_var,
-            detections,
-            tracks,
-            tuple(zone_events),
+            tracked.detections,
+            tracked.tracks,
+            tracked.zone_events,
             state is not None,
             timings,
+        )
+
+    def _track(
+        self,
+        found: list[Detection],
+        frame: ClaimedFrame,
+        state: CameraState | None,
+        width: int,
+        height: int,
+    ) -> TrackedFrame:
+        return track_frame(
+            found,
+            camera_id=frame.camera_id,
+            ts=frame.ts,
+            seq=frame.seq,
+            state=state,
+            width=width,
+            height=height,
+            store_min_conf=self._tracking.store_min_conf,
         )
 
     def _reset_tracker(self, state: CameraState) -> None:

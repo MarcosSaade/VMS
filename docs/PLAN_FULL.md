@@ -131,6 +131,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 **Prompt:** Add `make demo`: start the stack and the UI, run loadgen with 4 cameras for a few minutes, then print answers to a few example structured queries (also visible in the UI). Add an integration test in CI that runs a shortened version on CPU with tiny models and a fake or tiny LLM (the fake returns canned plans), with no AWS or DVC remote access.
 **Done when:** `make demo` works on a fresh clone with only Docker and uv installed; the CI integration job runs it.
+**Zones (user request, 2026-10-12):** build a small interface that shows a frame from each demo camera and lets the user draw and edit zone polygons, writing them to `configs/cameras.yaml`; then ask the user to draw the zones (the current ones are placeholders). Check the result with `python -m vms.worker render`.
 **Considerations:** the demo uses `make data-mini` (about 180 MB from motchallenge.net and Wikimedia Commons). Cache `data/` in CI keyed on the hash of `configs/data/sources.yaml`, so CI does not hit those hosts on every run.
 
 ---
