@@ -6,6 +6,8 @@ import argparse
 import asyncio
 import json
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +36,8 @@ from vms.storage.objects import S3ObjectStore
 from vms.storage.roles import ReadonlyUserSettings
 
 SERVICE = "query"
-REPO_ROOT = Path.cwd()  # services run from the repo root (make, compose WORKDIR)
+REPO_ROOT = Path.cwd()
+ASK_TIMEOUT_S = 120.0  # services run from the repo root (make, compose WORKDIR)
 
 
 def reader_conninfo(postgres: PostgresSettings, settings: QuerySettings) -> str:
@@ -199,6 +202,54 @@ def plan_questions(questions: list[str], compare: dict[str, dict[str, Any]]) -> 
     return asyncio.run(run())
 
 
+def ask_service(url: str, questions: list[str], *, check: bool, max_rows: int = 5) -> int:
+    """POST each question to a running query service and print the answers (make demo).
+
+    With `check`, exit 1 if any question failed (status `error`) or no question returned rows,
+    so CI can tell a demo that ran from one that worked.
+    """
+    errors = with_rows = 0
+    for question in questions:
+        request = urllib.request.Request(
+            f"{url.rstrip('/')}/v1/query",
+            data=json.dumps({"question": question}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=ASK_TIMEOUT_S) as response:
+                body = json.load(response)
+        except urllib.error.HTTPError as err:
+            body = json.load(err)
+        except OSError as exc:
+            sys.stdout.write(f"Q: {question}\n   request failed: {exc}\n\n")
+            errors += 1
+            continue
+        sys.stdout.write(format_answer(body, max_rows))
+        errors += body["status"] == "error"
+        with_rows += bool(body["rows"])
+    if check and (errors or not with_rows):
+        sys.stdout.write(f"CHECK FAILED: {errors} error(s), {with_rows} answer(s) with rows\n")
+        return 1
+    return 0
+
+
+def format_answer(body: dict[str, Any], max_rows: int) -> str:
+    total = body.get("timings_ms", {}).get("total", 0.0)
+    lines = [f"Q: {body['question']}", f"   [{body['status']}] {body['answer']}  ({total:.0f} ms)"]
+    if body.get("error"):
+        lines += [f"   error: {body['error']['type']}: {body['error']['detail']}"]
+        lines += [f"   - {e}" for e in body["error"].get("errors", [])]
+    columns = [c for c in body.get("columns", []) if c not in ("image_url", "object_key")]
+    if body.get("rows") and body.get("result_kind") != "scalar":
+        at = [body["columns"].index(c) for c in columns]
+        lines.append("   " + " | ".join(columns))
+        for row in body["rows"][:max_rows]:
+            lines.append("   " + " | ".join(str(row[i]) for i in at))
+        if len(body["rows"]) > max_rows:
+            lines.append(f"   ... {len(body['rows']) - max_rows} more")
+    return "\n".join(lines) + "\n\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m vms.query")
     sub = parser.add_subparsers(dest="command")
@@ -210,7 +261,19 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="JSONL of {question, plan}: plan every question and report matches",
     )
+    ask = sub.add_parser("ask", help="ask a running query service and print the answers")
+    ask.add_argument("questions", nargs="*")
+    ask.add_argument("--url", default="http://127.0.0.1:8070")
+    ask.add_argument("--from-file", type=Path, help="JSONL with a question per row")
+    ask.add_argument("--check", action="store_true", help="exit 1 on errors or no rows")
     args = parser.parse_args(argv)
+    if args.command == "ask":
+        questions = list(args.questions)
+        if args.from_file is not None:
+            for line in args.from_file.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    questions.append(json.loads(line)["question"])
+        return ask_service(args.url, questions, check=args.check)
     if args.command == "plan":
         expected: dict[str, dict[str, Any]] = {}
         if args.compare is not None:

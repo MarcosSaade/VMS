@@ -45,7 +45,7 @@
   - Understand it: trace one question from text to SQL; where can it fail, and what does the user see for each failure?
 - [x] 1.8 Minimal UI: live camera tiles, query box with answer and chart or table, plan JSON and compiled SQL panel (SHRINK: no feedback buttons, no semantic mode)
   - Understand it: what does the UI call, and how does it show an abstention or a validator rejection?
-- [ ] 1.9 `make demo` end to end on CPU, plus integration test
+- [x] 1.9 `make demo` end to end on CPU, plus integration test
   - Understand it: what exactly does the demo prove, and what does it fake (LLM, models)?
 
 ## Phase 2: Observability and baseline

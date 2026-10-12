@@ -53,7 +53,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         models = load_models_config()
         for name in args.names or sorted(models.weights):
             path = ensure_weights(models, name)
-            log.info("weights verified", extra={"name": name, "path": str(path)})
+            log.info("weights verified", extra={"weights": name, "path": str(path)})
         return 0
 
     if args.command == "render":

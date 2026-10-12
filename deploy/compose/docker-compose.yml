@@ -174,6 +174,65 @@ services:
 
   # --- Application (profile app) -----------------------------------------------------------
   # One image for the Python services (deploy/docker/Dockerfile), built from the repo root.
+  # `make app` starts the query service + UI; `make demo` also starts ingest and a worker.
+  ingest:
+    profiles: [app]
+    image: vms/app:local
+    command: ["python", "-m", "vms.ingest"]
+    environment:
+      <<: *app-env
+      VMS_HTTP__HOST: 0.0.0.0
+      VMS_HTTP__PORT: "8080"
+    ports:
+      - "127.0.0.1:${INGEST_PORT:-8080}:8080"
+    depends_on:
+      query:          # same image: built once, by the query service's build section
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"
+    restart: unless-stopped
+
+  worker:
+    profiles: [app]
+    image: vms/app:local
+    command: ["python", "-m", "vms.worker", "run"]
+    environment:
+      <<: *app-env
+      VMS_HTTP__HOST: 0.0.0.0
+      VMS_HTTP__PORT: "8090"
+      # yolo11n keeps up with more cameras on CPU than yolo11s (E-013, E-014).
+      VMS_DETECTOR__WEIGHTS: ${DEMO_WEIGHTS:-yolo11n}
+    volumes:
+      # Fetched and verified on the host (make models); read-only in the container.
+      - ../../models/weights:/app/models/weights:ro
+    ports:
+      - "127.0.0.1:${WORKER_PORT:-8090}:8090"
+    depends_on:
+      query:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      start_period: 60s   # loads and warms the model first
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/readyz', timeout=2)"
+    restart: unless-stopped
+
   query:
     profiles: [app]
     build:

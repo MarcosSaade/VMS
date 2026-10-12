@@ -21,7 +21,10 @@ make setup   # Python 3.12 env from uv.lock, pre-commit hooks, .env
 make check   # lint + typecheck + unit tests
 make up      # local stack (Postgres + pgvector, object store, OTel, Prometheus, Tempo, Grafana), waits until healthy, applies migrations and the camera catalog
 make app     # query service + UI in a container: http://localhost:8070 (camera wall and question box)
+make demo    # end to end on CPU: clips, ingest, worker, loadgen, example questions; then open http://localhost:8070
 ```
+
+`make demo` needs only Docker and uv (no GPU, no LLM, no AWS): the planner is a canned stand-in unless `LLM_MODEL` points at an OpenAI-compatible endpoint such as Ollama. Draw camera zones with `make zones`.
 
 Run `make help` to list every target. Details are in [docs/RUNBOOK.md](docs/RUNBOOK.md).
 

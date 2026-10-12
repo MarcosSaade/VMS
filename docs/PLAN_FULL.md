@@ -135,6 +135,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Done when:** `make demo` works on a fresh clone with only Docker and uv installed; the CI integration job runs it.
 **Zones (user request, 2026-10-12):** build a small interface that shows a frame from each demo camera and lets the user draw and edit zone polygons, writing them to `configs/cameras.yaml`; then ask the user to draw the zones (the current ones are placeholders). Check the result with `python -m vms.worker render`.
 **Considerations:** the demo uses `make data-mini` (about 180 MB from motchallenge.net and Wikimedia Commons). Cache `data/` in CI keyed on the hash of `configs/data/sources.yaml`, so CI does not hit those hosts on every run.
+**Status note:** Done 2026-10-12 (D24, E-020). `make demo` runs ingest, a yolo11n worker and the query service as containers of the application image, loadgen from the host, waits for the backlog to drain and prints the canned planner's answers (`ask --check` fails on errors). CI runs `make demo DEMO_SECONDS=30` after the integration tests, with `data/` and the weights cached. The zone editor is `make zones` (`vms.zones`); by the user's instruction the agent did not wait for zones to be drawn: the placeholders remain until the user draws them locally and checks them with `python -m vms.worker render`.
 
 ---
 

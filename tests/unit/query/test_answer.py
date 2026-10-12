@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -62,3 +63,21 @@ def test_truncation_is_stated() -> None:
     assert answer(plan, ["frame_id"], [("a",), ("b",)], truncated=True) == (
         "2 frames (showing the first 2)."
     )
+
+
+def test_numeric_values_are_rounded() -> None:
+    dwell = {
+        "intent": "dwell",
+        "target": "tracks",
+        "measure": {"op": "avg", "field": "dwell_seconds"},
+        "group_by": ["zone"],
+    }
+    assert answer(dwell, ["zone", "value"], [("register_2", Decimal("11.6000000000000000"))]) == (
+        "1 group; first: register_2 (11.60)."
+    )
+    scalar = {
+        "intent": "dwell",
+        "target": "tracks",
+        "measure": {"op": "max", "field": "dwell_seconds"},
+    }
+    assert answer(scalar, ["value"], [(Decimal("3.5"),)]) == "max dwell_seconds: 3.50 s."

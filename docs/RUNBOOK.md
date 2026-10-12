@@ -50,7 +50,35 @@ Adding a clip: look at its frames first, keep only static cameras, and label the
 
 ## Running locally
 
-`make demo` (task 1.9) will run the end-to-end CPU demo on `make data-mini`. The local stack exists now:
+### Demo (end to end on CPU)
+
+```bash
+make setup && make demo                 # needs only Docker and uv; ~10 min the first time
+make demo DEMO_SECONDS=30               # shorter load (CI runs this)
+```
+
+What it does (`scripts/demo.sh`): `make up` (stack, migrations, camera catalog), `make data-mini` (3 clips, ~180 MB the first time), the yolo11n weights, then the application containers from one image (`make app` builds it: ingest on :8080, one worker on :8090, the query service with the UI on :8070), then loadgen with 4 cameras x 5 FPS for `DEMO_SECONDS` (180) against the containerized ingest, waits until the worker has processed every frame (`python -m vms.storage wait-drained`, printing frames, tracks and events per camera), and prints the answers to the example questions (`python -m vms.query ask --check`, which fails the demo if any question errors or none returns rows). Everything stays up: open http://localhost:8070, then `make down` (or `make down-volumes` for an empty start next time).
+
+- Knobs: `DEMO_SECONDS`, `DEMO_CAMERAS` (4; the catalog has 4 cameras, more are ingested but invisible to questions), `DEMO_FPS` (5), `DEMO_WEIGHTS` (yolo11n), `DEMO_DRAIN_TIMEOUT_S` (900).
+- What it fakes: the planner is the canned one unless `LLM_MODEL` is set (then the same questions go to the real model); clips are 10 s loops, so each loop restarts every person's walk and counts of tracks are much higher than the people in view (D21 already notes tracks overcount); the camera and zone names are labels on public video, not real places.
+- On a laptop CPU one yolo11n worker processes fewer than the 20 frames/s offered, so frames queue during loadgen and the wall shows frames tens of seconds old; the drain step waits them out (E-020).
+- Re-running adds a new loadgen run to the same database; "last hour" answers then include the previous run.
+
+### Zone editor
+
+```bash
+make zones          # builds the UI (Node 22), then http://127.0.0.1:8075
+```
+
+- Tabs per catalog camera, each showing frames of the clip that camera plays in the demo (loadgen's round robin over `configs/loadgen.yaml` clips: cam-001 mot17-09-mini, cam-002 mot17-04-mini, cam-003 commons-roncesvalles, cam-004 mot17-09-mini). The slider scrubs through the clip.
+- New zone: click "+ New zone", click the corners, then click the first point or press Enter (Backspace removes the last point, Esc cancels). Rename it in the list (lowercase, digits, `_`; unique across all cameras). Selected zone: drag points, double-click an edge to add a point, right-click a point to delete it. Save writes `configs/cameras.yaml` (validated by the same rules as `make migrate`; the header comment is kept). Revert drops unsaved edits.
+- Afterwards: `make migrate` loads the zones into Postgres (running workers reload them within `zones.refresh_s`, 60 s), and check them on video: `uv run python -m vms.worker render mot17-09-mini:entrance mot17-04-mini:checkout commons-roncesvalles:parking_lot mot17-09-mini:loading_dock --out ~/Desktop/zones.mp4`.
+- Zone ids are `<camera_id>:<name>`: renaming a zone starts a new zone; events of the old name stay under the old id.
+- Show a different clip for a camera: `uv run python -m vms.zones edit --clip cam-004=mot17-04-mini`.
+
+### Stack
+
+The local stack on its own:
 
 ```bash
 make up            # build/pull, start, wait until every health check passes (timeout 300 s), print URLs
