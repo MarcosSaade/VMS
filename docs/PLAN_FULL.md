@@ -127,6 +127,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Prompt:** Build a small Vite + TypeScript UI (React optional; no heavy component libraries), served by compose. Views: a camera wall with the latest frame per camera and its detection boxes, refreshed every second or two; a query box that shows the answer, a table or chart chosen from the result kind (scalar, table, time series, frames), and a collapsible panel with the plan JSON and compiled SQL; clear states for abstention, validator rejection and errors. Design it to look good in screenshots (consistent spacing, readable at 1280 px wide).
 **Done when:** usable against the local stack during `make demo`; screenshots of both views saved for the README.
 **Considerations:** keep it small: the UI exists to make the demo and write-up visual, not as a product. No feedback buttons and no semantic mode.
+**Status note:** Done 2026-10-12 (D23). Vanilla TypeScript served by the query service at `/`; compose runs it with `make app` (profile `app`, image `deploy/docker/Dockerfile`). Screenshots of both views and of each result state were taken at 1280 px with `npm run screenshots` against a live pipeline (4 cameras, yolo11n) and handed to the user; they are not committed, because `AGENTS.md` forbids committing images and the frames are CC BY-NC-SA video: committing them (with a `docs/images/` exception) is the user's call before 11.1.
 
 ### 1.9 Demo
 

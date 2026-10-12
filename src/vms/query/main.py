@@ -21,7 +21,7 @@ from vms.query.catalog import catalog_from_rows
 from vms.query.compiler import PostgresCompiler
 from vms.query.engine import CatalogCache, PlanEngine
 from vms.query.fewshots import load_fewshots
-from vms.query.llm import LlmEndpointSettings, build_llm
+from vms.query.llm import CannedLlm, LlmEndpointSettings, build_llm
 from vms.query.plan import QueryPlan
 from vms.query.planner import Planner, PlannerUnavailableError, PlanningFailedError, abstention
 from vms.query.prompts import PLANNER_FIELDS, PromptTemplate
@@ -114,6 +114,10 @@ def build_app(settings: QuerySettings, obs: Observability) -> FastAPI:
         store,
         obs.metrics,
         ready_checks={"postgres": reader.ready, "object_store": store.ready},
+        examples=CannedLlm.from_files(
+            [REPO_ROOT / p for p in settings.llm.canned_plans]
+        ).questions_as_written,
+        ui_dir=REPO_ROOT / settings.ui_dir,
         on_startup=startup,
         on_shutdown=shutdown,
     )

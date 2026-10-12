@@ -240,6 +240,7 @@ class CannedLlm:
 
     def __init__(self, plans: dict[str, QueryPlan]) -> None:
         self._plans = {normalize_question(q): p for q, p in plans.items()}
+        self.questions_as_written = list(plans)  # file order, original spelling
 
     @classmethod
     def from_files(cls, paths: Sequence[Path]) -> CannedLlm:

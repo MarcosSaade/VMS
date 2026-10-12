@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VMS</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand"><span class="logo">●</span> VMS <span class="muted">video analytics</span></div>
+      <div id="status" class="status">connecting…</div>
+    </header>
+    <main class="layout">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Cameras</h2>
+          <div class="toggles">
+            <label><input type="checkbox" id="show-boxes" checked /> boxes</label>
+            <label><input type="checkbox" id="show-zones" checked /> zones</label>
+          </div>
+        </div>
+        <div id="wall" class="wall"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Ask</h2></div>
+        <form id="ask" class="ask">
+          <input id="question" type="text" maxlength="1000" autocomplete="off"
+                 placeholder="How many people did each camera see in the last hour?" />
+          <button type="submit">Ask</button>
+        </form>
+        <div id="examples" class="chips"></div>
+        <div id="result"></div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

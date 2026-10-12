@@ -20,6 +20,7 @@ Requires [uv](https://docs.astral.sh/uv/), GNU make and Docker.
 make setup   # Python 3.12 env from uv.lock, pre-commit hooks, .env
 make check   # lint + typecheck + unit tests
 make up      # local stack (Postgres + pgvector, object store, OTel, Prometheus, Tempo, Grafana), waits until healthy, applies migrations and the camera catalog
+make app     # query service + UI in a container: http://localhost:8070 (camera wall and question box)
 ```
 
 Run `make help` to list every target. Details are in [docs/RUNBOOK.md](docs/RUNBOOK.md).

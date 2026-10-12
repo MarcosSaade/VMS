@@ -2,10 +2,15 @@
 
     POST /v1/query                  {"question": "..."} -> QueryResponse (JSON; no SSE in v0)
     GET  /v1/catalog                cameras, zones and classes the planner knows
+    GET  /v1/live                   per camera: latest processed frame, detections, zones
+    GET  /v1/examples               example questions (the canned planner answers these)
     GET  /v1/frames/{id}/image      a stored frame's JPEG, read from the object store
     GET  /healthz                   the process is up
     GET  /readyz                    Postgres (read-only login) and the object store answer
     GET  /metrics                   Prometheus
+
+With a built UI (`frontend/dist`, `make ui-build` or the app image), it is served at `/`, so
+the browser talks to one origin and needs no CORS or proxy.
 
 Every query response has the same shape whatever happened, so a client renders answers,
 abstentions and errors from one type; the HTTP status says which (vms.query.engine).
@@ -16,16 +21,19 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path as FsPath
 from typing import Any, Protocol
 
 from fastapi import FastAPI, Path, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from opentelemetry import context as otel_context
 from opentelemetry import propagate
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from vms.common.metrics import Metrics
 from vms.query.engine import CatalogCache, StructuredQueryEngine
+from vms.query.live import live_view
 from vms.query.store import ExecutionError, Reader
 
 READY_TIMEOUT_S = 2.0
@@ -62,6 +70,8 @@ def create_app(
     metrics: Metrics,
     *,
     ready_checks: dict[str, ReadyCheck],
+    examples: list[str] | None = None,
+    ui_dir: FsPath | None = None,
     on_startup: Callable[[], Awaitable[None]] | None = None,
     on_shutdown: Callable[[], Awaitable[None]] | None = None,
 ) -> FastAPI:
@@ -143,6 +153,18 @@ def create_app(
         headers = {"Cache-Control": "public, max-age=86400, immutable"}
         return Response(jpeg, media_type="image/jpeg", headers=headers)
 
+    @app.get("/v1/live")
+    async def live() -> Response:
+        try:
+            cameras = await live_view(reader, await catalog.get())
+        except ExecutionError as exc:
+            return JSONResponse({"error": "database_unavailable", "detail": str(exc)}, 503)
+        return JSONResponse({"cameras": [c.model_dump(mode="json") for c in cameras]})
+
+    @app.get("/v1/examples")
+    async def get_examples() -> dict[str, list[str]]:
+        return {"questions": list(examples or [])}
+
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
@@ -166,4 +188,7 @@ def create_app(
     async def metrics_endpoint() -> Response:
         return Response(metrics.exposition(), media_type="text/plain; version=0.0.4")
 
+    if ui_dir is not None and (ui_dir / "index.html").is_file():
+        # Last, so API routes win; html=True serves index.html at "/".
+        app.mount("/", StaticFiles(directory=ui_dir, html=True), name="ui")
     return app

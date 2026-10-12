@@ -63,6 +63,11 @@ up: ## Start the compose stack, wait until healthy, migrate and bootstrap the DB
 	@$(MAKE) --no-print-directory migrate
 	@scripts/stack_urls.sh $(ENV_FILE)
 
+.PHONY: app
+app: ## Build and start the containerized query service + UI on http://localhost:8070 (after make up)
+	$(COMPOSE) --profile app up -d --build --wait --wait-timeout $(STACK_WAIT_TIMEOUT) query
+	@echo "UI and query API: http://localhost:$${QUERY_PORT:-8070}"
+
 .PHONY: migrate
 migrate: ## Apply migrations, then the read-only login and camera catalog (POSTGRES_* from .env)
 	$(RUN) alembic upgrade head
@@ -119,6 +124,18 @@ worker: ## Run the inference worker on the host (needs make up; fetches weights 
 .PHONY: query
 query: ## Run the query service on the host (needs make up; LLM from LLM_* in .env, else canned)
 	$(RUN) python -m vms.query serve
+
+.PHONY: ui-build
+ui-build: ## Build the UI into frontend/dist (served by make query); needs Node 22
+	cd frontend && npm ci --no-audit --no-fund && npm run build
+
+.PHONY: ui-dev
+ui-dev: ## UI dev server on http://localhost:5173, proxying /v1 to make query
+	cd frontend && npm run dev
+
+.PHONY: ui-check
+ui-check: ## Frontend typecheck and unit tests (vitest); needs Node 22
+	cd frontend && npm ci --no-audit --no-fund && npm run typecheck && npm test
 
 .PHONY: models
 models: ## Fetch and verify the pinned detector weights into models/weights/

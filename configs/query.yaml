@@ -28,6 +28,7 @@ objects:                      # frame images for GET /v1/frames/{id}/image
   max_attempts: 3
 
 catalog_ttl_s: 30             # cameras and zones are re-read from Postgres at most this often
+ui_dir: frontend/dist         # built UI (make ui-build), served at / when present
 
 telemetry:
   sample_ratio: 1.0           # every question is traced

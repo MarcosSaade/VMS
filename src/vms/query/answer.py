@@ -63,7 +63,8 @@ def render_answer(
     if kind is ResultKind.TIME_SERIES:
         total = sum(int(r[columns.index("n")]) for r in rows)
         assert plan.bucket is not None
-        return f"{len(rows)} {plan.bucket.value} buckets, {total:,} in total{more}."
+        plural = "s" if len(rows) != 1 else ""
+        return f"{len(rows)} {plan.bucket.value} bucket{plural}, {total:,} in total{more}."
     if kind is ResultKind.FRAMES:
         return f"{len(rows)} frame{'s' if len(rows) != 1 else ''}{more}."
     if plan.intent is Intent.LIST:

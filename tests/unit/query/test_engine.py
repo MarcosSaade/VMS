@@ -7,6 +7,7 @@ import asyncio
 import datetime as dt
 import logging
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -341,3 +342,86 @@ def test_probes_and_metrics(client: TestClient, harness: Harness) -> None:
     assert "vms_query_requests_total" in text
     assert "vms_query_stage_duration_seconds" in text
     assert 'route="/v1/query"' in text
+
+
+# --- camera wall, examples, UI -----------------------------------------------------------------
+
+
+def test_live_view(harness: Harness, client: TestClient) -> None:
+    ts = dt.datetime(2026, 10, 12, 13, 29, tzinfo=dt.UTC)
+    harness.reader.fixed["model_version IS NOT NULL"] = QueryRows(
+        ["frame_id", "ts", "width", "height"], [(FRAME_ID, ts, 1280, 720)], False
+    )
+    harness.reader.fixed["FROM detections"] = QueryRows(
+        [], [(FRAME_ID, "person", 0.91, "cam-001:a:7", 10.0, 20.0, 110.0, 220.0)], False
+    )
+    harness.reader.fixed["FROM zones"] = QueryRows(
+        [], [("cam-001", "front_door", [[0.1, 0.5], [0.9, 0.5], [0.5, 1.0]])], False
+    )
+    cameras = client.get("/v1/live").json()["cameras"]
+    assert [c["name"] for c in cameras] == ["entrance", "checkout"]
+    entrance = cameras[0]
+    assert entrance["zones"] == [
+        {"name": "front_door", "polygon": [[0.1, 0.5], [0.9, 0.5], [0.5, 1.0]]}
+    ]
+    frame = entrance["frame"]
+    assert frame["image_url"] == f"/v1/frames/{FRAME_ID}/image"
+    assert (frame["width"], frame["height"]) == (1280, 720)
+    assert frame["detections"] == [
+        {
+            "class_name": "person",
+            "confidence": 0.91,
+            "track_id": "cam-001:a:7",
+            "box": [10.0, 20.0, 110.0, 220.0],
+        }
+    ]
+    # Camera ids are bound parameters of the fixed query, one probe per camera.
+    probes = [p for sql, p in harness.reader.fetched if "model_version IS NOT NULL" in sql]
+    assert probes == [{"camera_id": "cam-001"}, {"camera_id": "cam-002"}]
+
+
+def test_examples_endpoint(harness: Harness) -> None:
+    app = create_app(
+        harness.engine,
+        harness.catalog,
+        harness.reader,
+        FakeFrames(),
+        harness.metrics,
+        ready_checks={},
+        examples=["How many cars?", "Show the last 10 zone events."],
+    )
+    with TestClient(app) as c:
+        assert c.get("/v1/examples").json() == {
+            "questions": ["How many cars?", "Show the last 10 zone events."]
+        }
+
+
+def test_ui_is_served_and_api_routes_win(harness: Harness, tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<!doctype html><title>VMS</title>")
+    app = create_app(
+        harness.engine,
+        harness.catalog,
+        harness.reader,
+        FakeFrames(),
+        harness.metrics,
+        ready_checks={},
+        ui_dir=tmp_path,
+    )
+    with TestClient(app) as c:
+        assert "<title>VMS</title>" in c.get("/").text
+        assert c.get("/healthz").json() == {"status": "ok"}
+        assert c.get("/v1/examples").status_code == 200
+
+
+def test_no_ui_dir_means_no_root_page(harness: Harness, tmp_path: Path) -> None:
+    app = create_app(
+        harness.engine,
+        harness.catalog,
+        harness.reader,
+        FakeFrames(),
+        harness.metrics,
+        ready_checks={},
+        ui_dir=tmp_path / "missing",
+    )
+    with TestClient(app) as c:
+        assert c.get("/").status_code == 404

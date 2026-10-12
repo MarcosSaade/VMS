@@ -8,7 +8,8 @@
 # Profiles: infrastructure below has no profile and always starts. Application services that
 # exist in a CPU and a GPU variant (the inference worker; Phase 1+) carry
 # `profiles: [cpu]` or `profiles: [gpu]`. `make up` activates `cpu`; `make up PROFILES=gpu`
-# activates `gpu`.
+# activates `gpu`. The containerized application (profile `app`: the query service with the UI)
+# starts with `make app`, after `make up` has migrated the database.
 #
 # Images are pinned by tag; bump deliberately and re-run `make test-integration`.
 
@@ -22,6 +23,23 @@ x-healthcheck-defaults: &healthcheck-defaults
 
 # Tempo and the OTel collector ship distroless images with no shell or HTTP client for health
 # checks; their inline builds add a static busybox as /bin/wget and nothing else.
+
+# Connection settings shared by the application containers: the same POSTGRES_* and S3_*
+# values as the host, pointed at the services on the compose network.
+x-app-env: &app-env
+  VMS_ENV: ${VMS_ENV:-local}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:-vms}
+  POSTGRES_USER: ${POSTGRES_USER:-vms}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+  POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER:-vms_query}
+  POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD:-change-me}
+  S3_ENDPOINT_URL: http://objectstore:8333
+  S3_BUCKET: ${S3_BUCKET:-vms-frames}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-vms-local}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-change-me-s3}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
 
 services:
   postgres:
@@ -153,6 +171,52 @@ services:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
     restart: unless-stopped
+
+  # --- Application (profile app) -----------------------------------------------------------
+  # One image for the Python services (deploy/docker/Dockerfile), built from the repo root.
+  query:
+    profiles: [app]
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      secrets: [extra_ca]
+    image: vms/app:local
+    command: ["python", "-m", "vms.query", "serve"]
+    environment:
+      <<: *app-env
+      VMS_HTTP__HOST: 0.0.0.0
+      VMS_HTTP__PORT: "8070"
+      # The planner. Empty LLM_MODEL: the canned planner. Ollama on the host is reachable at
+      # http://host.docker.internal:11434/v1 (on Linux, Ollama must listen beyond 127.0.0.1).
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      VMS_LLM__PROVIDER: ${VMS_LLM__PROVIDER:-auto}
+      VMS_LLM__RESPONSE_FORMAT: ${VMS_LLM__RESPONSE_FORMAT:-json_schema}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${QUERY_PORT:-8070}:8070"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      objectstore:
+        condition: service_healthy
+      otel-collector:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8070/readyz', timeout=2)"
+    restart: unless-stopped
+
+# Optional CA for builds behind a TLS-intercepting proxy (EXTRA_CA_CERT in .env); empty by default.
+secrets:
+  extra_ca:
+    file: ${EXTRA_CA_CERT:-/dev/null}
 
 volumes:
   postgres-data:

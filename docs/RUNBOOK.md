@@ -131,6 +131,23 @@ uv run python -m vms.query plan --compare configs/demo/canned_plans.v1.jsonl    
 - Every question is a row in `query_log` (written as `POSTGRES_USER`; the read-only login cannot read it): `SELECT ts, question, success, error_type, latency_ms, timings, llm FROM query_log ORDER BY ts DESC LIMIT 20`.
 - Metrics on `/metrics`: `vms_query_requests_total{status,error_type}`, `vms_query_stage_duration_seconds{stage}`, `vms_query_llm_tokens_total`, `vms_query_plan_repairs_total`, `vms_query_query_log_failures_total`.
 
+### UI
+
+```bash
+make app           # build the app image and start the query service + UI in compose: http://localhost:8070
+make query         # or on the host; serves the UI too once it is built:
+make ui-build      #   npm ci && npm run build into frontend/dist (needs Node 22)
+make ui-dev        # dev server with hot reload on http://localhost:5173, proxying /v1 to :8070
+make ui-check      # frontend typecheck + vitest (CI runs the same in the frontend job)
+```
+
+- The UI is served by the query service at `/`; there is no separate web server. Without `frontend/dist` (host mode, not built), `/` answers 404 and the API still works.
+- Camera wall empty ("waiting for frames"): nothing has been processed for that camera yet; it needs ingest, a worker and frames from loadgen (`make demo`). Tiles show how long ago their frame was captured: a growing age means the worker is behind.
+- Example chips are the canned planner's questions (`configs/demo/canned_plans.v1.jsonl`); with a real LLM any question works.
+- The containerized query service reaches an LLM on the host at `http://host.docker.internal:11434/v1` (the compose default for `LLM_BASE_URL`). On Linux, Ollama listens on 127.0.0.1 by default and is unreachable from containers: start it with `OLLAMA_HOST=0.0.0.0`, or run `make query` on the host instead.
+- Image builds behind a TLS-intercepting proxy: set `EXTRA_CA_CERT` in `.env` to the proxy's CA file; compose passes it to the build as a secret (never stored in the image).
+- Screenshots for the README: `cd frontend && CHROMIUM_PATH=/path/to/chrome npm run screenshots -- http://localhost:8070 ../docs/images` while the demo runs.
+
 ### Load generator
 
 `vms.loadgen` replays clips from `make data-mini` (or `make data`) as virtual cameras. Settings are in `configs/loadgen.yaml`; a scenario in `bench/scenarios/` overrides them, and command-line flags override the scenario.

@@ -43,6 +43,21 @@ jobs:
       - name: make check
         run: make check
 
+  frontend:
+    name: frontend (typecheck, unit tests, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container: node:22.22.0-alpine   # same Node as the app image's UI stage
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
   integration:
     name: integration (compose CPU stack)
     needs: check
