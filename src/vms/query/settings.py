@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from vms.common.settings import ServiceSettings
+from vms.query.llm import LlmTuning
 
 
 class _Section(BaseModel):
@@ -47,6 +48,20 @@ class QueryAssets(_Section):
     sql_prompt: Path = Path("configs/prompts/sql.v1.txt")
 
 
+class PlannerSettings(_Section):
+    """Planning and semantic validation of plans."""
+
+    repair_attempts: int = Field(default=1, ge=0, le=3)
+    # Longest time range a plan may ask for; longer ones go back to the planner as an error.
+    max_time_range_days: int = Field(default=400, ge=1)
+    # How far in the future an absolute range may start (clock skew, "later today").
+    max_future_start_hours: float = Field(default=24.0, ge=0)
+
+
 class QuerySettings(ServiceSettings):
     sql: SqlValidatorSettings = Field(default_factory=SqlValidatorSettings)
     assets: QueryAssets = Field(default_factory=QueryAssets)
+    llm: LlmTuning = Field(default_factory=LlmTuning)
+    planner: PlannerSettings = Field(default_factory=PlannerSettings)
+    # Object classes the detector can emit (COCO for YOLO11): the names plans may filter on.
+    classes: list[str] = Field(default_factory=list)
