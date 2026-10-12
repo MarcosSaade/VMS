@@ -74,24 +74,27 @@ migrate: ## Apply migrations, then the read-only login and camera catalog (POSTG
 	$(RUN) python -m vms.storage bootstrap
 
 .PHONY: down
-down: ## Stop the compose stack (keeps data volumes)
-	$(COMPOSE) down
+down: ## Stop the compose stack and the app containers (keeps data volumes)
+	$(COMPOSE) --profile app down
 
 .PHONY: down-volumes
-down-volumes: ## Stop the compose stack and delete its data volumes
-	$(COMPOSE) down --volumes
+down-volumes: ## Stop the compose stack and the app containers, delete data volumes
+	$(COMPOSE) --profile app down --volumes
 
 .PHONY: ps
 ps: ## Show compose services and health
-	$(COMPOSE) ps
+	$(COMPOSE) --profile app ps
 
 .PHONY: logs
 logs: ## Follow compose logs (SERVICE=<name> for one service)
 	$(COMPOSE) logs -f --tail=200 $(SERVICE)
 
+# make demo DEMO_SECONDS=30 for a short run (CI). DEMO_CAMERAS, DEMO_FPS, DEMO_WEIGHTS too.
+DEMO_SECONDS ?= 180
+
 .PHONY: demo
-demo: ## End-to-end CPU demo on the mini dataset
-	$(call not_yet,1.9)
+demo: ## End-to-end CPU demo: stack, clips, ingest + worker + query/UI, loadgen, example questions
+	DEMO_SECONDS=$(DEMO_SECONDS) scripts/demo.sh $(ENV_FILE)
 
 # --- Data ----------------------------------------------------------------------
 
@@ -136,6 +139,10 @@ ui-dev: ## UI dev server on http://localhost:5173, proxying /v1 to make query
 .PHONY: ui-check
 ui-check: ## Frontend typecheck and unit tests (vitest); needs Node 22
 	cd frontend && npm ci --no-audit --no-fund && npm run typecheck && npm test
+
+.PHONY: zones
+zones: ui-build ## Zone editor on http://127.0.0.1:8075: draw zones on clip frames, saves configs/cameras.yaml
+	$(RUN) python -m vms.zones edit
 
 .PHONY: models
 models: ## Fetch and verify the pinned detector weights into models/weights/

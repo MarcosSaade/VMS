@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VMS zone editor</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand"><span class="logo">●</span> VMS <span class="muted">zone editor</span></div>
+      <div class="status muted">saves to <code id="catalog">configs/cameras.yaml</code></div>
+    </header>
+    <main class="editor">
+      <section class="panel">
+        <nav id="tabs" class="tabs"></nav>
+        <div id="stage" class="stage">
+          <img id="frame" alt="camera frame" draggable="false" />
+          <svg id="overlay" class="overlay"></svg>
+        </div>
+        <div class="scrub">
+          <input id="frame-index" type="range" min="0" max="0" value="0" aria-label="frame" />
+          <span id="frame-label" class="muted"></span>
+        </div>
+        <p id="help" class="muted help"></p>
+      </section>
+      <aside class="panel side">
+        <div class="panel-head"><h2>Zones</h2><button id="new-zone" type="button">+ New zone</button></div>
+        <ul id="zones" class="zone-list"></ul>
+        <div class="actions">
+          <button id="save" type="button" disabled>Save</button>
+          <button id="revert" type="button" class="ghost" disabled>Revert</button>
+        </div>
+        <div id="messages"></div>
+      </aside>
+    </main>
+    <script type="module" src="/src/zones.ts"></script>
+  </body>
+</html>

@@ -105,6 +105,83 @@ def load_catalog(path: Path = DEFAULT_CATALOG) -> CameraCatalog:
     return CameraCatalog.model_validate(data)
 
 
+# --- Writing (the zone editor, python -m vms.zones) ----------------------------------------
+
+POLYGON_DECIMALS = 4  # ~0.1 px at 1280 px wide
+
+
+def with_zones(
+    catalog: CameraCatalog, camera_id: str, zones: list[dict[str, Any]]
+) -> CameraCatalog:
+    """The catalog with `camera_id`'s zones replaced. Validates everything (polygons, unique
+    names across the catalog) and raises ValueError with the reasons."""
+    cameras = []
+    found = False
+    for cam in catalog.cameras:
+        if cam.camera_id == camera_id:
+            found = True
+            cam = Camera.model_validate({**cam.model_dump(), "zones": zones})
+        cameras.append(cam)
+    if not found:
+        raise ValueError(f"unknown camera {camera_id!r}")
+    return CameraCatalog.model_validate({"version": catalog.version, "cameras": cameras})
+
+
+def catalog_header(text: str) -> str:
+    """The comment block before the YAML body, kept verbatim when the file is rewritten."""
+    lines = []
+    for line in text.splitlines():
+        if line.strip() and not line.lstrip().startswith("#"):
+            break
+        lines.append(line)
+    return "\n".join(lines).rstrip() + "\n\n" if any(lines) else ""
+
+
+def dump_catalog(catalog: CameraCatalog, header: str = "") -> str:
+    """YAML in the hand-written style of configs/cameras.yaml: one polygon per line."""
+
+    def point(p: Point) -> str:
+        return f"[{round(p[0], POLYGON_DECIMALS)}, {round(p[1], POLYGON_DECIMALS)}]"
+
+    out = [header + f"version: {catalog.version}", "", "cameras:"]
+    for i, cam in enumerate(catalog.cameras):
+        if i:
+            out.append("")
+        out += [
+            f"  - camera_id: {cam.camera_id}",
+            f"    name: {cam.name}",
+            f"    site: {cam.site}",
+            f"    timezone: {cam.timezone}",
+        ]
+        if cam.zones:
+            out.append("    zones:")
+            for zone in cam.zones:
+                out.append(f"      - name: {zone.name}")
+                out.append(f"        polygon: [{', '.join(point(p) for p in zone.polygon)}]")
+    return "\n".join(out) + "\n"
+
+
+def write_catalog(path: Path, catalog: CameraCatalog) -> None:
+    """Rewrite `path` atomically, keeping its header comment; the result must load back equal."""
+    header = catalog_header(path.read_text(encoding="utf-8")) if path.exists() else ""
+    text = dump_catalog(catalog, header)
+    if CameraCatalog.model_validate(yaml.safe_load(text)) != _rounded(catalog):
+        raise ValueError("catalog did not round-trip through YAML")  # pragma: no cover
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
+def _rounded(catalog: CameraCatalog) -> CameraCatalog:
+    data = catalog.model_dump()
+    for cam in data["cameras"]:
+        for zone in cam["zones"]:
+            zone["polygon"] = [
+                (round(x, POLYGON_DECIMALS), round(y, POLYGON_DECIMALS)) for x, y in zone["polygon"]
+            ]
+    return CameraCatalog.model_validate(data)
+
+
 # --- Geometry (small polygons from config; O(n^2) is fine) --------------------------------
 
 

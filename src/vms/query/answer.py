@@ -7,6 +7,7 @@ returned next to it for anyone who wants the detail.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from vms.query.plan import Intent, QueryPlan, ResultKind, Target
@@ -32,6 +33,8 @@ def _noun(plan: QueryPlan, n: int) -> str:
 
 
 def _number(value: Any) -> str:
+    if isinstance(value, Decimal):  # Postgres numeric, e.g. EXTRACT(EPOCH ...) for dwell
+        value = float(value)
     if isinstance(value, float):
         return f"{value:,.2f}"
     if isinstance(value, int):
@@ -75,4 +78,5 @@ def render_answer(
     first = rows[0]
     label = ", ".join(str(first[columns.index(k)]) for k in keys)
     value = _number(first[columns.index(metric)])
-    return f"{len(rows)} groups; first: {label} ({value}){more}."
+    groups = "group" if len(rows) == 1 else "groups"
+    return f"{len(rows)} {groups}; first: {label} ({value}){more}."

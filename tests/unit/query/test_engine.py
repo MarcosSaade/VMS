@@ -425,3 +425,34 @@ def test_no_ui_dir_means_no_root_page(harness: Harness, tmp_path: Path) -> None:
     )
     with TestClient(app) as c:
         assert c.get("/").status_code == 404
+
+
+def test_ask_output_format() -> None:
+    from vms.query.main import format_answer
+
+    body = {
+        "question": "Per camera?",
+        "status": "ok",
+        "answer": "2 groups; first: entrance (5).",
+        "result_kind": "table",
+        "columns": ["camera", "n"],
+        "rows": [["entrance", 5], ["checkout", 3]],
+        "timings_ms": {"total": 12.4},
+    }
+    assert format_answer(body, max_rows=1).splitlines() == [
+        "Q: Per camera?",
+        "   [ok] 2 groups; first: entrance (5).  (12 ms)",
+        "   camera | n",
+        "   entrance | 5",
+        "   ... 1 more",
+        "",  # a blank line separates answers
+    ]
+    failed = {
+        "question": "x",
+        "status": "error",
+        "answer": "Could not plan.",
+        "columns": [],
+        "rows": [],
+        "error": {"type": "invalid_plan", "detail": "d", "errors": ["unknown camera 'x'"]},
+    }
+    assert "   - unknown camera 'x'" in format_answer(failed, 5)

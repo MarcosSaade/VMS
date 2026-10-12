@@ -7,8 +7,10 @@
 #   (eval/fewshot/structured.v1.jsonl). Zone names are unique across the catalog.
 # - timezone: IANA name; "today" and "this morning" are computed in it.
 # - polygon: [x, y] points normalized to the frame (0..1, origin top-left), simple, non-zero
-#   area; edges count as inside. Positions are placeholders, not drawn from the scenes: they do
-#   produce enters and exits on the demo clips (E-015). Redraw them on frame overlays for 1.9.
+#   area; edges count as inside. Draw and edit them on frames of each camera's demo clip with
+#   the zone editor (make zones), which rewrites this file below this comment block; then
+#   make migrate. Until drawn, the positions are placeholders that do produce enters and exits on
+#   the demo clips (E-015). Check them with python -m vms.worker render CLIP:CAMERA --out x.mp4.
 
 version: 1
 

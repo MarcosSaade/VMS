@@ -12,7 +12,17 @@ from pydantic import ValidationError
 from vms.common.settings import load_settings
 from vms.query.fewshots import load_fewshots
 from vms.query.settings import QuerySettings
-from vms.storage.catalog import CameraCatalog, Zone, is_simple, load_catalog, signed_area
+from vms.storage.catalog import (
+    CameraCatalog,
+    Zone,
+    catalog_header,
+    dump_catalog,
+    is_simple,
+    load_catalog,
+    signed_area,
+    with_zones,
+    write_catalog,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SQUARE = [[0.1, 0.1], [0.5, 0.1], [0.5, 0.5], [0.1, 0.5]]
@@ -136,3 +146,50 @@ def test_names_must_be_lower_snake_case(name: str) -> None:
 def test_unknown_keys_are_rejected() -> None:
     with pytest.raises(ValidationError):
         CameraCatalog.model_validate(catalog(tz="UTC"))
+
+
+# --- writing (zone editor) ----------------------------------------------------------------------
+
+
+def test_shipped_catalog_round_trips_through_dump(tmp_path: Path) -> None:
+    source = (REPO_ROOT / "configs/cameras.yaml").read_text(encoding="utf-8")
+    catalog = load_catalog(REPO_ROOT / "configs/cameras.yaml")
+    text = dump_catalog(catalog, catalog_header(source))
+    assert text.startswith("# Camera catalog")
+    path = tmp_path / "cameras.yaml"
+    path.write_text(text, encoding="utf-8")
+    assert load_catalog(path) == catalog
+
+
+def test_with_zones_replaces_one_camera_and_validates(tmp_path: Path) -> None:
+    path = tmp_path / "cameras.yaml"
+    path.write_text((REPO_ROOT / "configs/cameras.yaml").read_text(encoding="utf-8"))
+    catalog = load_catalog(path)
+    drawn = [{"name": "bay_1", "polygon": [[0.1, 0.2], [0.512345678, 0.2], [0.3, 0.9]]}]
+    updated = with_zones(catalog, "cam-004", drawn)
+    write_catalog(path, updated)
+    reloaded = load_catalog(path)
+    dock = next(c for c in reloaded.cameras if c.camera_id == "cam-004")
+    assert [z.name for z in dock.zones] == ["bay_1"]
+    assert dock.zones[0].polygon[1] == (0.5123, 0.2)  # rounded to 4 decimals
+    assert reloaded.cameras[0] == catalog.cameras[0]  # other cameras untouched
+    assert path.read_text().startswith("# Camera catalog")  # header kept
+    assert not (tmp_path / ".cameras.yaml.tmp").exists()
+
+
+@pytest.mark.parametrize(
+    ("zones", "fragment"),
+    [
+        ([{"name": "x", "polygon": [[0, 0], [1, 1], [1, 0], [0, 1]]}], "intersect"),
+        ([{"name": "x", "polygon": [[0, 0], [1, 0]]}], "at least 3"),
+        ([{"name": "Bad Name", "polygon": [[0, 0], [1, 0], [0, 1]]}], "pattern"),
+        ([{"name": "front_door", "polygon": [[0, 0], [1, 0], [0, 1]]}], "duplicate zone name"),
+        ([{"name": "x", "polygon": [[0, 0], [1.5, 0], [0, 1]]}], "outside"),
+    ],
+)
+def test_with_zones_rejects_invalid_zones(zones: list[dict[str, object]], fragment: str) -> None:
+    catalog = load_catalog(REPO_ROOT / "configs/cameras.yaml")
+    with pytest.raises(ValueError, match=fragment):
+        with_zones(catalog, "cam-004", zones)
+    with pytest.raises(ValueError, match="unknown camera"):
+        with_zones(catalog, "cam-999", [])
