@@ -44,7 +44,18 @@ _Placeholder (tasks 4.3, 4.4)._
 
 ## Inference
 
-_Placeholder (tasks 5.2, 5.3)._ Model-only and end-to-end numbers are reported separately, with mAP and recall@k next to speed.
+_Precision ladder and batch sweep: placeholder (tasks 5.2, 5.3)._ Model-only and end-to-end numbers are reported separately, with mAP and recall@k next to speed.
+
+### Worker model-only latency, CPU baseline
+
+Self-measured on `laptop` with `make bench-model`: the worker's per-frame work in its own thread (JPEG decode, input statistics, YOLO11 pre-processing + forward + NMS), batch size 1, imgsz 640, PyTorch 2.14.1 CPU build, 150 frames from the three data-mini clips at 1280x720 q85, 10 warmup frames excluded, 3 repetitions. No database, object store or HTTP, so end-to-end throughput will be lower (task 2.5). No accuracy number yet: mAP comes in task 3.4, so the yolo11n speedup has an unmeasured quality cost.
+
+| Model | Frames/s (mean, std) | Infer p50 / p95 ms | Total p95 ms | CPU cores | Detections/frame | Evidence |
+|---|---|---|---|---|---|---|
+| yolo11s | 9.8 (0.65) | 90 / 100 | 116 | ~7.5 | 16.7 | E-013, `bench/results/2026-10-12-worker-model-cpu-01M4QT5GC08N5MNH1CY0WNWS9Q.json` |
+| yolo11n | 20.0 (1.07) | 39 / 50 | 65 | ~7.5 | 13.2 | E-014, `bench/results/2026-10-12-worker-model-cpu-n-01M4QT70RZG5SB1GTPH058VAXT.json` |
+
+At 5 FPS per camera, one CPU worker keeps up with about 2 cameras on yolo11s and about 4 on yolo11n, before the database and object store are added. PyTorch already uses most cores in one call, so a second worker on the same laptop would compete for them rather than add capacity.
 
 ## Evaluation
 

@@ -78,3 +78,13 @@ Outcome: done criterion met; generator_ok in every rep.
 Tried: the first recording of E-009 to E-011 (commit 48b9814).
 Result: two harness bugs. (1) Every results file after the first in a session said dirty: true, because untracked results files counted as changes. (2) SIGTERM to the 6-worker stub left its workers on port 8080; the 1-worker stub then failed to bind, so the "20x5 vs 1-worker stub" run actually hit the leftover 6-worker stub (latency p50 6.4 ms instead of 8.7 ms).
 Outcome: both fixed with regression tests (c5cff6c); all three scenarios re-run, earlier files discarded. Benchmark scripts now check that the port is free before starting a stub.
+
+### E-013 | 2026-10-12 | inference
+Tried: worker model-only latency (task 1.5), yolo11s, PyTorch 2.14.1 CPU, batch 1, imgsz 640; 150 frames (50 each of the 3 data-mini clips, 1280x720 q85), 10 warmup, 3 reps. i7-1355U, other containers running (load avg ~7). Commit d37b10b.
+Result: 9.8 frames/s (std 0.65); infer p50/p95/p99 90/100/~120 ms; decode p50 3 to 6 ms; stats p50 5 to 9 ms; total p95 116 ms; torch used ~7.5 cores; 16.7 detections/frame. bench/results/2026-10-12-worker-model-cpu-01M4QT5GC08N5MNH1CY0WNWS9Q.json
+Outcome: one CPU worker with yolo11s serves ~2 cameras at 5 FPS, short of the 4x5 demo load. Input stats cost as much as decode (Laplacian in float64 at full resolution): a cheap 2.6 candidate.
+
+### E-014 | 2026-10-12 | inference
+Tried: E-013 with only the weights changed to yolo11n. Same host and commit.
+Result: 20.0 frames/s (std 1.07); infer p50/p95 39/50 ms; total p95 65 ms; 13.2 detections/frame (fewer than yolo11s; no mAP yet, task 3.4). bench/results/2026-10-12-worker-model-cpu-n-01M4QT70RZG5SB1GTPH058VAXT.json
+Outcome: yolo11n just matches the 20 frames/s demo load model-only, with no headroom once DB and object-store time are added. Input to 1.9 (demo model and FPS) and to the CPU ladder (5.2).
