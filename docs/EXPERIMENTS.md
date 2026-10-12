@@ -93,3 +93,8 @@ Outcome: yolo11n just matches the 20 frames/s demo load model-only, with no head
 Tried: demo smoke run (not a benchmark): ingest + one yolo11n worker + loadgen, 4 catalogued cameras x 5 FPS for 30 s on the data-mini clips, dev database, laptop.
 Result: tracks lasting hours (mean duration 2.3 to 6.6 h per camera). Cause: 30 frames per camera left pending since a 1.3 smoke run (2026-10-09) were processed first, and ByteTrack's lost-track buffer counts frames, so it joined objects across the 3-day gap. After a reset on any gap longer than buffer_s (regression test added), a re-run on a fresh database gave 329 tracks, max duration 29.8 s; zone events on all three zones (75 enters, 57 exits; visits still open at the end have no exit); the worker drained 20 s after loadgen stopped.
 Outcome: keep the time-gap reset (D21). The dev database still holds tracks from the buggy run.
+
+### E-016 | 2026-10-12 | inference
+Tried: E-013 and E-014 with only the detector threshold changed, 0.25 -> 0.1 (the tracking default, D21). Same host and scenarios; commit 8d270be.
+Result: yolo11s 9.79 frames/s (std 0.22; was 9.81), infer p50 89 ms; yolo11n 18.8 frames/s (std 1.9; was 20.0, std 1.07), infer p50 40 ms. Raw detections per frame 27.8 and 23.2 (were 16.7 and 13.2) before the storage rule. bench/results/2026-10-12-worker-model-cpu-01M4QVF9ZAKC9HXMTFERF164VV.json, bench/results/2026-10-12-worker-model-cpu-n-01M4QVGTE15P83D77JXS71K9VF.json
+Outcome: no measurable latency cost from the lower threshold (yolo11n difference inside run-to-run noise on a busy laptop). BENCHMARKS now shows the 0.1 runs.

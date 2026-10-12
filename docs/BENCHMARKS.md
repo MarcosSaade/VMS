@@ -48,12 +48,14 @@ _Precision ladder and batch sweep: placeholder (tasks 5.2, 5.3)._ Model-only and
 
 ### Worker model-only latency, CPU baseline
 
-Self-measured on `laptop` with `make bench-model`: the worker's per-frame work in its own thread (JPEG decode, input statistics, YOLO11 pre-processing + forward + NMS), batch size 1, imgsz 640, PyTorch 2.14.1 CPU build, 150 frames from the three data-mini clips at 1280x720 q85, 10 warmup frames excluded, 3 repetitions. No database, object store or HTTP, so end-to-end throughput will be lower (task 2.5). No accuracy number yet: mAP comes in task 3.4, so the yolo11n speedup has an unmeasured quality cost.
+Self-measured on `laptop` with `make bench-model`: the worker's per-frame work in its own thread (JPEG decode, input statistics, YOLO11 pre-processing + forward + NMS; tracking is not included), batch size 1, imgsz 640, detector threshold 0.1 (the tracking default, D21), PyTorch 2.14.1 CPU build, 150 frames from the three data-mini clips at 1280x720 q85, 10 warmup frames excluded, 3 repetitions. No database, object store or HTTP, so end-to-end throughput will be lower (task 2.5). No accuracy number yet: mAP comes in task 3.4, so the yolo11n speedup has an unmeasured quality cost.
 
-| Model | Frames/s (mean, std) | Infer p50 / p95 ms | Total p95 ms | CPU cores | Detections/frame | Evidence |
+| Model | Frames/s (mean, std) | Infer p50 / p95 ms | Total p95 ms | CPU cores | Raw detections/frame | Evidence |
 |---|---|---|---|---|---|---|
-| yolo11s | 9.8 (0.65) | 90 / 100 | 116 | ~7.5 | 16.7 | E-013, `bench/results/2026-10-12-worker-model-cpu-01M4QT5GC08N5MNH1CY0WNWS9Q.json` |
-| yolo11n | 20.0 (1.07) | 39 / 50 | 65 | ~7.5 | 13.2 | E-014, `bench/results/2026-10-12-worker-model-cpu-n-01M4QT70RZG5SB1GTPH058VAXT.json` |
+| yolo11s | 9.8 (0.22) | 89 / 105 | 119 | ~7.5 | 27.8 | E-016, `bench/results/2026-10-12-worker-model-cpu-01M4QVF9ZAKC9HXMTFERF164VV.json` |
+| yolo11n | 18.8 (1.9) | 40 / 47 | 62 | ~7.5 | 23.2 | E-016, `bench/results/2026-10-12-worker-model-cpu-n-01M4QVGTE15P83D77JXS71K9VF.json` |
+
+At the earlier threshold of 0.25 the numbers were the same within noise (E-013, E-014).
 
 At 5 FPS per camera, one CPU worker keeps up with about 2 cameras on yolo11s and about 4 on yolo11n, before the database and object store are added. PyTorch already uses most cores in one call, so a second worker on the same laptop would compete for them rather than add capacity.
 
