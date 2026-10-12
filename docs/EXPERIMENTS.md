@@ -123,3 +123,8 @@ Outcome: the default 180 s demo takes ~10 min on this machine, mostly waiting fo
 Tried: `make setup && make demo DEMO_SECONDS=30` on a fresh clone of the 1.9 commit (stack volumes deleted first; Docker image cache kept; EXTRA_CA_CERT added to .env for this environment's TLS proxy).
 Result: two failures. (1) Wikimedia Commons answered 429 for the Roncesvalles clip (rate limit on this environment's shared IP, also seen in step 0); the verified clip was copied from the main checkout to continue. (2) Every question failed with planner_unavailable: Docker Compose read `LLM_MODEL=   # comment` from the fresh .env as the value "# comment" (python-dotenv reads it as empty), so the container chose the OpenAI client with a nonsense model. Runs from the older .env never hit it. The same pattern affected LLM_API_KEY, S3_REGION, AWS_REGION and the new EXTRA_CA_CERT (which would have broken the image build in CI).
 Outcome: comments for variables that may be empty moved to their own lines in .env.example; a unit test forbids the pattern. Existing local .env files created from the old .env.example still carry it and should be fixed by hand (or recreated).
+
+### E-022 | 2026-10-12 | infra
+Tried: the shortened `make demo` in CI (run 38261052259, commit b80f36e), the first run on a machine without the `vms/app:local` image.
+Result: failed at step 3: compose tried to pull `vms/app:local` for ingest and worker (which reuse the query service's image and have no build section) before building it ("pull access denied"). Every earlier run here had the image already. Reproduced locally by deleting the image.
+Outcome: ingest and worker get `pull_policy: never`, and `make demo` and `make app` build the image explicitly before `up`. Re-run here without the image: exit 0.

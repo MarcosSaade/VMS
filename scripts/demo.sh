@@ -41,7 +41,9 @@ make --no-print-directory data-mini
 uv run python -m vms.worker weights "$weights"
 
 step "3/5 application containers: ingest, worker ($weights), query + UI"
-DEMO_WEIGHTS="$weights" "${compose[@]}" --profile app up -d --build --wait --wait-timeout 600 \
+# Build the one image first: ingest and worker reuse it and must not try to pull it.
+"${compose[@]}" --profile app build query
+DEMO_WEIGHTS="$weights" "${compose[@]}" --profile app up -d --wait --wait-timeout 600 \
   query ingest worker
 
 step "4/5 loadgen: $cameras cameras x $fps FPS for $seconds s, then wait for the worker"

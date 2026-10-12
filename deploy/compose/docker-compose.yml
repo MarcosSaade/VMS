@@ -178,6 +178,7 @@ services:
   ingest:
     profiles: [app]
     image: vms/app:local
+    pull_policy: never  # built locally by the query service's build (make app / make demo build first)
     command: ["python", "-m", "vms.ingest"]
     environment:
       <<: *app-env
@@ -204,6 +205,7 @@ services:
   worker:
     profiles: [app]
     image: vms/app:local
+    pull_policy: never  # built locally by the query service's build (make app / make demo build first)
     command: ["python", "-m", "vms.worker", "run"]
     environment:
       <<: *app-env
