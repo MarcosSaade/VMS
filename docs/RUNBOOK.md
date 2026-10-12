@@ -4,7 +4,7 @@
 
 ## Setup
 
-Prerequisites: [uv](https://docs.astral.sh/uv/) (it downloads Python 3.12 if needed), GNU make, Docker with Compose v2.
+Prerequisites: [uv](https://docs.astral.sh/uv/) (it downloads Python 3.12 if needed), GNU make, Docker with Compose v2. Node 22.12 or newer for the host UI targets (`make zones`, `make ui-build`, `make ui-check`); `frontend/.nvmrc` pins the version CI and the app image use (`nvm install` in `frontend/`).
 
 ```bash
 make setup   # uv sync --locked (incl. dev tools: ruff, mypy, pytest, pre-commit, dvc),
@@ -223,6 +223,7 @@ Symptom, cause and fix entries as issues are met.
 - `make ingest` starts but `/readyz` returns 503: the named dependency is down or misconfigured. Check `make ps`, then the `POSTGRES_*` / `S3_*` values in `.env` (they must match what the stack was created with).
 - Ingest answers 500 `database_unavailable` with `relation "frames" does not exist`: migrations were not applied. Run `make migrate`.
 - `vms_ingest_orphaned_objects_total` above 0: an object was written but neither recorded nor removed (database and store both failed for that frame). Harmless for correctness; the objects under `frames/` that have no `frames` row can be deleted.
+- `make zones` or `make ui-build` fails with `npm error notsup ... Required: {"node":">=22.12.0"}`: the host Node is too old. Before the engine check existed this showed up as `Cannot find module '@rolldown/binding-linux-x64-gnu'`, because npm silently skips optional native bindings whose `engines` the running Node does not meet. Install the pinned Node (`cd frontend && nvm install && nvm alias default 22.22.0`), open a new shell and re-run.
 - Query service answers 503 `planner_unavailable`: the LLM at `LLM_BASE_URL` is unreachable or timing out (`llm.timeout_s`, after `llm.max_retries`). Check `curl $LLM_BASE_URL/models`, or unset `LLM_MODEL` to use the canned planner.
 - Query service answers 422 `invalid_plan` for most questions with a hosted model: the provider may ignore or reject `json_schema`; look at `error.errors` in the response and try `VMS_LLM__RESPONSE_FORMAT=json_object`.
 - Query service `/readyz` returns 503 with `postgres: unavailable`: the read-only login is missing or its password differs from `.env`. Run `make migrate`.
