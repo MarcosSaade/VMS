@@ -166,6 +166,28 @@ loadgen-selftest: ## Measure the load generator's own max rate (no server)
 loadgen-stub: ## Stub ingest server for loadgen tests (STUB_WORKERS=n processes)
 	$(RUN) python -m vms.loadgen stub --workers $(STUB_WORKERS)
 
+# --- GPU sessions on AWS (task 2.4; RUNBOOK: GPU sessions) ------------------------
+
+GPU_SCENARIOS ?= bench/scenarios/gpu-smoke.yaml bench/scenarios/worker-model-gpu-n.yaml
+SESSION ?=
+
+.PHONY: gpu-preflight
+gpu-preflight: ## Free checks before a GPU session: credentials, Region, quota, AMI, dry-run launch
+	scripts/gpu_session.sh preflight
+
+.PHONY: gpu-session
+gpu-session: ## Launch, run GPU_SCENARIOS, collect results, tear down and verify (asks first; costs money)
+	scripts/gpu_session.sh run $(GPU_SCENARIOS)
+
+.PHONY: gpu-teardown
+gpu-teardown: ## Delete what a GPU session left behind and verify (SESSION=<id>)
+	@test -n "$(SESSION)" || { echo "make gpu-teardown: set SESSION=<id>" >&2; exit 1; }
+	scripts/gpu_session.sh teardown --session $(SESSION)
+
+.PHONY: gpu-list
+gpu-list: ## AWS resources tagged project=vms that still exist
+	scripts/gpu_session.sh list
+
 # --- Benchmarks and evaluation -------------------------------------------------
 
 .PHONY: dashboards

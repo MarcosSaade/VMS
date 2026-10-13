@@ -1,0 +1,16 @@
+name: worker-model-gpu-n
+description: >
+  worker-model-cpu-n with one variable changed, the device: model-only latency of the worker's
+  per-frame work (JPEG decode, input statistics, YOLO11n detection) at batch size 1 on the GPU
+  instance, inside the CUDA worker image. Decode and statistics stay on the CPU. Baseline for
+  the GPU precision ladder (5.2).
+kind: model
+repeats: 3
+bench:
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  frames_per_clip: 50
+  warmup_frames: 10
+config:
+  detector:
+    weights: yolo11n
+    device: cuda

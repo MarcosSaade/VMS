@@ -1,0 +1,16 @@
+name: gpu-smoke
+description: >
+  Task 2.4 done check on the GPU instance, not a capacity measurement: bench-smoke's shape with
+  the CUDA worker (yolo11n) at 2 and 8 cameras x 5 FPS on the data-mini clips, one query client
+  (canned planner, no LLM cost). Short holds, so percentiles are rough. Proves the session runs
+  an e2e scenario end to end and brings back a results file with GPU hardware; the ramp is 2.5.
+kind: e2e
+repeats: 3
+warmup_s: 10
+hold_s: 20
+ingest:
+  cameras: [2, 8]
+  fps: 5
+query:
+  concurrency: [1]
+  questions: configs/demo/canned_plans.v1.jsonl

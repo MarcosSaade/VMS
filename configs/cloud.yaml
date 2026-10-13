@@ -1,0 +1,60 @@
+# GPU sessions on AWS (vms.cloud, scripts/gpu_session.sh, task 2.4). Overrides
+# configs/common.yaml; VMS_* environment variables override this file (e.g.
+# VMS_INSTANCE_TYPE=g4dn.xlarge). Credentials and the Region come from the AWS CLI configuration
+# (AWS_PROFILE, AWS_REGION in .env or the shell).
+
+region: null                   # null: the AWS configuration's Region (the project's selected Region)
+instance_type: g6.xlarge       # 1x NVIDIA L4 24 GB, 4 vCPU, 16 GiB (D28)
+# On-demand only: the managed SCP denies spot launches on this account (D28).
+vcpu_quota_code: L-DB2E81BA    # Running On-Demand G and VT instances (vCPUs)
+# AWS Deep Learning Base OSS Nvidia Driver GPU AMI: NVIDIA driver, Docker and the NVIDIA
+# container toolkit. Resolved at launch; the AMI id is recorded in the session's results.
+ami_parameter: /aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-22.04/latest/ami-id
+root_volume_gb: 100            # the AMI needs 75; the CUDA image and clips need ~25 more
+ssh_user: ubuntu
+ssh_cidr: null                 # null: this machine's public IP /32 (checkip.amazonaws.com)
+# Safety net if this machine dies mid-session: the instance powers itself off after this long,
+# and the shutdown terminates it (its volume goes with it).
+max_session_minutes: 150
+tags:
+  project: vms
+
+# On-demand Linux prices in us-east-2 from the AWS Price List API, 2026-10-13. A session's
+# cost = (instance + root volume + public IPv4) x billed seconds (per second, 60 s minimum).
+prices:
+  hourly_usd:
+    g4dn.xlarge: 0.526
+    g5.xlarge: 1.006
+    g6.xlarge: 0.8048
+    g6e.xlarge: 1.861
+  gp3_gb_month_usd: 0.08
+  hours_per_month: 730
+  public_ipv4_hour_usd: 0.005
+
+remote:
+  dir: vms                     # under the SSH user's home
+  # Clips copied from data/clips instead of downloaded on the instance (the mini subset).
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+
+timeouts:
+  aws_connect_s: 10
+  aws_read_s: 60
+  aws_max_attempts: 5          # botocore standard retry mode: backoff with jitter
+  running_s: 600               # pending -> running
+  ssh_ready_s: 600             # running -> SSH answers
+  ssh_connect_s: 10
+  sync_s: 1200
+  setup_s: 3600                # uv, make setup, stack, weights, image builds
+  scenario_s: 3600             # each scenario
+  collect_s: 600
+  terminate_s: 600             # running -> terminated
+  delete_retry_s: 300          # security group deletion waits for the instance's ENI to go
+  poll_s: 5
+
+# Created once with `scripts/gpu_session.sh budget --email ...` (not per session). Measures
+# usage before credits, so it alerts while promotional credits are being spent.
+budget:
+  name: vms-monthly
+  amount_usd: 20
+  actual_thresholds_pct: [50, 80, 100]
+  forecast_thresholds_pct: [100]

@@ -6,7 +6,7 @@
 
 **Checkpoint C1 (end of this plan).** Every task below is ticked: the system runs end to end on CPU with a UI and dashboards; it has a measured baseline with a bottleneck analysis; structured-query and detection quality are evaluated with bootstrap confidence intervals; a precision ladder shows accuracy against latency; drift detection is scored on delay against false-alarm rate; and the README and write-up present it all. At C1, stop and decide whether to continue at all. Deferred work comes back only through the scope-lock rule.
 
-**Estimate.** 29 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). The biggest schedule risk is the GPU spot quota (request pending since 2026-10-04): Phase 5 and 9.5 need a GPU, and both have a CPU fallback in `PLAN_FULL.md`.
+**Estimate.** 29 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). The biggest schedule risk is the GPU quota: spot is denied by the account's SCP, and the on-demand G quota is 0 (4 vCPUs requested 2026-10-13; D28): Phase 5 and 9.5 need a GPU, and both have a CPU fallback in `PLAN_FULL.md`.
 
 **Order of work.** Phase 1, then 2.1 to 2.3, then Phase 3, then 2.4 to 2.6 (first GPU session), then Phase 5, then Phase 9, then Phase 11. Phase numbers are kept for stable IDs, so this order differs from the numbering.
 
@@ -55,7 +55,7 @@
   - Understand it: for each panel, what decision would you make from it?
 - [x] 2.3 Benchmark framework: scenario YAML, runner, results JSON schema, warmup and repetitions
   - Understand it: why exclude warmup, how many repetitions, and how is variance reported?
-- [ ] 2.4 GPU session on AWS: one tagged spot instance by script, Budgets alarm, verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote)
+- [ ] 2.4 GPU session on AWS: one tagged on-demand instance by script (spot is denied by the account's SCP, D28), Budgets alarm, verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote). Built and budget created 2026-10-13; waiting for the on-demand G quota for the real session
   - Understand it: how do you know nothing is still billing after a session, and what does an hour cost?
 - [ ] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK)
   - Understand it: what is the definition of rated capacity, and where did the ramp break?

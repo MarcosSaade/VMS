@@ -30,6 +30,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "botocore[crt]>=1.43.110",
     "dvc>=3.60",
     "httpx2>=2.13.1",
     "mypy>=1.18",

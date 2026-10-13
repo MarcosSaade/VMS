@@ -232,7 +232,30 @@ make bench-report RESULTS="bench/results/<file>.json ..."  # Markdown tables for
 
 ## GPU sessions
 
-_Placeholder (task 2.4)._ `scripts/gpu_session.sh` runs provision, sync, run scenarios, collect results and destroy, with teardown in a trap. Includes prerequisites (AWS credentials, the project's selected Region, spot quota), expected cost per hour and the confirmation step before any apply.
+One on-demand GPU instance per session, launched, used and destroyed by `scripts/gpu_session.sh` (`python -m vms.cloud`; design in ARCHITECTURE 9, D28). Settings: `configs/cloud.yaml`.
+
+**Cost.** g6.xlarge (1x L4, 4 vCPUs) costs about **$0.82 per hour** in us-east-2 (instance $0.8048 + 100 GB gp3 + public IPv4), billed per second with a 60 s minimum. A session needs roughly 15 to 25 minutes of setup (tools, `make setup`, the stack, the CUDA image) before the first scenario. The instance terminates itself after 150 minutes whatever happens, so one session costs at most about $2.05. Each results file records its cost; the session's own file (`bench/results/<date>-gpu-session-<id>.json`) has the total.
+
+Prerequisites, once:
+1. AWS credentials for the project: `aws login` (or `AWS_PROFILE` in the shell). The Region is the project's selected Region (AWS Settings > View all projects > Overview > Additional Info > Region; us-east-2 here, also in `~/.aws/config`).
+2. On-demand G and VT vCPU quota (`L-DB2E81BA`, Service Quotas > Amazon EC2 > "Running On-Demand G and VT instances") of at least 4 in that Region. Spot is not an option on this account: the managed SCP denies it (D28).
+3. The budget alarm, already created on 2026-10-13: `scripts/gpu_session.sh budget --email <address>` (`vms-monthly`, $20/month, usage before credits; a second run changes nothing).
+4. `rsync` and `ssh` on this machine, and the mini clips (`make data-mini`; they are copied to the instance).
+
+Running a session:
+```bash
+make gpu-preflight                    # free: credentials, Region, quota, AMI, dry-run launch, leftovers
+git status                            # must be clean: results carry the commit's SHA (--allow-dirty for a test)
+make gpu-session                      # GPU_SCENARIOS="bench/scenarios/a.yaml ..." to choose; asks first
+scripts/gpu_session.sh run --yes bench/scenarios/gpu-smoke.yaml   # no prompt (scripted use)
+```
+`make gpu-session` prints the account, Region, instance type, AMI, hourly cost and cap, and launches only after you type `launch`. Then: key pair and security group (SSH from your public IP only), instance, SSH ready, code and clips synced, `scripts/gpu_remote.sh setup` (output streams here), one `scripts/gpu_remote.sh run <scenario>` per scenario (e2e scenarios run `make bench` on the instance; `kind: model` scenarios run inside the CUDA worker image), results copied into `bench/results/`, teardown, verification. A failing scenario is recorded and the next one still runs. Ctrl-C at any point tears down (a second Ctrl-C during teardown is ignored). Per-session files (private key, known_hosts, state) are in `.gpu-sessions/<id>/` (gitignored).
+
+Exit codes: 0 all good; 1 setup or a scenario failed; 2 **resources remain after teardown**; 3 not confirmed (nothing created); 4 preflight failed (nothing created); 130 interrupted.
+
+While it runs, to look at the instance yourself: `ssh -i .gpu-sessions/<id>/id_ed25519 -o UserKnownHostsFile=.gpu-sessions/<id>/known_hosts ubuntu@<public_ip>` (the IP is in `.gpu-sessions/<id>/state.json`); Grafana and Prometheus are on the instance's localhost (`ssh -L 3000:localhost:3000 ...`).
+
+After a session: check the session file's `metrics.teardown_verified` is true, log the run in `EXPERIMENTS.md` with its cost, and commit the results files behind any reported number.
 
 ## Deployment
 
@@ -284,10 +307,19 @@ Symptom, cause and fix entries as issues are met.
 - `make bench` fails with "backlog still N frames after 900 s": the worker cannot drain what an earlier step or run left. Wait, or start from an empty database (`make down-volumes`). A step with freshness `null` and `ingest_ok: false` means no frame reached the worker in the window: is the worker container running, and scraped (`make ps`, Prometheus targets)?
 - `python -m vms.observe` (the demo's last step) reports "no healthy target": the named container is not running or not ready (`make ps`). "No series for" a metric: the service runs but has not done that work yet (for example no question asked), or runs on the host where Prometheus does not scrape it. "No complete frame trace": check that loadgen, ingest and the worker all export (`docker logs vms-worker-1` for OTLP export errors; `VMS_TELEMETRY__ENABLED` must not be false) and that the frames were sampled (`DEMO_TRACE_RATIO`); then open the newest loadgen trace in Grafana to see where the chain stops.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.
+- `make gpu-preflight` fails with "quota ... is 0": request the on-demand G and VT vCPU quota (`L-DB2E81BA`) in Service Quotas; a spot quota does not help (spot is denied by the SCP). "A dry-run launch was refused ... service control policy": the instance type or a launch option is denied by the managed SCP. "Missing Dependency ... botocore[crt]": run `make setup` (the `aws login` credential provider needs it).
+- A GPU session fails in setup at the CUDA check ("no CUDA"): the instance's NVIDIA driver is older than the image's CUDA build needs (cu126: driver 560 or newer); check `nvidia-smi` in the setup output, and change `TORCH_CUDA` in `deploy/compose/docker-compose.gpu.yml` or the AMI.
+- A GPU session hangs at "SSH ready" until timeout: your public IP changed (the security group allows only the IP seen at launch) or a firewall blocks outbound port 22. Set `VMS_SSH_CIDR` to the right range.
 
 ## Teardown
 
-_Placeholder (tasks 2.4, 10.1)._ `make down` locally (`make down-volumes` also deletes stack data). In the cloud: the scripted destroy, then the Resource Groups Tagging API check that no resource tagged `session=<id>` remains, then recording the session cost in the run's results.
+Locally: `make down` (`make down-volumes` also deletes stack data).
+
+GPU sessions tear themselves down and verify it (above). How you know nothing is still billing:
+- The session ends with "teardown verified": it looked up every resource tagged `session=<id>` (Resource Groups Tagging API) plus the instance, security group and key pair it recorded, and none still exists. A terminated instance can stay listed by the Tagging API for a while; it counts as gone once EC2 reports it `terminated` (terminated instances are not billed).
+- `make gpu-list` lists every resource tagged `project=vms` that still exists, from any session. It should print "no project resources exist" (the budget is not an EC2 resource and is not listed).
+- If a session exits 2, or this machine died mid-session: `make gpu-teardown SESSION=<id>` (the id is printed at the start and names `.gpu-sessions/<id>/`). It finds the resources from the session's tags and saved state, deletes them and verifies. Even without it, the instance terminated itself after 150 minutes; the security group and key pair left behind cost nothing but should be removed.
+- Billing data lags about a day: compare the session cost in the results file with Billing and Cost Management (filter by tag `project=vms` once the tag is activated as a cost allocation tag) the next day.
 
 ## Production checklist
 

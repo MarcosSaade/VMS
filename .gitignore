@@ -86,3 +86,6 @@ frontend/dist/
 
 # Local CA files for builds behind a TLS-intercepting proxy (EXTRA_CA_CERT)
 /.certs/
+
+# GPU sessions: per-session SSH key, known_hosts and state (scripts/gpu_session.sh)
+.gpu-sessions/

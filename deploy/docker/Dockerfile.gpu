@@ -1,0 +1,25 @@
+# The GPU worker image: the application image (deploy/docker/Dockerfile) with PyTorch and
+# torchvision swapped for their CUDA builds. Built on the GPU instance by the compose GPU
+# override (deploy/compose/docker-compose.gpu.yml) after the CPU image:
+#   docker build -f deploy/docker/Dockerfile.gpu -t vms/app:gpu .
+# The versions are the ones uv.lock installed in the base image (only the build tag changes, e.g.
+# 2.14.1+cpu -> 2.14.1+cu126), so the GPU worker runs the same PyTorch as every CPU number.
+# cu126 runs on NVIDIA drivers from 560 (D28); the instance's driver is recorded in results.
+# uv searches --index before --default-index (and stops at the first index that has a package),
+# so torch comes from the PyTorch index; already-installed dependencies are kept as locked.
+ARG BASE_IMAGE=vms/app:local
+FROM ${BASE_IMAGE}
+ARG TORCH_CUDA=cu126
+USER root
+RUN --mount=type=secret,id=extra_ca,required=false \
+    if [ -s /run/secrets/extra_ca ]; then export SSL_CERT_FILE=/run/secrets/extra_ca; fi && \
+    torch="$(python -c 'from importlib.metadata import version; print(version("torch").split("+")[0])')" && \
+    vision="$(python -c 'from importlib.metadata import version; print(version("torchvision").split("+")[0])')" && \
+    uv pip install --python /opt/venv/bin/python --no-cache \
+      --index "https://download.pytorch.org/whl/${TORCH_CUDA}" \
+      --default-index https://pypi.org/simple \
+      "torch==${torch}+${TORCH_CUDA}" "torchvision==${vision}+${TORCH_CUDA}" && \
+    python -c "import torch; assert torch.version.cuda, torch.__version__; print(torch.__version__)"
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+USER vms

@@ -1,0 +1,37 @@
+# GPU override for the GPU instance (task 2.4), applied on top of docker-compose.yml:
+#   docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.gpu.yml ...
+# scripts/gpu_remote.sh uses it; nothing local does. The worker keeps its service name, so
+# Prometheus discovery, dashboards and the bench queries are the same as on CPU.
+services:
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.gpu
+      args:
+        BASE_IMAGE: vms/app:local
+        TORCH_CUDA: cu126
+      secrets: [extra_ca]
+    image: vms/app:gpu
+    environment:
+      VMS_DETECTOR__DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # GPU utilization and memory for the Inference dashboard's GPU row (DCGM_FI_DEV_*).
+  # Scraped through Docker DNS like the application services (deploy/compose/prometheus).
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.2-4.7.1-ubuntu22.04@sha256:0b98c0aceb106d3eac170bbaf21e70da7bc3a5136991fced511ea1f3dd0022e0
+    cap_add: [SYS_ADMIN]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped

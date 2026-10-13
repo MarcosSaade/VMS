@@ -50,3 +50,13 @@ scrape_configs:
         type: A
         port: 8070
         refresh_interval: 5s
+
+  # NVIDIA DCGM exporter: only on the GPU instance (deploy/compose/docker-compose.gpu.yml).
+  # Elsewhere the name does not resolve and the job has no targets.
+  - job_name: dcgm
+    scrape_interval: 5s
+    dns_sd_configs:
+      - names: [dcgm-exporter]
+        type: A
+        port: 9400
+        refresh_interval: 5s
