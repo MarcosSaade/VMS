@@ -13,13 +13,16 @@ import cv2
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from vms.common.clock import FakeClock
 from vms.common.ids import UlidGenerator
 from vms.common.metrics import Metrics
+from vms.common.settings import TelemetrySettings
+from vms.common.telemetry import init_telemetry
 from vms.storage.frames import FrameStoreError
 from vms.storage.objects import ObjectStoreError
-from vms.storage.work import ClaimedFrame, FailOutcome, FrameResult, ZoneRow
+from vms.storage.work import Backlog, ClaimedFrame, FailOutcome, FrameResult, ZoneRow
 from vms.worker.detector import Detection
 from vms.worker.service import Worker
 from vms.worker.settings import QueueSettings
@@ -56,12 +59,21 @@ class FakeQueue:
     fail_ops: set[str] = field(default_factory=set)  # operations that raise FrameStoreError
     zone_rows: dict[str, list[ZoneRow]] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
+    clock: FakeClock = field(default_factory=lambda: FakeClock(T0))  # the database clock
 
-    def add(self, camera_id: str, seq: int, ts_s: float, key: str | None = None) -> str:
+    def add(
+        self,
+        camera_id: str,
+        seq: int,
+        ts_s: float,
+        key: str | None = None,
+        traceparent: str | None = None,
+    ) -> str:
+        """A pending frame captured (and received) at T0 + ts_s."""
         frame_id = f"{camera_id}-{seq}"
         ts = T0 + timedelta(seconds=ts_s)
         self.rows[frame_id] = Row(
-            ClaimedFrame(frame_id, camera_id, "run", seq, ts, ts, key or frame_id, 0)
+            ClaimedFrame(frame_id, camera_id, "run", seq, ts, ts, key or frame_id, 0, traceparent)
         )
         return frame_id
 
@@ -138,9 +150,12 @@ class FakeQueue:
                 if graceful:
                     r.attempts = max(r.attempts - 1, 0)
 
-    async def backlog(self) -> int:
+    async def backlog(self) -> Backlog:
         self._op("backlog")
-        return sum(r.status == "pending" for r in self.rows.values())
+        pending = [r for r in self.rows.values() if r.status == "pending"]
+        oldest = min((r.frame.received_at for r in pending), default=None)
+        age = 0.0 if oldest is None else (self.clock.now() - oldest).total_seconds()
+        return Backlog(len(pending), age)
 
     async def zones(self, camera_id: str) -> list[ZoneRow]:
         self._op("zones")
@@ -212,6 +227,7 @@ class Harness:
     detector: FakeDetector
     clock: FakeClock
     metrics: Metrics
+    spans: InMemorySpanExporter
 
     def sample(self, name: str, **labels: str) -> float:
         value = self.metrics.registry.get_sample_value(name, labels or None)
@@ -220,9 +236,13 @@ class Harness:
 
 @pytest.fixture
 def harness() -> Harness:
-    queue, fetcher, detector = FakeQueue(), FakeFetcher(), FakeDetector()
     clock = FakeClock(T0 + timedelta(seconds=60))
+    queue, fetcher, detector = FakeQueue(clock=clock), FakeFetcher(), FakeDetector()
     metrics = Metrics("worker")
+    spans = InMemorySpanExporter()
+    tracer = init_telemetry(
+        "worker", TelemetrySettings(), exporter=spans, set_global=False
+    ).get_tracer("test")
     settings = QueueSettings(max_cameras=2, claim_batch=2, max_attempts=2)
     counter = iter(range(1, 1_000_000))
     ids = UlidGenerator(clock, randbytes=lambda n: next(counter).to_bytes(n, "big"))
@@ -238,8 +258,9 @@ def harness() -> Harness:
         tracker_settings=TrackerSettings(fps=5.0, buffer_s=1.0),
         zone_settings=ZoneSettings(min_frames=2, loiter_s=2.0, refresh_s=60.0),
         executor=InlineExecutor(),
+        tracer=tracer,
     )
-    return Harness(worker, queue, fetcher, detector, clock, metrics)
+    return Harness(worker, queue, fetcher, detector, clock, metrics, spans)
 
 
 @pytest.fixture

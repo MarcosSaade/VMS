@@ -44,6 +44,7 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Protocol, TypeVar, cast
 
@@ -57,6 +58,7 @@ from vms.common.clock import Clock
 from vms.common.ids import UlidGenerator
 from vms.common.logs import get_logger
 from vms.common.metrics import Metrics
+from vms.common.telemetry import context_from_traceparent
 from vms.storage.frames import FrameStoreError
 from vms.storage.objects import ObjectStoreError
 from vms.storage.work import (
@@ -80,7 +82,11 @@ log = get_logger(__name__)
 T = TypeVar("T")
 
 STAGE_BUCKETS_S = (0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0)
-FRESHNESS_BUCKETS_S = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 300.0)
+# Dense around the 2 s freshness SLO (ARCHITECTURE 8), with an edge at exactly 2 s so the
+# share of frames within the SLO is read from a bucket, not interpolated.
+FRESHNESS_BUCKETS_S = (
+    0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 10.0, 30.0, 60.0, 300.0
+)  # fmt: skip
 
 
 class FrameFetcher(Protocol):
@@ -187,7 +193,13 @@ class Worker:
             buckets=FRESHNESS_BUCKETS_S,
         )
         self._leased = metrics.gauge("leased", "cameras", "Cameras leased by this worker")
+        # Both are global (every worker reports the same value): aggregate with max, not sum.
         self._backlog = metrics.gauge("backlog", "frames", "Pending frames across all cameras")
+        self._backlog_age = metrics.gauge(
+            "backlog_age",
+            "seconds",
+            "Wait so far of the oldest pending frame (database clock)",
+        )
 
     @property
     def leased_cameras(self) -> frozenset[str]:
@@ -225,10 +237,13 @@ class Worker:
             await self._renew_and_acquire()
             self._last_leases = now
         if now - self._last_backlog >= self._settings.backlog_every_s:
-            self._backlog.set(await self._queue.backlog())
+            backlog = await self._queue.backlog()
+            self._backlog.set(backlog.frames)
+            self._backlog_age.set(backlog.oldest_age_s)
             self._last_backlog = now
 
-        with self._timed("claim"):
+        # Histogram only: a span per poll would be a one-span trace, mostly of idle polls.
+        with self._timed("claim", span=False):
             frames = await self._queue.claim(self.worker_id, self._settings.claim_batch)
         if not frames:
             # Nothing to do with the cameras held: look for new ones right away.
@@ -277,69 +292,95 @@ class Worker:
     # --- One frame ----------------------------------------------------------------------
 
     async def process(self, frame: ClaimedFrame) -> Outcome:
+        # Continue the frame's trace from ingest (D25): the time in the queue becomes a span of
+        # its own, so a trace shows waiting apart from working.
+        parent = context_from_traceparent(frame.traceparent)
+        now = self._clock.now()
+        if parent is not None:
+            wait = self._tracer.start_span(
+                "worker.queue_wait",
+                context=parent,
+                start_time=_unix_ns(frame.received_at),
+                attributes={"camera_id": frame.camera_id, "frame_id": frame.frame_id},
+            )
+            wait.end(end_time=_unix_ns(now))
         with self._tracer.start_as_current_span(
             "worker.frame",
-            attributes={"camera_id": frame.camera_id, "frame_id": frame.frame_id},
-        ):
-            self._wait.observe(max(0.0, (self._clock.now() - frame.received_at).total_seconds()))
-            state = await self._camera_state(frame.camera_id)
-            key = (frame.ts, frame.seq)
-            track = state.last_key is None or key > state.last_key
-            if not track:
-                self._late.inc()
-            elif state.last_key is not None and (
-                (frame.ts - state.last_key[0]).total_seconds() > self._tracking.buffer_s
-            ):
-                self._reset_tracker(state)
-            try:
-                with self._timed("fetch"):
-                    jpeg = await self._fetcher.get(frame.object_key)
-                analysis = await self._in_thread(
-                    lambda data: self._analyze(data, frame, state if track else None), jpeg
-                )
-            except DecodeError as exc:
-                return await self._fail(frame, f"decode: {exc}", retry=False)
-            except ObjectStoreError as exc:
-                return await self._fail(frame, f"fetch: {exc}", retry=True)
-            except Exception as exc:  # the model: out of memory, a CUDA error, a bug
-                log.exception("inference failed", extra={"frame_id": frame.frame_id})
-                return await self._fail(frame, f"inference: {type(exc).__name__}: {exc}", True)
-            for stage, seconds in analysis.timings_s.items():
-                self._stage.labels(stage=stage).observe(seconds)
+            context=parent,
+            kind=trace.SpanKind.CONSUMER,
+            attributes={
+                "camera_id": frame.camera_id,
+                "frame_id": frame.frame_id,
+                "attempt": frame.attempts,
+            },
+        ) as span:
+            outcome = await self._process(frame, now)
+            span.set_attribute("outcome", outcome.value)
+            return outcome
 
-            result = FrameResult(
-                frame_id=frame.frame_id,
-                camera_id=frame.camera_id,
-                ts=frame.ts,
-                width=analysis.width,
-                height=analysis.height,
-                brightness=analysis.brightness,
-                contrast=analysis.contrast,
-                blur_var=analysis.blur_var,
-                model_version=self._detector.model_version,
-                detections=analysis.detections,
-                tracks=analysis.tracks,
-                events=tuple(
-                    EventRow(self._ids.new(), e.ts, e.track_id, e.zone_id, e.event_type)
-                    for e in analysis.zone_events
-                ),
+    async def _process(self, frame: ClaimedFrame, claimed_at: datetime) -> Outcome:
+        self._wait.observe(max(0.0, (claimed_at - frame.received_at).total_seconds()))
+        state = await self._camera_state(frame.camera_id)
+        key = (frame.ts, frame.seq)
+        track = state.last_key is None or key > state.last_key
+        if not track:
+            self._late.inc()
+        elif state.last_key is not None and (
+            (frame.ts - state.last_key[0]).total_seconds() > self._tracking.buffer_s
+        ):
+            self._reset_tracker(state)
+        try:
+            with self._timed("fetch"):
+                jpeg = await self._fetcher.get(frame.object_key)
+            analysis = await self._in_thread(
+                lambda data: self._analyze(data, frame, state if track else None), jpeg
             )
-            try:
-                with self._timed("write"):
-                    won = await self._queue.complete(self.worker_id, result)
-            except FrameStoreError as exc:
-                return await self._fail(frame, f"write: {exc}", retry=True)
-            if not won:
-                self._frames.labels(outcome=Outcome.LOST).inc()
-                log.warning("claim lost before completion", extra={"frame_id": frame.frame_id})
-                return Outcome.LOST
-            self._frames.labels(outcome=Outcome.DONE).inc()
-            self._detections.inc(len(result.detections))
-            self._track_sightings.inc(len(result.tracks))
-            for event in result.events:
-                self._zone_events.labels(event_type=event.event_type).inc()
-            self._freshness.observe(max(0.0, (self._clock.now() - frame.ts).total_seconds()))
-            return Outcome.DONE
+        except DecodeError as exc:
+            return await self._fail(frame, f"decode: {exc}", retry=False)
+        except ObjectStoreError as exc:
+            return await self._fail(frame, f"fetch: {exc}", retry=True)
+        except Exception as exc:  # the model: out of memory, a CUDA error, a bug
+            log.exception("inference failed", extra={"frame_id": frame.frame_id})
+            return await self._fail(frame, f"inference: {type(exc).__name__}: {exc}", True)
+        for stage, seconds in analysis.timings_s.items():
+            self._stage.labels(stage=stage).observe(seconds)
+
+        result = FrameResult(
+            frame_id=frame.frame_id,
+            camera_id=frame.camera_id,
+            ts=frame.ts,
+            width=analysis.width,
+            height=analysis.height,
+            brightness=analysis.brightness,
+            contrast=analysis.contrast,
+            blur_var=analysis.blur_var,
+            model_version=self._detector.model_version,
+            detections=analysis.detections,
+            tracks=analysis.tracks,
+            events=tuple(
+                EventRow(self._ids.new(), e.ts, e.track_id, e.zone_id, e.event_type)
+                for e in analysis.zone_events
+            ),
+        )
+        try:
+            with self._timed("write"):
+                won = await self._queue.complete(self.worker_id, result)
+        except FrameStoreError as exc:
+            return await self._fail(frame, f"write: {exc}", retry=True)
+        if not won:
+            self._frames.labels(outcome=Outcome.LOST).inc()
+            log.warning("claim lost before completion", extra={"frame_id": frame.frame_id})
+            return Outcome.LOST
+        self._frames.labels(outcome=Outcome.DONE).inc()
+        self._detections.inc(len(result.detections))
+        self._track_sightings.inc(len(result.tracks))
+        for event in result.events:
+            self._zone_events.labels(event_type=event.event_type).inc()
+        freshness_s = max(0.0, (self._clock.now() - frame.ts).total_seconds())
+        self._freshness.observe(freshness_s)
+        # On the span too, so slow frames can be found in Tempo: {span.freshness_s > 2.0}.
+        trace.get_current_span().set_attribute("freshness_s", freshness_s)
+        return Outcome.DONE
 
     def _analyze(self, jpeg: bytes, frame: ClaimedFrame, state: CameraState | None) -> Analysis:
         """Decode, input statistics, detection and (if `state`) tracking and zones; runs in the
@@ -466,8 +507,12 @@ class Worker:
         return await asyncio.get_running_loop().run_in_executor(self._executor, call)
 
     @contextmanager
-    def _timed(self, stage: str) -> Iterator[None]:
-        with self._tracer.start_as_current_span(f"worker.{stage}"):
+    def _timed(self, stage: str, *, span: bool = True) -> Iterator[None]:
+        with (
+            self._tracer.start_as_current_span(f"worker.{stage}")
+            if span
+            else contextlib.nullcontext()
+        ):
             t0 = self._clock.monotonic()
             try:
                 yield
@@ -483,6 +528,10 @@ class Worker:
                 yield
             finally:
                 timings[stage] = self._clock.monotonic() - t0
+
+
+def _unix_ns(ts: datetime) -> int:
+    return int(ts.timestamp() * 1_000_000_000)
 
 
 def decode_jpeg(data: bytes) -> NDArray[np.uint8]:

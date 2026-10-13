@@ -16,13 +16,12 @@ from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from opentelemetry import context as otel_context
-from opentelemetry import propagate
 from pydantic import ValidationError
 from starlette.datastructures import UploadFile
 
 from vms.common.ingest_api import FRAMES_PATH, JPEG_FIELD, FrameMeta
 from vms.common.metrics import Metrics
+from vms.common.telemetry import http_telemetry, remote_parent
 from vms.ingest.service import FrameIngestor, IngestError, Outcome
 
 META_FIELDS = ("camera_id", "run_id", "seq", "ts_unix_ms")
@@ -67,18 +66,21 @@ def create_app(
             if on_shutdown is not None:
                 await on_shutdown()
 
-    app = FastAPI(title="vms ingest", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="vms ingest",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        telemetry=http_telemetry(),
+    )
 
     @app.post(FRAMES_PATH)
     async def post_frame(request: Request) -> Response:
         loop = asyncio.get_running_loop()
         t0 = loop.time()
         # Continue the sender's trace (loadgen injects `traceparent`) if there is one.
-        token = otel_context.attach(propagate.extract(dict(request.headers)))
-        try:
+        with remote_parent(request.headers):
             response = await _post_frame(request)
-        finally:
-            otel_context.detach(token)
         duration.labels(route=FRAMES_PATH, status=str(response.status_code)).observe(
             loop.time() - t0
         )
@@ -93,9 +95,11 @@ def create_app(
         if int(length) > max_body:
             return _error(ingestor.invalid(413, "body_too_large", f"body over {max_body} bytes"))
         try:
-            form = await request.form(
-                max_files=1, max_fields=len(META_FIELDS), max_part_size=MAX_FIELD_BYTES
-            )
+            # Reading and parsing the multipart body: ~1.7 ms of CPU per 200 KB frame (E-010).
+            with ingestor.timed("parse"):
+                form = await request.form(
+                    max_files=1, max_fields=len(META_FIELDS), max_part_size=MAX_FIELD_BYTES
+                )
         except Exception as exc:  # malformed multipart, too many parts, wrong content type
             return _error(ingestor.invalid(400, "bad_multipart", str(exc)))
         try:

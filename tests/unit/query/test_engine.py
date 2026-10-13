@@ -13,12 +13,15 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from opentelemetry import trace
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from tests.unit.query.conftest import REPO_ROOT
 from tests.unit.query.fakes import FakeFrames, FakeQueryLog, FakeReader, ScriptedLlm
 from vms.common.clock import FakeClock
 from vms.common.ids import UlidGenerator
 from vms.common.metrics import Metrics
+from vms.common.settings import TelemetrySettings
+from vms.common.telemetry import init_telemetry
 from vms.query.app import create_app
 from vms.query.engine import CatalogCache, ErrorType, PlanEngine, QueryResponse, QueryStatus
 from vms.query.fewshots import load_fewshots
@@ -54,7 +57,9 @@ class Harness:
         *,
         log_fails: bool = False,
         sql: SqlValidatorSettings | None = None,
+        tracer: trace.Tracer | None = None,
     ) -> None:
+        tracer = tracer or trace.NoOpTracer()
         self.clock = FakeClock(NOW)
         self.llm = llm
         self.reader = FakeReader(CAMERAS, ZONES, results)
@@ -67,6 +72,7 @@ class Harness:
             planner=PlannerSettings(),
             sql=settings.sql,
             clock=self.clock,
+            tracer=tracer,
         )
         self.catalog = CatalogCache(self.reader, ["person", "car"], self.clock, ttl_s=30)
         self.engine = PlanEngine(
@@ -80,7 +86,7 @@ class Harness:
             clock=self.clock,
             ids=UlidGenerator(self.clock),
             metrics=self.metrics,
-            tracer=trace.NoOpTracer(),
+            tracer=tracer,
             logger=logging.getLogger("test"),
         )
 
@@ -484,3 +490,44 @@ def test_ask_output_format() -> None:
         "error": {"type": "invalid_plan", "detail": "d", "errors": ["unknown camera 'x'"]},
     }
     assert "   - unknown camera 'x'" in format_answer(failed, 5)
+
+
+def test_query_trace_spans_every_stage_and_tokens_are_counted_by_kind(
+    query_settings: QuerySettings,
+) -> None:
+    """Task 2.1: one question's trace covers every pipeline stage, with one span per LLM call
+    (the repair shows as a second call)."""
+    spans = InMemorySpanExporter()
+    tracer = init_telemetry(
+        "query", TelemetrySettings(), exporter=spans, set_global=False
+    ).get_tracer("test")
+    bad = {**COUNT_PEOPLE, "filters": {**COUNT_PEOPLE["filters"], "cameras": ["nowhere"]}}
+    h = Harness(
+        query_settings,
+        ScriptedLlm(bad, COUNT_PEOPLE, tokens=5),
+        [QueryRows(["n"], [(7,)], False)],
+        tracer=tracer,
+    )
+    assert h.ask().status is QueryStatus.OK
+
+    finished = spans.get_finished_spans()
+    root = next(s for s in finished if s.name == "query")
+    assert root.context is not None
+    children = {
+        s.name: s for s in finished if s.parent and s.parent.span_id == root.context.span_id
+    }
+    assert set(children) == {
+        "query.catalog", "query.plan", "query.compile", "query.validate", "query.execute"
+    }  # fmt: skip
+    plan = children["query.plan"]
+    assert plan.context is not None
+    llm_calls = [s for s in finished if s.name == "query.llm"]
+    assert [s.attributes["attempt"] for s in llm_calls if s.attributes] == [1, 2]
+    assert all(s.parent and s.parent.span_id == plan.context.span_id for s in llm_calls)
+    assert all(s.attributes and s.attributes["prompt_tokens"] == 5 for s in llm_calls)
+
+    assert h.metric("vms_query_llm_tokens_total", kind="prompt") == 10
+    assert h.metric("vms_query_llm_tokens_total", kind="completion") == 10
+    assert h.metric("vms_query_plan_repairs_total") == 1
+    for stage in ("catalog", "plan", "compile", "validate", "execute"):
+        assert h.metric("vms_query_stage_duration_seconds_count", stage=stage) == 1, stage

@@ -68,6 +68,7 @@ def build_app(settings: QuerySettings, obs: Observability) -> FastAPI:
         planner=settings.planner,
         sql=settings.sql,
         clock=clock,
+        tracer=obs.tracer,
     )
     catalog = CatalogCache(reader, settings.classes, clock, settings.catalog_ttl_s)
     engine = PlanEngine(

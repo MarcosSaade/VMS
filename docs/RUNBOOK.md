@@ -57,9 +57,10 @@ make setup && make demo                 # needs only Docker and uv; ~10 min the 
 make demo DEMO_SECONDS=30               # shorter load (CI runs this)
 ```
 
-What it does (`scripts/demo.sh`): `make up` (stack, migrations, camera catalog), `make data-mini` (3 clips, ~180 MB the first time), the yolo11n weights, then the application containers from one image (`make app` builds it: ingest on :8080, one worker on :8090, the query service with the UI on :8070), then loadgen with 4 cameras x 5 FPS for `DEMO_SECONDS` (180) against the containerized ingest, waits until the worker has processed every frame (`python -m vms.storage wait-drained`, printing frames, tracks and events per camera), and prints the answers to the example questions (`python -m vms.query ask --check`, which fails the demo if any question errors or none returns rows). Everything stays up: open http://localhost:8070, then `make down` (or `make down-volumes` for an empty start next time).
+What it does (`scripts/demo.sh`): `make up` (stack, migrations, camera catalog), `make data-mini` (3 clips, ~180 MB the first time), the yolo11n weights, then the application containers from one image (`make app` builds it: ingest on :8080, one worker on :8090, the query service with the UI on :8070), then loadgen with 4 cameras x 5 FPS for `DEMO_SECONDS` (180) against the containerized ingest, waits until the worker has processed every frame (`python -m vms.storage wait-drained`, printing frames, tracks and events per camera), prints the answers to the example questions (`python -m vms.query ask --check`, which fails the demo if any question errors or none returns rows), and finally checks the telemetry (`python -m vms.observe`, see Traces and metrics), printing one frame's and one question's trace as a time breakdown. Everything stays up: open http://localhost:8070, then `make down` (or `make down-volumes` for an empty start next time).
 
-- Knobs: `DEMO_SECONDS`, `DEMO_CAMERAS` (4; the catalog has 4 cameras, more are ingested but invisible to questions), `DEMO_FPS` (5), `DEMO_WEIGHTS` (yolo11n), `DEMO_DRAIN_TIMEOUT_S` (900).
+- Knobs: `DEMO_SECONDS`, `DEMO_CAMERAS` (4; the catalog has 4 cameras, more are ingested but invisible to questions), `DEMO_FPS` (5), `DEMO_WEIGHTS` (yolo11n), `DEMO_DRAIN_TIMEOUT_S` (900), `DEMO_TRACE_RATIO` (0.1: share of frames traced).
+- With `LLM_MODEL` set, every demo run sends the 10 example questions to that model (about 45k prompt tokens with the planner.v1 prompt, E-017), which a hosted provider bills.
 - What it fakes: the planner is the canned one unless `LLM_MODEL` is set (then the same questions go to the real model); clips are 10 s loops, so each loop restarts every person's walk and counts of tracks are much higher than the people in view (D21 already notes tracks overcount); the camera and zone names are labels on public video, not real places.
 - On a laptop CPU one yolo11n worker processes fewer than the 20 frames/s offered, so frames queue during loadgen and the wall shows frames tens of seconds old; the drain step waits them out (E-020).
 - Re-running adds a new loadgen run to the same database; "last hour" answers then include the previous run.
@@ -193,6 +194,25 @@ uv run python -m vms.loadgen run --cameras 50 --fps 5 --duration 120 --target-ur
 - Trust check before reading any number: `generator_ok` must be true (schedule lag p99 within `max_schedule_lag_p99_ms`) and `cpu.utilization_cores` well below 1.0. Near 1.0 the single event loop is saturated and the offered load is lower than configured. The measured ceiling is in E-010.
 - Ctrl-C stops scheduling, waits for in-flight sends and writes partial results.
 
+### Traces and metrics
+
+Every service exports spans to the collector (`OTEL_EXPORTER_OTLP_ENDPOINT`) and serves `/metrics`. What is traced and measured: ARCHITECTURE 4.11 and D25.
+
+- **Find a trace.** Grafana > Explore > Tempo, query type TraceQL (or `curl -G localhost:3200/api/search --data-urlencode 'q=...'`):
+  - a whole frame, loadgen to DB write: `{resource.service.name="loadgen"} >> {name="worker.frame"}`
+  - slow frames: `{name="worker.frame" && span.freshness_s > 2.0}` (a float literal: `> 2` matches nothing, the attribute is a double)
+  - one camera: `{name="worker.frame" && span.camera_id="cam-001"}`
+  - questions that needed a repair: `{name="query.llm" && span.attempt = 2}`
+  - Traces become searchable 1 to 2 minutes after they end (E-024); fetching one by ID works at once.
+- **Sampling.** Loadgen decides per frame (`telemetry.sample_ratio` in `configs/loadgen.yaml`, 1%; `VMS_TELEMETRY__SAMPLE_RATIO=0.1` for more); ingest and the worker follow that decision. Every question is traced (`configs/query.yaml`).
+- **Metrics.** Prometheus at http://localhost:9090 scrapes `ingest`, `worker` and `query` containers every 5 s, found by Docker DNS (`deploy/compose/prometheus/prometheus.yml`). Status > Targets lists them; a job with no target means that container is not running. Services started on the host (`make ingest`, `make worker`, `make query`) are not scraped: use their `/metrics` directly, or the containers. Useful queries:
+  - freshness p95: `histogram_quantile(0.95, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[1m])))`
+  - share of frames within the 2 s SLO: `sum(rate(vms_worker_capture_to_done_seconds_bucket{le="2.0"}[5m])) / sum(rate(vms_worker_capture_to_done_seconds_count[5m]))`
+  - ingest rate by outcome: `sum by (outcome) (rate(vms_ingest_frames_total[1m]))`
+  - backlog and its age: `max(vms_worker_backlog_frames)`, `max(vms_worker_backlog_age_seconds)` (every worker reports the same global value: use `max`, never `sum`)
+  - worker time per stage: `sum by (stage) (rate(vms_worker_stage_duration_seconds_sum[1m]))`
+- **Check.** `uv run python -m vms.observe [--since <unix time>]` passes when every required metric has a series and Tempo has a complete frame trace and a complete query trace (since the given time, else the last hour). It waits up to `--timeout-s` (240) for Tempo.
+
 ## Benchmarks
 
 _Placeholder (task 2.3)._ Writing a scenario in `bench/scenarios/`, running it with `make bench`, where results land, and how to promote a number to `docs/BENCHMARKS.md`.
@@ -230,6 +250,7 @@ Symptom, cause and fix entries as issues are met.
 - Query service `/readyz` returns 503 with `postgres: unavailable`: the read-only login is missing or its password differs from `.env`. Run `make migrate`.
 - `make loadgen` reports every frame failed with reason `connection`: nothing listens on `target_url`. Start the ingest service or `make loadgen-stub`.
 - `make loadgen` logs "generator fell behind its schedule": the host or the generator is saturated, so the run offered less load than configured. Reduce cameras, close other load on the machine, or run several loadgen processes with different `camera_prefix` values.
+- `python -m vms.observe` (the demo's last step) reports "no healthy target": the named container is not running or not ready (`make ps`). "No series for" a metric: the service runs but has not done that work yet (for example no question asked), or runs on the host where Prometheus does not scrape it. "No complete frame trace": check that loadgen, ingest and the worker all export (`docker logs vms-worker-1` for OTLP export errors; `VMS_TELEMETRY__ENABLED` must not be false) and that the frames were sampled (`DEMO_TRACE_RATIO`); then open the newest loadgen trace in Grafana to see where the chain stops.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.
 
 ## Teardown

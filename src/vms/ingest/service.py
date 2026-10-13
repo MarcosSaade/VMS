@@ -32,6 +32,7 @@ from vms.common.ids import UlidGenerator
 from vms.common.ingest_api import JPEG_CONTENT_TYPE, FrameAccepted, FrameMeta
 from vms.common.logs import get_logger
 from vms.common.metrics import Metrics
+from vms.common.telemetry import current_traceparent
 from vms.ingest.settings import FrameLimits
 from vms.storage.frames import FrameRepository, FrameStoreError, NewFrame
 from vms.storage.objects import ObjectStore, ObjectStoreError
@@ -125,21 +126,46 @@ class FrameIngestor:
         return ts
 
     async def ingest(self, meta: FrameMeta, jpeg: bytes) -> IngestResult:
+        """Store one frame. The `ingest.frame` span continues the sender's trace (if the HTTP
+        layer attached one) and its traceparent is stored on the row for the worker (D25)."""
+        with self._tracer.start_as_current_span(
+            "ingest.frame",
+            attributes={"camera_id": meta.camera_id, "seq": meta.seq},
+        ) as span:
+            try:
+                result = await self._ingest(meta, jpeg)
+            except IngestError as err:
+                span.set_attribute("outcome", err.code)
+                raise
+            span.set_attribute("frame_id", result.accepted.frame_id)
+            span.set_attribute("outcome", result.outcome.value)
+            return result
+
+    async def _ingest(self, meta: FrameMeta, jpeg: bytes) -> IngestResult:
         ts = self._validate(meta, jpeg)
         frame_id = self._ids.new()
         key = object_key(meta.camera_id, ts, frame_id)
 
         try:
-            with self._timed("object_put"):
+            with self.timed("object_put"):
                 await self._store.put(key, jpeg, JPEG_CONTENT_TYPE)
         except ObjectStoreError as exc:
             self._frames.labels(outcome=Outcome.ERROR).inc()
             log.warning("object put failed", extra={"key": key, "error": str(exc)})
             raise IngestError(500, "object_store_unavailable", "could not store the frame") from exc
 
-        frame = NewFrame(frame_id, meta.camera_id, meta.run_id, meta.seq, ts, key, len(jpeg))
+        frame = NewFrame(
+            frame_id,
+            meta.camera_id,
+            meta.run_id,
+            meta.seq,
+            ts,
+            key,
+            len(jpeg),
+            traceparent=current_traceparent(),  # the ingest.frame span
+        )
         try:
-            with self._timed("db_insert"):
+            with self.timed("db_insert"):
                 stored = await self._repo.insert(frame)
         except FrameStoreError as exc:
             self._frames.labels(outcome=Outcome.ERROR).inc()
@@ -160,14 +186,14 @@ class FrameIngestor:
 
     async def _delete_quietly(self, key: str) -> None:
         try:
-            with self._timed("cleanup"):
+            with self.timed("cleanup"):
                 await self._store.delete(key)
         except ObjectStoreError as exc:
             self._orphans.inc()
             log.error("orphaned object", extra={"key": key, "error": str(exc)})
 
     @contextmanager
-    def _timed(self, stage: str) -> Iterator[None]:
+    def timed(self, stage: str) -> Iterator[None]:
         """A span plus a stage-latency observation around one step."""
         with self._tracer.start_as_current_span(f"ingest.{stage}"):
             t0 = self._clock.monotonic()

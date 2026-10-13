@@ -133,3 +133,13 @@ Outcome: ingest and worker get `pull_policy: never`, and `make demo` and `make a
 Tried: the shortened `make demo` in CI after E-022 (run 38264465076, commit fbc1af8).
 Result: failed at step 3 before building: `compose build` (BuildKit bake) refused the build secret's default file `/dev/null` ("additional privileges requested: pass --allow=fs.read=/dev/null"): bake grants no reads outside the project. The local Compose v5.6.0 does not enforce this, even with COMPOSE_BAKE=true, so it passed here.
 Outcome: the default secret is an empty file in the repo (deploy/docker/no-extra-ca.pem); a user CA goes under .certs/ (gitignored). Verified only by the next CI run, since the failure does not reproduce locally.
+
+### E-024 | 2026-10-13 | infra
+Tried: task 2.1 done check: `make demo DEMO_SECONDS=30` (4 cameras x 5 FPS, yolo11n, 10% of frames traced, DeepSeek planner from the local .env), then `python -m vms.observe`. Laptop of E-013, other containers running; one trace each, not a benchmark.
+Result: one frame trace from loadgen to the DB write: send 11.5 ms (multipart parse 0.7, object put 7.0, row insert 1.4), queue wait 20.0 s, worker 84 ms (infer 66, decode 3, stats 3.5, write 5.5, fetch 4, track 1.3). One question: 2.48 s, of which the LLM call 2.43 s, validate 21 ms, execute 4.5 ms. Every required metric present; the ingest, worker and query targets discovered and up.
+Outcome: at the demo load, freshness is queueing, not work: the worker is slower than the 20 frames/s offered (E-020), so 2.5 must find the camera count where the queue stays empty. The first span to open when freshness rises is `worker.queue_wait`. Tempo made traces searchable 1 to 2 min after they ended, so the check retries for up to 240 s.
+
+### E-025 | 2026-10-13 | infra
+Tried: the first demo runs with the 2.1 instrumentation.
+Result: three problems. (1) FastAPI 0.143 now creates HTTP server spans itself; the services' own `traceparent` extraction replaced that context, so each query's `query` span became a separate trace from its `POST /v1/query` span (and ingest's stages hung off loadgen, not the HTTP span). (2) Docker health checks and Prometheus scrapes produced a one-span trace every few seconds per service. (3) The telemetry check passed on a trace from the previous demo run while the new ones were not searchable yet.
+Outcome: extract only when no span is active (`remote_parent`), exclude `/healthz`, `/readyz`, `/metrics` from FastAPI telemetry, and search only from the run's start (`--since`); unit tests for each. Re-run: the question trace nests under `POST /v1/query` (E-024).

@@ -49,6 +49,7 @@ class ClaimedFrame:
     received_at: datetime
     object_key: str
     attempts: int  # including this one
+    traceparent: str | None = None  # the ingest span to continue (D25)
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,12 @@ class FrameResult:
     events: tuple[EventRow, ...] = ()
 
 
+@dataclass(frozen=True)
+class Backlog:
+    frames: int  # pending frames across all cameras
+    oldest_age_s: float  # now minus the oldest pending frame's receive time; 0 when empty
+
+
 class FailOutcome(StrEnum):
     RETRY = "retry"  # back to pending
     FAILED = "failed"  # terminal
@@ -142,8 +149,8 @@ class WorkQueue(Protocol):
         (recovery after a failure could not be recorded); leases are kept."""
         ...
 
-    async def backlog(self) -> int:
-        """Pending frames across all cameras."""
+    async def backlog(self) -> Backlog:
+        """Pending frames across all cameras, and how long the oldest has waited."""
         ...
 
     async def zones(self, camera_id: str) -> list[ZoneRow]:
@@ -208,7 +215,7 @@ WHERE f.frame_id IN (
     FOR UPDATE OF p SKIP LOCKED
 )
 RETURNING f.frame_id, f.camera_id, f.run_id, f.seq, f.ts, f.received_at, f.object_key,
-          f.attempts
+          f.attempts, f.traceparent
 """
 
 COMPLETE_FRAME_SQL = """
@@ -273,7 +280,11 @@ WHERE claimed_by = %(worker_id)s AND status = 'processing'
 
 RELEASE_LEASES_SQL = "DELETE FROM camera_leases WHERE worker_id = %(worker_id)s"
 
-BACKLOG_SQL = "SELECT count(*) FROM frames WHERE status = 'pending'"
+# Both on the database clock, the one every service shares (ingest stamps received_at).
+BACKLOG_SQL = """
+SELECT count(*), coalesce(extract(epoch FROM now() - min(received_at)), 0)::float8
+FROM frames WHERE status = 'pending'
+"""
 
 MAX_ERROR_CHARS = 500
 
@@ -449,9 +460,9 @@ class PostgresWorkQueue:
     async def release_frames(self, worker_id: str) -> None:
         await self._rows_none(REQUEUE_FRAMES_SQL, {"worker_id": worker_id})
 
-    async def backlog(self) -> int:
+    async def backlog(self) -> Backlog:
         rows = await self._rows(BACKLOG_SQL, {})
-        return int(rows[0][0])
+        return Backlog(int(rows[0][0]), max(0.0, float(rows[0][1])))
 
     async def ready(self) -> bool:
         try:

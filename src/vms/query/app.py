@@ -27,11 +27,10 @@ from typing import Any, Protocol
 from fastapi import FastAPI, Path, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from opentelemetry import context as otel_context
-from opentelemetry import propagate
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from vms.common.metrics import Metrics
+from vms.common.telemetry import http_telemetry, remote_parent
 from vms.query.engine import CatalogCache, StructuredQueryEngine
 from vms.query.live import live_view
 from vms.query.store import ExecutionError, Reader
@@ -93,7 +92,13 @@ def create_app(
             if on_shutdown is not None:
                 await on_shutdown()
 
-    app = FastAPI(title="vms query", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="vms query",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        telemetry=http_telemetry(),
+    )
 
     @app.middleware("http")
     async def observe(
@@ -101,11 +106,8 @@ def create_app(
     ) -> Response:
         loop = asyncio.get_running_loop()
         t0 = loop.time()
-        token = otel_context.attach(propagate.extract(dict(request.headers)))
-        try:
+        with remote_parent(request.headers):
             response = await call_next(request)
-        finally:
-            otel_context.detach(token)
         route = request.scope.get("route")
         path = getattr(route, "path", "unmatched")
         duration.labels(route=path, status=str(response.status_code)).observe(loop.time() - t0)

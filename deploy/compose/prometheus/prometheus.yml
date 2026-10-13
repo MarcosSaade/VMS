@@ -1,5 +1,5 @@
-# Scrape targets for the local stack. VMS services are added here as they land (Phase 1+);
-# each exposes /metrics with names of the form vms_<component>_<metric>_<unit>.
+# Scrape targets for the local stack. Each VMS service exposes /metrics with names of the form
+# vms_<component>_<metric>_<unit>.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -22,3 +22,31 @@ scrape_configs:
   - job_name: tempo
     static_configs:
       - targets: ["tempo:3200"]
+
+  # VMS application containers (profile app). Found through Docker's DNS: a service that is not
+  # running has no targets (instead of a target that is down), and `--scale worker=N` gives one
+  # target per replica. Every 5 s, so short benchmark steps still get enough samples.
+  # Services run on the host (make ingest / make worker) are not scraped; see RUNBOOK.
+  - job_name: ingest
+    scrape_interval: 5s
+    dns_sd_configs:
+      - names: [ingest]
+        type: A
+        port: 8080
+        refresh_interval: 5s
+
+  - job_name: worker
+    scrape_interval: 5s
+    dns_sd_configs:
+      - names: [worker]
+        type: A
+        port: 8090
+        refresh_interval: 5s
+
+  - job_name: query
+    scrape_interval: 5s
+    dns_sd_configs:
+      - names: [query]
+        type: A
+        port: 8070
+        refresh_interval: 5s

@@ -37,6 +37,7 @@ from vms.query.catalog import QueryCatalog, catalog_from_rows
 from vms.query.compiler import CompileError, PostgresCompiler
 from vms.query.plan import AbstainReason, ResultKind
 from vms.query.planner import (
+    PlanAttempt,
     Planner,
     PlannerUnavailableError,
     PlanningFailedError,
@@ -184,7 +185,11 @@ class PlanEngine:
             ["stage"],
             STAGE_BUCKETS_S,
         )
-        self._tokens = metrics.counter("llm_tokens", "total", "LLM tokens used by the planner")
+        # Prompt and completion apart: they are priced differently, and the prompt (~4.5k
+        # tokens, mostly few-shots; E-017) is what prefix caching would save.
+        self._tokens = metrics.counter(
+            "llm_tokens", "total", "LLM tokens used by the planner", ["kind"]
+        )
         self._repairs = metrics.counter("plan_repairs", "total", "Plans that needed a repair")
         self._log_failures = metrics.counter(
             "query_log_failures", "total", "query_log writes that failed"
@@ -259,7 +264,7 @@ class PlanEngine:
             return failed(ErrorType.PLANNER_UNAVAILABLE, str(exc))
         except PlanningFailedError as exc:
             tokens = sum(a.tokens for a in exc.attempts)
-            self._tokens.inc(tokens)
+            self._count_tokens(exc.attempts)
             self._repairs.inc(1 if len(exc.attempts) > 1 else 0)
             return failed(
                 ErrorType.INVALID_PLAN,
@@ -268,7 +273,7 @@ class PlanEngine:
                 tokens=tokens,
                 repaired=len(exc.attempts) > 1,
             )
-        self._tokens.inc(result.tokens)
+        self._count_tokens(result.attempts)
         if result.repaired:
             self._repairs.inc()
         plan = result.plan
@@ -347,6 +352,10 @@ class PlanEngine:
             row_count=len(rows.rows),
             truncated=truncated,
         )
+
+    def _count_tokens(self, attempts: list[PlanAttempt]) -> None:
+        self._tokens.labels(kind="prompt").inc(sum(a.prompt_tokens for a in attempts))
+        self._tokens.labels(kind="completion").inc(sum(a.completion_tokens for a in attempts))
 
     async def _write_log(self, response: QueryResponse, started: Any) -> None:
         entry = QueryLogEntry(

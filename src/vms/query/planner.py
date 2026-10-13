@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from opentelemetry import trace
 from pydantic import ValidationError
 
 from vms.common.clock import Clock
@@ -59,8 +60,13 @@ class PlanningFailedError(Exception):
 class PlanAttempt:
     raw: str
     errors: list[str]
-    tokens: int
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
     model: str = ""
+
+    @property
+    def tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
 
 
 @dataclass
@@ -183,8 +189,10 @@ class Planner:
         planner: PlannerSettings,
         sql: SqlValidatorSettings,
         clock: Clock,
+        tracer: trace.Tracer | None = None,
     ) -> None:
         self._llm = llm
+        self._tracer = tracer or trace.get_tracer(__name__)
         self._prompt = prompt
         self._examples = examples_block(examples)
         self._schema = plan_json_schema()
@@ -217,17 +225,30 @@ class Planner:
             ChatMessage("user", question),
         ]
         attempts: list[PlanAttempt] = []
-        for _ in range(self._settings.repair_attempts + 1):
-            try:
-                reply = await self._llm.complete(messages, self._schema)
-            except LlmError as exc:
-                raise PlannerUnavailableError(str(exc)) from exc
+        for attempt in range(self._settings.repair_attempts + 1):
+            # One span per LLM call, so a repair shows up as a second call in the trace.
+            with self._tracer.start_as_current_span(
+                "query.llm",
+                kind=trace.SpanKind.CLIENT,
+                attributes={"attempt": attempt + 1, "llm": self._llm.name},
+            ) as span:
+                try:
+                    reply = await self._llm.complete(messages, self._schema)
+                except LlmError as exc:
+                    raise PlannerUnavailableError(str(exc)) from exc
+                span.set_attribute("prompt_tokens", reply.prompt_tokens)
+                span.set_attribute("completion_tokens", reply.completion_tokens)
+                span.set_attribute("model", reply.model)
             plan, errors = parse_plan(reply.text)
             if plan is not None:
                 errors = validate_plan(
                     plan, catalog, now, self._settings, max_limit=self._sql.max_limit
                 )
-            attempts.append(PlanAttempt(reply.text, errors, reply.tokens, reply.model))
+            attempts.append(
+                PlanAttempt(
+                    reply.text, errors, reply.prompt_tokens, reply.completion_tokens, reply.model
+                )
+            )
             if plan is not None and not errors:
                 return PlanResult(plan, attempts)
             messages += [

@@ -17,6 +17,7 @@ from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 
 from vms.common.metrics import Metrics
+from vms.common.telemetry import http_telemetry
 
 READY_TIMEOUT_S = 2.0
 
@@ -38,7 +39,13 @@ def create_app(
         finally:
             await on_shutdown()
 
-    app = FastAPI(title="vms worker", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="vms worker",
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        telemetry=http_telemetry(),
+    )
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

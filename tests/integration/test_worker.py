@@ -26,7 +26,7 @@ from vms.loadgen.runner import Runner
 from vms.loadgen.schedule import plan_cameras
 from vms.loadgen.settings import LoadgenSettings
 from vms.loadgen.transport import HttpTransport
-from vms.storage.frames import PoolTuning
+from vms.storage.frames import NewFrame, PoolTuning, PostgresFrameRepository
 from vms.storage.work import (
     DetectionRow,
     EventRow,
@@ -131,11 +131,46 @@ def test_workers_lease_disjoint_cameras_and_claim_in_capture_order(
                         worker, result(f.frame_id, f.camera_id)
                     )
         assert seen == {c: [0, 1, 2, 3, 4] for c in cameras}
-        assert await q1.backlog() == 0
+        assert (await q1.backlog()).frames == 0
 
     with_queues(stack, fresh_db, 2, body)
     assert fetch(stack, fresh_db, "SELECT count(*) FROM detections") == [(40,)]
     assert fetch(stack, fresh_db, "SELECT DISTINCT status FROM frames") == [("done",)]
+
+
+def test_trace_context_and_receive_time_travel_through_the_queue(
+    stack: StackSettings, fresh_db: str
+) -> None:
+    """Task 2.1 (D25): ingest's traceparent comes back with the claim; the backlog reports how
+    long the oldest pending frame has waited, on the database clock."""
+    parent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+    repo = PostgresFrameRepository(dsn(stack, fresh_db), PoolTuning(min_size=0, max_size=2))
+
+    async def insert() -> None:
+        await repo.open()
+        try:
+            for seq, tp in [(0, parent), (1, None)]:
+                await repo.insert(
+                    NewFrame(f"f{seq}", "cam-a", "run", seq, T0, f"k{seq}", 1, traceparent=tp)
+                )
+        finally:
+            await repo.aclose()
+
+    asyncio.run(insert())
+    with psycopg.connect(dsn(stack, fresh_db), autocommit=True) as conn:
+        conn.execute("UPDATE frames SET received_at = now() - interval '90 seconds'")
+
+    async def body(q1: PostgresWorkQueue) -> None:
+        backlog = await q1.backlog()
+        assert backlog.frames == 2
+        assert 90.0 <= backlog.oldest_age_s < 120.0
+        await q1.acquire_cameras("w1", 1, TTL_S, 3)
+        claimed = await q1.claim("w1", 2)
+        assert [(f.seq, f.traceparent) for f in claimed] == [(0, parent), (1, None)]
+        empty = await q1.backlog()
+        assert (empty.frames, empty.oldest_age_s) == (0, 0.0)
+
+    with_queues(stack, fresh_db, 1, body)
 
 
 def test_concurrent_lease_attempts_have_one_winner(stack: StackSettings, fresh_db: str) -> None:
@@ -230,9 +265,9 @@ def test_release_hands_back_frames_and_leases(stack: StackSettings, fresh_db: st
     async def body(q1: PostgresWorkQueue) -> None:
         await q1.acquire_cameras("w1", 2, TTL_S, 3)
         assert len(await q1.claim("w1", 3)) == 3
-        assert await q1.backlog() == 1
+        assert (await q1.backlog()).frames == 1
         await q1.release("w1")
-        assert await q1.backlog() == 4
+        assert (await q1.backlog()).frames == 4
 
     with_queues(stack, fresh_db, 1, body)
     assert fetch(stack, fresh_db, "SELECT count(*) FROM camera_leases") == [(0,)]

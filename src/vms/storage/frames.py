@@ -40,6 +40,8 @@ class NewFrame:
     ts: datetime  # capture time, UTC
     object_key: str
     size_bytes: int
+    # W3C traceparent of the ingest span; the worker continues this trace (D25).
+    traceparent: str | None = None
 
 
 @dataclass(frozen=True)
@@ -58,8 +60,9 @@ class FrameRepository(Protocol):
 
 
 INSERT_SQL = """
-INSERT INTO frames (frame_id, camera_id, run_id, seq, ts, object_key, size_bytes)
-VALUES (%(frame_id)s, %(camera_id)s, %(run_id)s, %(seq)s, %(ts)s, %(object_key)s, %(size_bytes)s)
+INSERT INTO frames (frame_id, camera_id, run_id, seq, ts, object_key, size_bytes, traceparent)
+VALUES (%(frame_id)s, %(camera_id)s, %(run_id)s, %(seq)s, %(ts)s, %(object_key)s, %(size_bytes)s,
+        %(traceparent)s)
 ON CONFLICT (camera_id, run_id, seq) DO NOTHING
 RETURNING frame_id, object_key
 """
@@ -95,6 +98,7 @@ class PostgresFrameRepository:
             "ts": frame.ts,
             "object_key": frame.object_key,
             "size_bytes": frame.size_bytes,
+            "traceparent": frame.traceparent,
         }
         try:
             async with self._pool.connection() as conn:

@@ -167,6 +167,7 @@ class Runner:
         try:
             with self._tracer.start_as_current_span(
                 "loadgen.send_frame",
+                kind=trace.SpanKind.CLIENT,
                 attributes={"camera_id": frame.camera_id, "seq": frame.seq},
             ) as span:
                 headers: dict[str, str] = {}
