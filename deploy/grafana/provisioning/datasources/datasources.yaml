@@ -11,7 +11,7 @@ datasources:
     isDefault: true
     editable: false
     jsonData:
-      timeInterval: 15s
+      timeInterval: 5s   # the application jobs' scrape interval; $__rate_interval = 20 s
 
   - name: Tempo
     uid: tempo

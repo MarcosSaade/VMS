@@ -3,8 +3,9 @@
 `make demo` runs this last, so CI fails if a service stops exporting, a scrape target goes
 missing, or the trace context is lost somewhere between loadgen and the worker's DB write.
 
-1. Prometheus: the ingest, worker and query jobs each have a target that is up, and every
-   metric in REQUIRED_METRICS has at least one series.
+1. Prometheus: the ingest, worker and query jobs each have a target that is up, every
+   metric in REQUIRED_METRICS has at least one series, and every dashboard panel's query
+   returns data (vms.observe.dashboards; GPU and placeholder panels exempt).
 2. Tempo, frame trace: a trace in which a worker.frame span descends from a loadgen span
    (TraceQL `>>`), containing every span in FRAME_SPANS. Its breakdown is printed: where one
    frame spent its time from send to stored detections.
@@ -32,6 +33,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from vms.common.clock import Clock, SystemClock
 from vms.common.logs import configure_logging, get_logger
+from vms.observe.dashboards import RATE, Dashboard, all_dashboards, panel_queries
 
 log = get_logger(__name__)
 
@@ -142,6 +144,18 @@ class TelemetryCheck:
                 missing.append(name)
         return missing
 
+    def empty_panels(self, dashboards: Sequence[Dashboard]) -> list[str]:
+        """Dashboard panels whose query returns no series (GPU and placeholder panels are
+        exempt). `$__rate_interval` becomes 5m, which covers a demo run."""
+        empty = []
+        for d in dashboards:
+            for title, expr in panel_queries(d):
+                query = urllib.parse.urlencode({"query": expr.replace(RATE, "5m")})
+                data = self._get(f"{self._prom}/api/v1/query?{query}")
+                if not data["data"]["result"]:
+                    empty.append(f"{d.title}: {title}")
+        return sorted(set(empty))
+
     # --- Tempo --------------------------------------------------------------------------
 
     def find_trace(self, traceql: str, required: frozenset[str]) -> list[Span] | None:
@@ -214,6 +228,7 @@ def run_checks(
     clock: Clock,
     sleep: Callable[[float], None],
     out: Callable[[str], Any],
+    dashboards: Sequence[Dashboard] = (),
 ) -> list[str]:
     """Run every check, all within one `timeout_s`; returns the failures (empty if none)."""
     wait: dict[str, Any] = {
@@ -229,6 +244,9 @@ def run_checks(
     metrics = retry(checker.missing_metrics, lambda m: not m, **wait)
     if metrics:
         failures.append(f"Prometheus has no series for: {', '.join(metrics)}")
+    panels = retry(lambda: checker.empty_panels(dashboards), lambda m: not m, **wait)
+    if panels:
+        failures.append(f"Dashboard panels with no data: {'; '.join(panels)}")
 
     frame = retry(
         lambda: checker.find_trace(FRAME_TRACE_QUERY, FRAME_SPANS), lambda t: t is not None, **wait
@@ -286,6 +304,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         clock=SystemClock(),
         sleep=time.sleep,
         out=sys.stdout.write,
+        dashboards=all_dashboards(),
     )
     for failure in failures:
         log.error("telemetry check failed", extra={"failure": failure})

@@ -51,7 +51,7 @@
 ## Phase 2: Observability and baseline
 - [x] 2.1 Tracing and metrics: frame and query traces, freshness, throughput, backlog, stage latencies (SHRINK: GPU metrics only during the GPU session)
   - Understand it: how is freshness measured, and which span would you open first if p95 freshness doubled?
-- [ ] 2.2 Grafana dashboards as code: Pipeline, Inference, Query, plus Drift (filled in 9.4); designed to be screenshotted
+- [x] 2.2 Grafana dashboards as code: Pipeline, Inference, Query, plus Drift (filled in 9.4); designed to be screenshotted
   - Understand it: for each panel, what decision would you make from it?
 - [ ] 2.3 Benchmark framework: scenario YAML, runner, results JSON schema, warmup and repetitions
   - Understand it: why exclude warmup, how many repetitions, and how is variance reported?

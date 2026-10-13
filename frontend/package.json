@@ -12,7 +12,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "screenshots:grafana": "node scripts/grafana-screenshots.mjs"
   },
   "devDependencies": {
     "playwright-core": "1.56.1",

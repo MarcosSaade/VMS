@@ -81,11 +81,19 @@ log = get_logger(__name__)
 
 T = TypeVar("T")
 
-STAGE_BUCKETS_S = (0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0)
+# Dense from 25 to 300 ms, where CPU inference lives (E-013): with only 0.1 and 0.25 there, the
+# inference p95 read as a flat 100 ms bucket edge (E-026).
+STAGE_BUCKETS_S = (
+    0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.2, 0.25, 0.3, 0.5,
+    1.0, 2.5, 5.0,
+)  # fmt: skip
 # Dense around the 2 s freshness SLO (ARCHITECTURE 8), with an edge at exactly 2 s so the
 # share of frames within the SLO is read from a bucket, not interpolated.
+# Past the SLO it keeps enough edges for minutes of overload: with only 60 and 300 s, a p95
+# inside that bucket was interpolated to 4.8 min when no frame had waited much over 2 min (E-026).
 FRESHNESS_BUCKETS_S = (
-    0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 10.0, 30.0, 60.0, 300.0
+    0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 10.0, 20.0, 30.0, 45.0, 60.0,
+    90.0, 120.0, 180.0, 240.0, 300.0, 600.0,
 )  # fmt: skip
 
 

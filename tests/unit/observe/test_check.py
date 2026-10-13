@@ -192,3 +192,28 @@ def test_late_traces_are_waited_for_within_one_overall_deadline() -> None:
     )
     assert len(failures) == 2
     assert clock.monotonic() == 6.0
+
+
+def test_empty_dashboard_panels_are_reported() -> None:
+    from vms.observe.dashboards import Dashboard, Panel, Row, Target
+
+    board = Dashboard(
+        "vms-x",
+        "X",
+        "test",
+        (
+            Row(
+                "r",
+                (
+                    Panel("Has data", "d", (Target("count(vms_worker_frames_total)"),)),
+                    Panel("Empty", "d", (Target("count(vms_nothing_total)"),)),
+                    Panel("GPU", "d", (Target("count(vms_nothing_total)"),), optional=True),
+                ),
+            ),
+        ),
+    )
+    backends = FakeBackends()
+    backends.metrics.add("vms_worker_frames_total")
+    clock = FakeClock(NOW)
+    checker = TelemetryCheck(backends, prometheus_url="http://p", tempo_url="http://t", clock=clock)
+    assert checker.empty_panels([board]) == ["X: Empty"]

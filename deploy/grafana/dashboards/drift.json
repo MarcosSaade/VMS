@@ -1,0 +1,66 @@
+{
+  "uid": "vms-drift",
+  "title": "VMS / Drift",
+  "description": "Per-camera input and output statistics and change alarms (task 9.4).",
+  "tags": [
+    "vms"
+  ],
+  "editable": false,
+  "graphTooltip": 1,
+  "timezone": "browser",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "type": "dashboards",
+      "title": "VMS dashboards",
+      "tags": [
+        "vms"
+      ],
+      "asDropdown": true,
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Drift (placeholder until task 9.4)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "text",
+      "title": "What goes here",
+      "description": "Placeholder: what the drift panels will show and how alarms will be handled, until task 9.4 replaces it with live per-camera statistics.",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 24,
+        "h": 7
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Drift detection arrives in task 9.4\n\nPer camera, against a reference window (tasks 9.1 to 9.3):\n\n- **Input:** brightness, blur (Laplacian variance), noise. The worker already stores brightness, contrast and blur per frame in the `frames` table.\n- **Output:** detections per frame, confidence distribution, class mix.\n- **Alarms:** CUSUM statistic against its threshold, alarms per camera, detection delay on the injected scenarios (9.2).\n\nThe procedure for an alarm is in `docs/RUNBOOK.md` (9.4)."
+      }
+    }
+  ]
+}

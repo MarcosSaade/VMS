@@ -168,6 +168,10 @@ loadgen-stub: ## Stub ingest server for loadgen tests (STUB_WORKERS=n processes)
 
 # --- Benchmarks and evaluation -------------------------------------------------
 
+.PHONY: dashboards
+dashboards: ## Regenerate the Grafana dashboards JSON from vms.observe.dashboards
+	$(RUN) python -m vms.observe.dashboards
+
 .PHONY: bench-model
 bench-model: ## Model-only worker latency (SCENARIO=bench/scenarios/worker-model-cpu.yaml)
 	$(RUN) python -m vms.worker bench --scenario $(or $(SCENARIO),bench/scenarios/worker-model-cpu.yaml)

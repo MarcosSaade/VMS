@@ -227,7 +227,25 @@ _Placeholder (tasks 6.4, 10.1, 10.2)._ Helm chart, kind smoke test, Terraform fo
 
 ## Operations
 
-_Placeholder (tasks 2.2, 9.4)._ Dashboards, alerts, drift response procedure, scaling, and promoting a model to champion.
+### Dashboards
+
+Grafana (http://localhost:3000, anonymous viewer) opens on **VMS / Pipeline**; the "VMS dashboards" menu at the top switches between them. Every panel's (i) tooltip says what it shows and what to do about it.
+
+| Dashboard | Answers | Look first at |
+|---|---|---|
+| Pipeline | Is the system keeping up, and how fresh are results? | "Within SLO" and "Oldest waiting"; then "Where freshness goes" (waiting vs working) |
+| Inference | Where does a worker's time go per frame? | "Where worker time goes" (stage shares), then "Stage latency p95" |
+| Query | Are questions fast and answered? | "Question latency" against the 1.5 s line, then "Time per stage" (LLM vs database) |
+| Resources | Which process is short of CPU or memory? | "CPU per service" against the machine's cores |
+| Drift | Placeholder until task 9.4 | |
+
+- Dashboards are code: edit `src/vms/observe/dashboards.py`, run `make dashboards`, and Grafana picks up the regenerated JSON in `deploy/grafana/dashboards/` within 10 s (no restart). Edits made in the Grafana UI cannot be saved (provisioned, read-only); a unit test fails if the JSON and the code disagree.
+- Rates use `$__rate_interval` (20 s at the 5 s scrape interval). Quantile panels show gaps when there was no traffic: no frames or questions means no latency, not the last value.
+- GPU panels (Inference, collapsed row) fill only on the GPU instance, where the DCGM exporter runs (2.4).
+- `make demo`'s telemetry check also fails if any panel (other than GPU and Drift) has no data.
+- Screenshots for the README and write-up, while there is live data (for example during or right after `make demo`): `cd frontend && CHROMIUM_PATH=/path/to/chrome npm run screenshots:grafana -- http://localhost:3000 ../docs/images [from] [to]`, with `from` and `to` as Grafana time values (Unix ms of the run, or `now-15m`). Kiosk mode, light theme, 1600 px wide.
+
+_Placeholder (task 9.4):_ alerts, drift response procedure, scaling, and promoting a model to champion.
 
 ## Troubleshooting
 

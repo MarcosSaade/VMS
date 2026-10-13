@@ -36,7 +36,8 @@ from vms.query.live import live_view
 from vms.query.store import ExecutionError, Reader
 
 READY_TIMEOUT_S = 2.0
-REQUEST_BUCKETS_S = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+# An edge at the 1.5 s query SLO (ARCHITECTURE 8), so the share within it is read, not guessed.
+REQUEST_BUCKETS_S = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 5.0, 10.0, 30.0)
 ULID_PATTERN = r"^[0-9A-HJKMNP-TV-Z]{26}$"
 FRAME_KEY_SQL = "SELECT object_key FROM frames WHERE frame_id = %(frame_id)s"
 
