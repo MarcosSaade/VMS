@@ -43,7 +43,8 @@ def test_sync_catalog_is_idempotent_and_keeps_stale_rows(
             "cam-002:register_1",
             "cam-002:register_2",
         ]
-        assert rows[0][2] == [[0.35, 0.45], [0.65, 0.45], [0.65, 1.0], [0.35, 1.0]]
+        # The polygon as configured (zones are redrawn with `make zones`, so not a literal).
+        assert rows[0][2] == [list(p) for p in catalog.cameras[0].zones[0].polygon]
 
         # Edit: move a zone, change a timezone, drop a camera from the config.
         data = catalog.model_dump(mode="json")
