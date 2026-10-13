@@ -1,0 +1,79 @@
+# End-to-end benchmark runner (vms.bench, task 2.3). Overrides configs/common.yaml; VMS_*
+# environment variables override this file (e.g. VMS_QUERY_URL=http://127.0.0.1:8071).
+# Scenarios (bench/scenarios/*.yaml) describe the load; this file describes where the system
+# under test is and how a step is measured and judged.
+
+ingest_url: http://127.0.0.1:8080      # loadgen target (the compose ingest service)
+query_url: http://127.0.0.1:8070       # the query service's POST /v1/query
+prometheus_url: http://127.0.0.1:9090
+results_dir: bench/results
+
+http_timeout_s: 10.0                   # Prometheus API calls
+query_timeout_s: 30.0                  # one question, LLM included
+loadgen_timeout_margin_s: 120.0        # loadgen startup (clip loading) and drain, beyond the step
+
+# Prometheus scrapes the services every 5 s. A step's window must hold several scrapes for
+# rate() and histogram_quantile() to mean anything, and the last scrape inside the window must
+# have landed before the window is read.
+min_window_s: 15.0
+scrape_settle_s: 7.0
+
+# Before each step with ingest load, wait until the worker backlog is empty, so a step does not
+# inherit the previous step's queue.
+drain:
+  enabled: true
+  timeout_s: 900.0
+  interval_s: 2.0
+
+# A step meets the SLO when every condition holds (ARCHITECTURE sections 2 and 8). Rated
+# capacity is the largest camera count whose step, and every smaller one, met it in every
+# repetition.
+slo:
+  freshness_p95_s: 2.0                 # capture to detections queryable
+  max_lost_frames: 0                   # dropped, rejected or failed at ingest, lost by the worker
+  max_backlog_slope_fps: 0.5           # a growing queue is not a steady state
+  query_p95_s: 1.5                     # structured query, LLM included (judged separately)
+
+# The harness must not be the bottleneck: a step is flagged harness_ok: false when loadgen fell
+# behind its schedule (generator_ok) or the query clients' process used more than this.
+max_client_cpu_cores: 0.8
+
+# PromQL evaluated at the end of each step's steady-state window. $window is the window length
+# (e.g. 30s). `by` names the label that splits the result into one number per value.
+queries:
+  ingest_created_fps:
+    query: sum(rate(vms_ingest_frames_total{outcome="created"}[$window]))
+  ingest_rejected_fps:
+    query: sum(rate(vms_ingest_frames_total{outcome=~"invalid|error"}[$window]))
+  worker_done_fps:
+    query: sum(rate(vms_worker_frames_total{outcome="done"}[$window]))
+  worker_lost_frames:
+    query: sum(increase(vms_worker_frames_total{outcome=~"lost|failed"}[$window]))
+  freshness_p50_s:
+    query: histogram_quantile(0.50, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))
+  freshness_p95_s:
+    query: histogram_quantile(0.95, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))
+  freshness_p99_s:
+    query: histogram_quantile(0.99, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))
+  queue_wait_p95_s:
+    query: histogram_quantile(0.95, sum by (le) (rate(vms_worker_queue_wait_seconds_bucket[$window])))
+  worker_stage_p95_s:
+    query: histogram_quantile(0.95, sum by (le, stage) (rate(vms_worker_stage_duration_seconds_bucket[$window])))
+    by: stage
+  backlog_end_frames:
+    query: max(vms_worker_backlog_frames)
+  backlog_max_frames:
+    query: max_over_time(max(vms_worker_backlog_frames)[$window:5s])
+  backlog_slope_fps:                   # least-squares slope of the backlog over the window
+    query: deriv(max(vms_worker_backlog_frames)[$window:5s])
+  backlog_age_max_s:
+    query: max_over_time(max(vms_worker_backlog_age_seconds)[$window:5s])
+  query_stage_p95_s:
+    query: histogram_quantile(0.95, sum by (le, stage) (rate(vms_query_stage_duration_seconds_bucket[$window])))
+    by: stage
+  cpu_cores:
+    query: sum by (job) (rate(process_cpu_seconds_total{job=~"ingest|worker|query"}[$window]))
+    by: job
+  rss_max_bytes:
+    query: max by (job) (max_over_time(process_resident_memory_bytes{job=~"ingest|worker|query"}[$window]))
+    by: job

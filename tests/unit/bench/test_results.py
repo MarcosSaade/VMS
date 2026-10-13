@@ -2,6 +2,9 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from vms.bench.results import (
     GitInfo,
     Hardware,
@@ -9,8 +12,10 @@ from vms.bench.results import (
     git_info,
     hardware,
     package_versions,
+    results_path,
     write_result,
 )
+from vms.bench.runner import E2EMetrics
 
 
 def test_git_info_outside_a_repo(tmp_path: Path) -> None:
@@ -65,3 +70,22 @@ def test_untracked_files_do_not_make_the_tree_dirty(tmp_path: Path) -> None:
     assert git_info(tmp_path).dirty is False
     (tmp_path / "code.py").write_text("x = 2\n")
     assert git_info(tmp_path).dirty is True
+
+
+RESULTS = sorted(Path(__file__).resolve().parents[3].joinpath("bench/results").glob("*.json"))
+
+
+@pytest.mark.parametrize("path", RESULTS, ids=lambda p: p.stem)
+def test_committed_results_match_the_schema(path: Path) -> None:
+    """Every results file in the repo is a valid RunResult; e2e files also carry E2EMetrics."""
+    result = RunResult.model_validate_json(path.read_text())
+    assert result.git.sha
+    assert result.ended_at >= result.started_at
+    assert path == results_path(path.parent, result)
+    if result.kind == "bench.e2e":
+        E2EMetrics.model_validate(result.metrics)
+
+
+def test_results_schema_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        RunResult.model_validate({"run_id": "x", "surprise": 1})

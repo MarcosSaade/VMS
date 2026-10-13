@@ -53,7 +53,7 @@
   - Understand it: how is freshness measured, and which span would you open first if p95 freshness doubled?
 - [x] 2.2 Grafana dashboards as code: Pipeline, Inference, Query, plus Drift (filled in 9.4); designed to be screenshotted
   - Understand it: for each panel, what decision would you make from it?
-- [ ] 2.3 Benchmark framework: scenario YAML, runner, results JSON schema, warmup and repetitions
+- [x] 2.3 Benchmark framework: scenario YAML, runner, results JSON schema, warmup and repetitions
   - Understand it: why exclude warmup, how many repetitions, and how is variance reported?
 - [ ] 2.4 GPU session on AWS: one tagged spot instance by script, Budgets alarm, verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote)
   - Understand it: how do you know nothing is still billing after a session, and what does an hour cost?

@@ -19,7 +19,6 @@ import argparse
 import asyncio
 import random
 import signal
-import statistics
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -30,6 +29,7 @@ import yaml
 from prometheus_client import start_http_server
 from pydantic import BaseModel, ConfigDict, Field
 
+from vms.bench import stats
 from vms.bench.results import RunResult, git_info, hardware, package_versions, write_result
 from vms.common.clock import SystemClock
 from vms.common.ids import new_ulid
@@ -92,29 +92,9 @@ def resolve_settings(
     return load_settings(LoadgenSettings, SERVICE, config_dir=config_dir, **overrides)
 
 
-def _get(summary: dict[str, Any], dotted: str) -> float | None:
-    value: Any = summary
-    for part in dotted.split("."):
-        if not isinstance(value, dict):
-            return None
-        value = value.get(part)
-    return float(value) if isinstance(value, int | float) else None
-
-
 def aggregate(reps: Sequence[dict[str, Any]]) -> dict[str, dict[str, float | None]]:
     """Mean, sample standard deviation, min and max of key numbers across repetitions."""
-    out: dict[str, dict[str, float | None]] = {}
-    for key in AGGREGATED:
-        values = [v for v in (_get(r, key) for r in reps) if v is not None]
-        if not values:
-            continue
-        out[key] = {
-            "mean": round(statistics.fmean(values), 3),
-            "std": round(statistics.stdev(values), 3) if len(values) > 1 else None,
-            "min": round(min(values), 3),
-            "max": round(max(values), 3),
-        }
-    return out
+    return stats.aggregate(reps, AGGREGATED)
 
 
 def _load_clips(settings: LoadgenSettings, obs: Observability) -> dict[str, LoadedClip]:
@@ -200,6 +180,7 @@ async def _repetition(
     paced = settings.mode == "paced" and kind == "run"
     summary = recorder.summary(steady_s, settings.cameras * settings.fps if paced else None)
     summary["seed"] = seed
+    summary["started_at"] = timing.started_at  # the schedule's time zero (wall clock)
     summary["elapsed_s"] = round(timing.elapsed_s, 3)
     summary["drain_s"] = round(timing.drain_s, 3)
     summary["cpu"] = {

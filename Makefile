@@ -177,8 +177,14 @@ bench-model: ## Model-only worker latency (SCENARIO=bench/scenarios/worker-model
 	$(RUN) python -m vms.worker bench --scenario $(or $(SCENARIO),bench/scenarios/worker-model-cpu.yaml)
 
 .PHONY: bench
-bench: ## Run a benchmark scenario
-	$(call not_yet,2.3)
+bench: ## Run a benchmark scenario of any kind (SCENARIO=bench/scenarios/<name>.yaml; e2e needs make demo's services)
+	$(RUN) python -m vms.bench run --scenario $(or $(SCENARIO),bench/scenarios/bench-smoke.yaml)
+
+RESULTS ?=
+.PHONY: bench-report
+bench-report: ## Markdown tables of results files for BENCHMARKS.md (RESULTS="bench/results/a.json ...")
+	@test -n "$(RESULTS)" || { echo "make bench-report: set RESULTS=<results JSON files>" >&2; exit 1; }
+	@$(RUN) python -m vms.bench report $(RESULTS)
 
 .PHONY: eval
 eval: ## Run eval suites

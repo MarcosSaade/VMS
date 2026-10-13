@@ -215,7 +215,20 @@ Every service exports spans to the collector (`OTEL_EXPORTER_OTLP_ENDPOINT`) and
 
 ## Benchmarks
 
-_Placeholder (task 2.3)._ Writing a scenario in `bench/scenarios/`, running it with `make bench`, where results land, and how to promote a number to `docs/BENCHMARKS.md`.
+Every reported number comes from a scenario in `bench/scenarios/` run through `make bench` (methodology: `docs/BENCHMARKS.md`).
+
+```bash
+make demo DEMO_SECONDS=30                                  # stack + ingest, worker, query service
+make bench                                                 # bench/scenarios/bench-smoke.yaml (~5 min)
+make bench SCENARIO=bench/scenarios/<name>.yaml            # any kind: e2e, run, selftest, model
+make bench-report RESULTS="bench/results/<file>.json ..."  # Markdown tables for BENCHMARKS.md
+```
+
+- Writing a scenario: write the YAML before running it. `kind: e2e` takes `repeats` (at least 3 for a reported number), `warmup_s`, `hold_s` (at least `min_window_s`, 15 s), `ingest: {cameras: [...], fps, loadgen: {...overrides of configs/loadgen.yaml}}` and/or `query: {concurrency: [...], questions, think_time_s}`; the docstring of `vms/bench/scenario.py` has an example. Change one variable at a time against a named baseline scenario.
+- What it needs: the e2e runner talks to the endpoints in `configs/bench.yaml` (ingest 8080, query 8070, Prometheus 9090; `VMS_INGEST_URL`, `VMS_QUERY_URL`, `VMS_PROMETHEUS_URL` override). The services must run in containers (`make demo` or `make app` plus `compose --profile app up ingest worker`): Prometheus does not scrape host processes, so a step against `make worker` has no freshness and fails. The canned planner keeps query load free; with `LLM_*` set the questions cost tokens.
+- While it runs: one JSON log line per step with its freshness p95, lost frames and verdict. Ctrl-C finishes the current step and writes partial results (`interrupted: true`). Nothing else should send frames or questions meanwhile; the database is shared, so a demo running alongside changes the numbers.
+- Results: `bench/results/<date>-<name>-<run_id>.json`, with the Markdown table printed at the end. Commit the files behind reported numbers, log the run in `EXPERIMENTS.md`, and put the curated number in `BENCHMARKS.md` with links to both.
+- Before trusting a step: `harness_ok` true (loadgen kept its schedule, the query clients used under 0.8 cores), `drain_s` small (else the previous step's backlog spilled over) and the hardware recorded in the file matches the table you add it to.
 
 ## GPU sessions
 
@@ -268,6 +281,7 @@ Symptom, cause and fix entries as issues are met.
 - Query service `/readyz` returns 503 with `postgres: unavailable`: the read-only login is missing or its password differs from `.env`. Run `make migrate`.
 - `make loadgen` reports every frame failed with reason `connection`: nothing listens on `target_url`. Start the ingest service or `make loadgen-stub`.
 - `make loadgen` logs "generator fell behind its schedule": the host or the generator is saturated, so the run offered less load than configured. Reduce cameras, close other load on the machine, or run several loadgen processes with different `camera_prefix` values.
+- `make bench` fails with "backlog still N frames after 900 s": the worker cannot drain what an earlier step or run left. Wait, or start from an empty database (`make down-volumes`). A step with freshness `null` and `ingest_ok: false` means no frame reached the worker in the window: is the worker container running, and scraped (`make ps`, Prometheus targets)?
 - `python -m vms.observe` (the demo's last step) reports "no healthy target": the named container is not running or not ready (`make ps`). "No series for" a metric: the service runs but has not done that work yet (for example no question asked), or runs on the host where Prometheus does not scrape it. "No complete frame trace": check that loadgen, ingest and the worker all export (`docker logs vms-worker-1` for OTLP export errors; `VMS_TELEMETRY__ENABLED` must not be false) and that the frames were sampled (`DEMO_TRACE_RATIO`); then open the newest loadgen trace in Grafana to see where the chain stops.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.
 

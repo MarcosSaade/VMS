@@ -38,7 +38,7 @@ Example write volume at 100 cameras: 100 x 5 FPS = 500 frames/s, ~4,000 detectio
 
 Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept concurrency, **while ingest runs at rated load**.
 
-**Rated capacity** = the largest number of cameras at 5 FPS for which the freshness SLO (section 8) holds with zero frame loss. This is the headline throughput number, reported per GPU type.
+**Rated capacity** = the largest number of cameras at 5 FPS for which the freshness SLO (section 8) holds with zero frame loss. This is the headline throughput number, reported per GPU type Measured by `make bench` (D27): a step meets it when freshness p95 is under 2 s over the step's steady-state window, no frame is lost (dropped, rejected or failed at ingest, lost by the worker) and the worker backlog is not growing (a queue that grows slowly can keep p95 low for a finite window without being a steady state). The rated number must hold in every repetition, and at every smaller camera count of the ramp.
 
 ## 3. System overview
 
@@ -218,6 +218,7 @@ Cross-cutting (deferred: cache and circuit breaker): a cache keyed by normalized
 - Dev and test splits; the test split is frozen and only used for reported numbers.
 - Results JSON files in the repo are the only record of runs and the source of truth for reported numbers; comparing two runs is a diff of two results files. There is no experiment tracker: MLflow and W&B were removed in task 0.7 because no kept task needs them (D16).
 - DVC tracks large artifacts we produce (synthetic datasets, training data, adapters, fine-tuned weights, large eval snapshots); small eval JSONL and configs stay in git. See section 10.
+- **Benchmark runner (task 2.3, `vms.bench`, D27).** `make bench SCENARIO=bench/scenarios/<name>.yaml` runs any scenario by its `kind`: `run`/`selftest` (loadgen alone), `model` (worker model-only) or `e2e`. An e2e scenario is a list of steps (every combination of `ingest.cameras` and `query.concurrency`), each run for `warmup_s + hold_s` and repeated `repeats` times, each repetition a full pass over the steps. Per step: wait for the worker backlog to empty, start the closed-loop query clients (`vms.bench.queryload`), run loadgen as a subprocess from a generated one-off scenario, then read the steady-state window (the last `hold_s` of loadgen's schedule) from Prometheus with the PromQL in `configs/bench.yaml`, and judge the ingest SLO, the query SLO and whether the harness kept up (`generator_ok`, client CPU). The results JSON (`kind: bench.e2e`) holds every step and repetition, mean/std/min/max per step, and the rated capacity; `python -m vms.bench report FILE...` renders it as Markdown for `BENCHMARKS.md`.
 - (Deferred, 10.2) An eval gate in CD blocks a model or prompt change that regresses against the recorded champion.
 
 ### 4.11 Observability

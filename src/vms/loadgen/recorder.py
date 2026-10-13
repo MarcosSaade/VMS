@@ -19,6 +19,7 @@ from typing import Any
 
 import numpy as np
 
+from vms.bench.stats import percentiles_ms
 from vms.common.metrics import Metrics
 from vms.loadgen.transport import Outcome, SendResult
 
@@ -38,18 +39,11 @@ LATENCY_BUCKETS_S = (
     10.0,
 )
 LAG_BUCKETS_S = (0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0)
-PERCENTILES = (50, 95, 99)
 
 
 def percentiles(samples: Sequence[float]) -> dict[str, float | None]:
     """p50/p95/p99, mean and max in milliseconds; None when there are no samples."""
-    keys = [f"p{p}" for p in PERCENTILES] + ["mean", "max"]
-    if not samples:
-        return dict.fromkeys(keys)
-    values = np.asarray(samples, dtype=np.float64) * 1000.0
-    stats = [float(v) for v in np.percentile(values, PERCENTILES)]
-    stats += [float(values.mean()), float(values.max())]
-    return {k: round(v, 3) for k, v in zip(keys, stats, strict=True)}
+    return percentiles_ms(samples)
 
 
 class Recorder:

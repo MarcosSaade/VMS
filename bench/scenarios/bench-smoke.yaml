@@ -1,0 +1,16 @@
+name: bench-smoke
+description: >
+  Task 2.3 done criterion and a quick end-to-end check of the runner, not a capacity
+  measurement: 1 and 2 cameras at 5 FPS on the data-mini clips with one query client, against
+  the services `make demo` starts (ingest, one worker, the query service). Short holds, so
+  freshness and query percentiles are rough. Takes about 5 minutes.
+kind: e2e
+repeats: 3
+warmup_s: 10
+hold_s: 20
+ingest:
+  cameras: [1, 2]
+  fps: 5
+query:
+  concurrency: [1]
+  questions: configs/demo/canned_plans.v1.jsonl
