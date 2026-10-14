@@ -31,7 +31,6 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -143,25 +142,33 @@ def classify(
 def summarize(
     speedscope: dict[str, Any], startup: str, categories: Sequence[Category]
 ) -> dict[str, Any]:
-    """Samples per thread and category, and each category's share of non-startup samples."""
+    """Seconds per thread and category, and each category's share of non-startup seconds.
+
+    py-spy weights each sample by its interval in seconds (`unit: seconds`, 1/rate each);
+    a profile without weights counts one per sample."""
     frames = [Frame(f["name"], f.get("file") or "") for f in speedscope["shared"]["frames"]]
     rules = [(c.name, re.compile(c.pattern)) for c in categories]
     startup_re = re.compile(startup)
-    threads: dict[str, dict[str, int]] = {}
-    total: Counter[str] = Counter()
+    threads: dict[str, dict[str, float]] = {}
+    total: dict[str, float] = {}
+    samples = 0
     for profile in speedscope["profiles"]:
-        counts: Counter[str] = Counter()
-        weights = profile.get("weights") or [1] * len(profile["samples"])
+        seconds: dict[str, float] = {}
+        weights = profile.get("weights") or [1.0] * len(profile["samples"])
         for sample, weight in zip(profile["samples"], weights, strict=True):
-            counts[classify([frames[i] for i in sample], startup_re, rules)] += int(weight)
-        threads[_thread_name(profile["name"])] = dict(counts)
-        total.update(counts)
+            category = classify([frames[i] for i in sample], startup_re, rules)
+            seconds[category] = seconds.get(category, 0.0) + float(weight)
+            samples += 1
+        threads[_thread_name(profile["name"])] = seconds
+        for k, v in seconds.items():
+            total[k] = total.get(k, 0.0) + v
     steady = sum(v for k, v in total.items() if k != STARTUP)
     order = [c.name for c in categories] + [OTHER]
     return {
-        "samples": dict(total),
-        "steady_samples": steady,
-        "shares": {k: (total.get(k, 0) / steady if steady else None) for k in order},
+        "samples": samples,
+        "seconds": total,
+        "steady_seconds": steady,
+        "shares": {k: (total.get(k, 0.0) / steady if steady else None) for k in order},
         "threads": threads,
     }
 

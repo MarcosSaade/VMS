@@ -72,15 +72,19 @@ def test_innermost_own_frame_decides_the_category() -> None:
     # db by our storage frame; idle_loop by a library frame (no own frame in the stack);
     # startup wins over everything; an unmatched stack is other.
     assert out["threads"]["MainThread"] == {"db": 1, "idle_loop": 1, OTHER: 1, STARTUP: 1}
-    assert out["steady_samples"] == 6
+    assert out["steady_seconds"] == pytest.approx(6)
     assert out["shares"]["infer"] == pytest.approx(2 / 6)
     assert list(out["shares"]) == ["infer", "decode", "db", "idle_loop", OTHER]
 
 
-def test_weights_count_as_samples() -> None:
-    doc = speedscope(FRAMES, {"infer": [[0, 1, 2]]})
-    doc["profiles"][0]["weights"] = [5]
-    assert summarize(doc, STARTUP_RE, CATEGORIES)["samples"] == {"infer": 5}
+def test_weights_are_seconds_as_py_spy_writes_them() -> None:
+    # py-spy writes unit "seconds" and one weight of 1/rate per sample (0.01 at 100 Hz).
+    doc = speedscope(FRAMES, {"infer": [[0, 1, 2], [0, 1, 2], [0, 1, 4]]})
+    doc["profiles"][0]["weights"] = [0.01, 0.01, 0.01]
+    out = summarize(doc, STARTUP_RE, CATEGORIES)
+    assert out["seconds"] == {"infer": pytest.approx(0.02), "decode": pytest.approx(0.01)}
+    assert out["samples"] == 3
+    assert out["shares"]["infer"] == pytest.approx(2 / 3)
 
 
 def scenario(**overrides: Any) -> dict[str, Any]:
