@@ -76,7 +76,7 @@ Status: accepted (default, not benchmarked)    Date: 2026-10-06
 Context: The structured-query planner turns natural language into a `QueryPlan` under constrained decoding. It is self-hosted on vLLM with prefix caching and structured outputs, with a hosted LLM as the circuit-breaker fallback (ARCHITECTURE 4.7, 4.8).
 Options: hosted model; small open base model with few-shot prompting; LoRA adapter on plan JSON targets; quantized LoRA (AWQ or GPTQ base, multi-LoRA).
 Decision: Few-shot prompting with a static few-shot bank and JSON-schema structured outputs through an OpenAI-compatible client; no fine-tuning. The model is the better of the two compared on the dev split (one local model, one hosted), taking cost into account. Until the local run on the first GPU session (moved there from 3.5 on 2026-10-14), the hosted DeepSeek planner is the provisional default. Rationale: Phase 8 (vLLM, LoRA) was deferred in the 2026-10-06 re-scope.
-Evidence: the 3.5 dev comparison will name the model; no LoRA or serving comparison.
+Evidence: provisional DeepSeek `deepseek-flash` baseline (task 3.5): test 95.8% [92.3, 98.6] overall, 95.9% [91.8, 99.0] on plan-expressible questions, p95 5.1 s, about $0.0017 per question (E-036; dev 94.2%, E-035). The local model's dev run on the first GPU session will settle the model; no LoRA or serving comparison.
 Trade-offs and consequences: No answer to whether a small fine-tuned model can match a hosted one. Evidence that would change it: 3.5 test accuracy too low to support the demo (say, below 60% on expressible questions), or hosted cost or latency unacceptable; then revive Phase 8 under the scope lock.
 
 ## D8: Embedding sampling

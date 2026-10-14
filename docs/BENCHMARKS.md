@@ -26,7 +26,12 @@ One entry per environment used (CPU, RAM, GPU model, driver, CUDA, instance type
 
 ## Headline results
 
-_No numbers yet._ Targets: rated capacity (cameras at 5 FPS per GPU), freshness p95, query p95 per mode, structured-query execution accuracy, retrieval recall@10, cost per camera-hour, drift detection delay.
+Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity (cameras at 5 FPS, CPU and GPU), freshness p95, query p95 under load, cost per camera-hour, drift detection delay.
+
+| Result | Number | Evidence |
+|---|---|---|
+| Structured-query execution accuracy, frozen test split (142 questions over a **synthetic** snapshot), typed-plan engine with DeepSeek `deepseek-flash` | 95.8% [92.3, 98.6]; plan-expressible 95.9% [91.8, 99.0]; red team 13/13 refused, 0 breaches; $0.24 for the split (upper bound) | E-036, [`2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json`](../eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json) |
+| Detection quality, yolo11s (PyTorch CPU) | COCO-500 mAP@50-95 45.8 [44.1, 49.6]; MOT17 person mAP@50-95 45.0 [43.1, 47.0] | E-034 (Evaluation, detection quality) |
 
 ## Ingest and pipeline capacity
 
@@ -70,8 +75,6 @@ At the earlier threshold of 0.25 the numbers were the same within noise (E-013, 
 At 5 FPS per camera, one CPU worker keeps up with about 2 cameras on yolo11s and about 4 on yolo11n, before the database and object store are added. PyTorch already uses most cores in one call, so a second worker on the same laptop would compete for them rather than add capacity.
 
 ## Evaluation
-
-_No accuracy numbers for a real planner yet (task 3.5)._
 
 ### Structured-query eval set v1 (task 3.1, D29, E-029)
 
@@ -119,24 +122,41 @@ Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`,
 | latency_ms | time per question inside the engine (plan, compile, validate, execute) | HTTP overhead, latency under load |
 | tokens, cost | LLM tokens per question (prompt and completion apart, repairs included); cost from per-model prices in `configs/eval.yaml` | the price itself: absent until a price is configured |
 
-Self-test (E-031): `PLANNER=gold` scores 100% on all 279 items (dev and test) with 0 breaches; dev takes 2.6 s on the laptop.
+Self-test (E-031): `PLANNER=gold` scores 100% on all 279 items (dev and test) with 0 breaches; dev takes 2.6 s on the laptop. CI runs it on dev through `make eval` on every push and fails on any wrong item (task 3.5).
 
-### Baseline planner on dev (E-032, E-035)
+### Baseline planner (task 3.5; E-032, E-035, E-036)
 
-Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, planner.v1 prompt with all 29 few-shots, temperature 0), dev split (137 questions), synthetic snapshot v1, laptop; self-measured. Current run: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json) (after sq-103 was accepted as a class listing); first run: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json). The test split is not run yet (task 3.5, once per chosen configuration).
+Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, planner.v1 prompt with all 29 few-shots, temperature 0, nothing tuned on dev), synthetic snapshot v1, laptop; self-measured. This is the provisional planner of D7: the second LLM (a local open model on dev) runs on the first GPU session. The test split was run once, from clean commit 4228e11, and is the reported number; dev is for tuning.
 
-| Metric (95% bootstrap CI) | dev, deepseek-flash |
-|---|---|
-| accuracy (all) | 94.2% [89.8, 97.8] (n=137) |
-| accuracy (plan-expressible) | 94.8% [89.7, 99.0] (n=97) |
-| abstention correct | 92.5% [85.0, 100.0] (n=40) |
-| false abstention | 0.0% [0.0, 0.0] (n=97) |
-| red team refused / attack success | 100% (n=12) / 0% (n=12) |
-| latency p50 / p95 (engine, ms) | 1,929 / 5,917 |
-| tokens per question | 4,840 (627k prompt, 37k completion in total; 6 repairs) |
-| cost | $0.23 for the 137 questions, an upper bound (peak, cache-miss prices; E-035) |
+- Test: [`2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json`](../eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json)
+- Dev (current, after sq-103 was accepted as a class listing): [`2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json); first dev run: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json)
 
-Errors (8): wrong_aggregation 3 (counted zone entries where the question asked for distinct people), wrong_abstain_reason 2 (two exhaustion attacks refused as unsupported rather than disallowed), should_have_abstained 1 ("what color was the last car" answered with the latest car frame), invalid_plan 1, wrong_order_limit 1 (an unrequested limit). Weakest categories: join 75.0% [50.0, 100.0] (n=12), adversarial 83.3% [58.3, 100.0] (n=12). Run to run at temperature 0, 3 of 137 answers changed between the two runs (same accuracy): differences of a few points between configurations are noise unless the intervals say otherwise.
+| Metric (95% bootstrap CI) | test (reported) | dev |
+|---|---|---|
+| accuracy (all) | 95.8% [92.3, 98.6] (n=142) | 94.2% [89.8, 97.8] (n=137) |
+| accuracy (plan-expressible) | 95.9% [91.8, 99.0] (n=97) | 94.8% [89.7, 99.0] (n=97) |
+| abstention correct | 95.6% [88.9, 100.0] (n=45) | 92.5% [85.0, 100.0] (n=40) |
+| false abstention | 0.0% (n=97) | 0.0% (n=97) |
+| red team refused / attack success | 100% / 0% (n=13) | 100% / 0% (n=12) |
+| latency p50 / p95 (engine, ms) | 1,855 / 5,126 | 1,929 / 5,917 |
+| tokens per question | 4,855 (653k prompt, 36k completion; 7 repairs) | 4,840 (627k prompt, 37k completion; 6 repairs) |
+| cost | $0.24 for 142 questions | $0.23 for 137 questions |
+
+Cost is an upper bound (peak, cache-miss prices; E-035). Latency is per question inside the engine, with 4 questions in flight (red-team questions alone), and is dominated by the hosted LLM call; it is not latency under load.
+
+Test errors (6), the same failure modes as on dev:
+
+| Error class | Test | Dev | What went wrong |
+|---|---|---|---|
+| wrong_aggregation | 2 | 3 | counted zone-entry events where the question asked how many (different) people: the plan should count distinct tracks |
+| wrong_abstain_reason | 2 | 2 | refused correctly with the wrong reason: a resource-exhaustion attack called `unsupported` (expected `disallowed`); a face-mask question called `unsupported` (expected `unanswerable`, no such attribute) |
+| wrong_order_limit | 2 | 1 | "find the frames ..." got an unrequested `limit 20` (36 and 80 rows expected). Arguable as a UI choice, but the question asks for all of them |
+| should_have_abstained | 0 | 1 | answered a question about a car's color with the latest car frame |
+| invalid_plan | 0 | 1 | |
+
+Weakest categories on test: frames 75.0% [37.5, 100.0] (n=8), unanswerable 87.5% [62.5, 100.0] (n=8), join 90.9% [72.7, 100.0] (n=11); with 8 to 16 questions per category, none of these differences is established. Dev and test agree within their intervals, so the dev numbers did not overfit the prompt (nothing was tuned). Run to run at temperature 0, 3 of 137 dev answers changed between two runs with the same accuracy (E-035): differences of a few points between configurations are noise unless the intervals say otherwise.
+
+**What this does and does not show.** The questions were written by the coding agent and reviewed by the user, over a synthetic database whose schema the prompt describes in full; real users' questions would be messier, so this is an upper-end estimate for the planner on in-domain questions. The 0 breaches hold by construction for the typed-plan engine (read-only login, compiled SQL): they test the guards, not the model.
 
 ### Detection quality, baseline (task 3.4, D31)
 
@@ -170,7 +190,7 @@ _Placeholder (task 10.3)._
 
 One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/scenarios/<name>.yaml` reruns any scenario named in a table (`make demo` first for end-to-end ones; `make loadgen-stub` for the stub scenarios; `make data-mini` and `make models` for the model-only ones), and `make bench-report RESULTS=...` renders a results file as the table rows above.
 
-- Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` (LLM from `LLM_*`), `make eval-report RESULTS=...`.
+- Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
 - Structured eval set: `make up`, `make eval-db` (pulls or regenerates the snapshot and checks its hashes), `make eval-build` (re-runs every gold; the split files must come out unchanged), `make eval-check`.
 - Load generator ceiling: `make data-mini`, then `make loadgen-selftest`; `make loadgen-stub STUB_WORKERS=6` in one shell and `make loadgen SCENARIO=bench/scenarios/loadgen-stub-max.yaml` in another; restart the stub with `STUB_WORKERS=1` and run `make loadgen SCENARIO=bench/scenarios/loadgen-stub-20x5.yaml`. Check that port 8080 is free before starting each stub.

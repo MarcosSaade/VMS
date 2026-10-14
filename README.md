@@ -6,7 +6,10 @@ Status: early scaffold. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Headline results
 
-_No numbers yet._ Every headline number will link to its evidence in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+Self-measured on a laptop CPU, 95% bootstrap intervals; details and evidence in [docs/BENCHMARKS.md](docs/BENCHMARKS.md#headline-results). Capacity, latency under load and drift numbers are still to come.
+
+- **Question answering:** 95.8% [92.3, 98.6] execution accuracy on a frozen 142-question test split over a synthetic database (typed query plan, DeepSeek `deepseek-flash`); 13/13 red-team questions refused, 0 breaches.
+- **Detection:** yolo11s COCO-500 mAP@50-95 45.8 [44.1, 49.6]; MOT17 person mAP@50-95 45.0 [43.1, 47.0].
 
 ## Architecture
 

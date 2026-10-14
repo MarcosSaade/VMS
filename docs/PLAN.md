@@ -69,7 +69,7 @@
   - Understand it: what is a 95% bootstrap CI here, why is it wide, and what does execution accuracy miss?
 - [x] 3.4 Detection quality subset (mAP@50 and mAP@50-95 with bootstrap CIs)
   - Understand it: what does mAP@50-95 reward that mAP@50 does not, and how representative is the subset of the clips?
-- [ ] 3.5 Baseline eval numbers and `make eval` (structured and detection suites; DeepSeek as the provisional planner). The second-LLM comparison on dev (a local open model, e.g. qwen2.5:7b) moved to the first GPU session (2026-10-14 revision)
+- [x] 3.5 Baseline eval numbers and `make eval` (structured and detection suites; DeepSeek as the provisional planner). The second-LLM comparison on dev (a local open model, e.g. qwen2.5:7b) moved to the first GPU session (2026-10-14 revision)
   - Understand it: is the difference between the two LLMs real given the CIs, and what are the top error classes?
 
 ## Phase 5: Model internals
