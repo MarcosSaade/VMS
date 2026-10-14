@@ -1,0 +1,318 @@
+{
+  "schema_version": 1,
+  "run_id": "01M4XXTACAXZPASNPFMDASJC9D",
+  "name": "profile-worker-cpu",
+  "kind": "bench.profile",
+  "started_at": "2026-10-14T19:21:52.266961Z",
+  "ended_at": "2026-10-14T19:23:22.469731Z",
+  "seed": 1234,
+  "git": {
+    "sha": "04c9c4eb613623f4f325ed1bb0ce052c36a2c5f4",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439496704,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0",
+    "torch": "2.14.1+cpu",
+    "ultralytics": "8.4.175",
+    "onnxruntime": "1.31.0",
+    "py-spy": "0.4.2"
+  },
+  "config": {
+    "bench": {
+      "service": "bench",
+      "env": "local",
+      "seed": 1234,
+      "log": {
+        "level": "INFO"
+      },
+      "telemetry": {
+        "enabled": true,
+        "otlp_endpoint": null,
+        "otlp_insecure": true,
+        "export_timeout_s": 10.0,
+        "sample_ratio": 1.0
+      },
+      "ingest_url": "http://127.0.0.1:8080",
+      "query_url": "http://127.0.0.1:8070",
+      "prometheus_url": "http://127.0.0.1:9090",
+      "results_dir": "bench/results",
+      "http_timeout_s": 10.0,
+      "query_timeout_s": 30.0,
+      "loadgen_timeout_margin_s": 120.0,
+      "min_window_s": 15.0,
+      "scrape_settle_s": 7.0,
+      "drain": {
+        "enabled": true,
+        "timeout_s": 900.0,
+        "interval_s": 2.0
+      },
+      "max_client_cpu_cores": 0.8,
+      "slo": {
+        "freshness_p95_s": 2.0,
+        "max_lost_frames": 0,
+        "max_backlog_slope_fps": 0.5,
+        "query_p95_s": 1.5
+      },
+      "queries": {
+        "ingest_created_fps": {
+          "query": "sum(rate(vms_ingest_frames_total{outcome=\"created\"}[$window]))",
+          "by": null
+        },
+        "ingest_rejected_fps": {
+          "query": "sum(rate(vms_ingest_frames_total{outcome=~\"invalid|error\"}[$window]))",
+          "by": null
+        },
+        "worker_done_fps": {
+          "query": "sum(rate(vms_worker_frames_total{outcome=\"done\"}[$window]))",
+          "by": null
+        },
+        "worker_lost_frames": {
+          "query": "sum(increase(vms_worker_frames_total{outcome=~\"lost|failed\"}[$window]))",
+          "by": null
+        },
+        "freshness_p50_s": {
+          "query": "histogram_quantile(0.50, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+          "by": null
+        },
+        "freshness_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+          "by": null
+        },
+        "freshness_p99_s": {
+          "query": "histogram_quantile(0.99, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+          "by": null
+        },
+        "queue_wait_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le) (rate(vms_worker_queue_wait_seconds_bucket[$window])))",
+          "by": null
+        },
+        "worker_stage_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le, stage) (rate(vms_worker_stage_duration_seconds_bucket[$window])))",
+          "by": "stage"
+        },
+        "backlog_end_frames": {
+          "query": "max(vms_worker_backlog_frames)",
+          "by": null
+        },
+        "backlog_max_frames": {
+          "query": "max_over_time(max(vms_worker_backlog_frames)[$window:5s])",
+          "by": null
+        },
+        "backlog_slope_fps": {
+          "query": "deriv(max(vms_worker_backlog_frames)[$window:5s])",
+          "by": null
+        },
+        "backlog_age_max_s": {
+          "query": "max_over_time(max(vms_worker_backlog_age_seconds)[$window:5s])",
+          "by": null
+        },
+        "query_stage_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le, stage) (rate(vms_query_stage_duration_seconds_bucket[$window])))",
+          "by": "stage"
+        },
+        "cpu_cores": {
+          "query": "sum by (job) (rate(process_cpu_seconds_total{job=~\"ingest|worker|query\"}[$window]))",
+          "by": "job"
+        },
+        "rss_max_bytes": {
+          "query": "max by (job) (max_over_time(process_resident_memory_bytes{job=~\"ingest|worker|query\"}[$window]))",
+          "by": "job"
+        }
+      }
+    }
+  },
+  "scenario": {
+    "name": "profile-worker-cpu",
+    "description": "Task 2.6: where one saturated CPU worker spends its time. The compose worker is stopped and the same code runs on the host under py-spy (100 Hz, speedscope output), with the container's settings (yolo11n, PyTorch backend, batch size 1), while loadgen offers 4 cameras x 5 FPS, above the ramp-cpu rated capacity, so the worker never idles and the profile is the per-frame cost at saturation. Categories are the worker's stages (vms.bench.profile).\n",
+    "kind": "profile",
+    "service": "worker",
+    "command": [
+      "python",
+      "-m",
+      "vms.worker",
+      "run"
+    ],
+    "env": {
+      "VMS_DETECTOR__WEIGHTS": "yolo11n"
+    },
+    "ready_url": "http://127.0.0.1:8090/readyz",
+    "rate_hz": 100,
+    "warmup_s": 20,
+    "duration_s": 60,
+    "ingest": {
+      "cameras": 4,
+      "fps": 5
+    },
+    "startup": "^(_find_and_load|_call_with_frames_removed|load_detector|build_detector|warmup) ",
+    "categories": [
+      {
+        "name": "infer_preprocess",
+        "pattern": "^(preprocess|pre_transform|setup_source) .*/ultralytics/",
+        "any_frame": true
+      },
+      {
+        "name": "infer_forward",
+        "pattern": "^inference .*/ultralytics/engine/predictor\\.py",
+        "any_frame": true
+      },
+      {
+        "name": "infer_postprocess",
+        "pattern": "^(postprocess|construct_results?) .*/ultralytics/",
+        "any_frame": true
+      },
+      {
+        "name": "infer",
+        "pattern": "^(detect|detect_batch|predict) .*/vms/worker/(detector|onnx_detector)\\.py"
+      },
+      {
+        "name": "decode",
+        "pattern": "^decode_jpeg "
+      },
+      {
+        "name": "input_stats",
+        "pattern": "/vms/worker/stats\\.py"
+      },
+      {
+        "name": "tracking",
+        "pattern": "/vms/worker/(pipeline|tracking|zones)\\.py"
+      },
+      {
+        "name": "db",
+        "pattern": "/vms/storage/(work|frames)\\.py|/psycopg"
+      },
+      {
+        "name": "object_store",
+        "pattern": "/vms/storage/objects\\.py|/(aio)?botocore/|/boto3/"
+      },
+      {
+        "name": "telemetry",
+        "pattern": "/opentelemetry/|/prometheus_client/|/vms/common/(metrics|telemetry|logs|observability)\\.py"
+      },
+      {
+        "name": "event_loop",
+        "pattern": "/asyncio/|selectors\\.py|/uvicorn/"
+      }
+    ]
+  },
+  "metrics": {
+    "profile_file": "bench/profiles/2026-10-14-profile-worker-cpu-01M4XXTACAXZPASNPFMDASJC9D.speedscope.json.gz",
+    "ready_s": 5.01660548899963,
+    "load": {
+      "loadgen": {
+        "steady_s": 59.984,
+        "offered_fps": 20.0,
+        "sent_fps": 20.01,
+        "accepted_fps": 20.01,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 1200,
+          "accepted": 1200,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 15.875,
+          "p95": 22.298,
+          "p99": 24.608,
+          "mean": 16.05,
+          "max": 27.932
+        },
+        "schedule_lag_ms": {
+          "p50": 0.72,
+          "p95": 1.267,
+          "p99": 1.873,
+          "mean": 0.748,
+          "max": 2.189
+        },
+        "seed": 1234,
+        "started_at": "2026-10-14T19:21:59.977722+00:00",
+        "elapsed_s": 79.984,
+        "drain_s": 0.014,
+        "cpu": {
+          "seconds": 3.196,
+          "utilization_cores": 0.04,
+          "us_per_frame": 1997.4
+        },
+        "generator_ok": true
+      }
+    },
+    "samples": 7022,
+    "seconds": {
+      "startup": 4.299999999999953,
+      "other": 2.070000000000001,
+      "object_store": 1.3600000000000008,
+      "event_loop": 2.6999999999999864,
+      "db": 3.279999999999974,
+      "telemetry": 0.29000000000000004,
+      "decode": 4.349999999999952,
+      "input_stats": 3.989999999999959,
+      "infer_forward": 43.42999999999993,
+      "infer_preprocess": 1.1700000000000008,
+      "tracking": 1.8200000000000014,
+      "infer_postprocess": 1.0200000000000007,
+      "infer": 0.4400000000000002
+    },
+    "steady_seconds": 65.9199999999998,
+    "shares": {
+      "infer_preprocess": 0.017748786407767055,
+      "infer_forward": 0.6588288834951466,
+      "infer_postprocess": 0.015473300970873844,
+      "infer": 0.006674757281553421,
+      "decode": 0.06598907766990238,
+      "input_stats": 0.06052791262135878,
+      "tracking": 0.027609223300970976,
+      "db": 0.049757281553397814,
+      "object_store": 0.020631067961165123,
+      "telemetry": 0.004399271844660208,
+      "event_loop": 0.04095873786407759,
+      "other": 0.031401699029126325
+    },
+    "threads": {
+      "": {
+        "startup": 4.299999999999953,
+        "other": 0.04,
+        "object_store": 0.15,
+        "event_loop": 2.6999999999999864,
+        "db": 3.279999999999974,
+        "telemetry": 0.09
+      },
+      "OtelBatchSpanRecordProcessor": {
+        "telemetry": 0.01
+      },
+      "s3_0": {
+        "other": 1.2500000000000009,
+        "object_store": 1.2100000000000009
+      },
+      "infer_0": {
+        "decode": 4.349999999999952,
+        "input_stats": 3.989999999999959,
+        "infer_forward": 43.42999999999993,
+        "other": 0.7800000000000005,
+        "infer_preprocess": 1.1700000000000008,
+        "tracking": 1.8200000000000014,
+        "infer_postprocess": 1.0200000000000007,
+        "infer": 0.4400000000000002,
+        "telemetry": 0.19000000000000003
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": "py-spy wall-clock samples of running Python threads (see vms.bench.profile). Open the profile at https://www.speedscope.app (gunzip first)."
+}

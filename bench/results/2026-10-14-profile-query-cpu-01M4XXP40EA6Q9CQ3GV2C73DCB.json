@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "run_id": "01M4XXP40EA6Q9CQ3GV2C73DCB",
+  "name": "profile-query-cpu",
+  "kind": "bench.profile",
+  "started_at": "2026-10-14T19:19:34.670347Z",
+  "ended_at": "2026-10-14T19:20:54.380091Z",
+  "seed": 1234,
+  "git": {
+    "sha": "116c5e4a2052c86011cf4628111761aabdc69a3b",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439496704,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0",
+    "torch": "2.14.1+cpu",
+    "ultralytics": "8.4.175",
+    "onnxruntime": "1.31.0",
+    "py-spy": "0.4.2"
+  },
+  "config": {
+    "bench": {
+      "service": "bench",
+      "env": "local",
+      "seed": 1234,
+      "log": {
+        "level": "INFO"
+      },
+      "telemetry": {
+        "enabled": true,
+        "otlp_endpoint": null,
+        "otlp_insecure": true,
+        "export_timeout_s": 10.0,
+        "sample_ratio": 1.0
+      },
+      "ingest_url": "http://127.0.0.1:8080",
+      "query_url": "http://127.0.0.1:8070",
+      "prometheus_url": "http://127.0.0.1:9090",
+      "results_dir": "bench/results",
+      "http_timeout_s": 10.0,
+      "query_timeout_s": 30.0,
+      "loadgen_timeout_margin_s": 120.0,
+      "min_window_s": 15.0,
+      "scrape_settle_s": 7.0,
+      "drain": {
+        "enabled": true,
+        "timeout_s": 900.0,
+        "interval_s": 2.0
+      },
+      "max_client_cpu_cores": 0.8,
+      "slo": {
+        "freshness_p95_s": 2.0,
+        "max_lost_frames": 0,
+        "max_backlog_slope_fps": 0.5,
+        "query_p95_s": 1.5
+      },
+      "queries": {
+        "ingest_created_fps": {
+          "query": "sum(rate(vms_ingest_frames_total{outcome=\"created\"}[$window]))",
+          "by": null
+        },
+        "ingest_rejected_fps": {
+          "query": "sum(rate(vms_ingest_frames_total{outcome=~\"invalid|error\"}[$window]))",
+          "by": null
+        },
+        "worker_done_fps": {
+          "query": "sum(rate(vms_worker_frames_total{outcome=\"done\"}[$window]))",
+          "by": null
+        },
+        "worker_lost_frames": {
+          "query": "sum(increase(vms_worker_frames_total{outcome=~\"lost|failed\"}[$window]))",
+          "by": null
+        },
+        "freshness_p50_s": {
+          "query": "histogram_quantile(0.50, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+          "by": null
+        },
+        "freshness_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+          "by": null
+        },
+        "freshness_p99_s": {
+          "query": "histogram_quantile(0.99, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+          "by": null
+        },
+        "queue_wait_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le) (rate(vms_worker_queue_wait_seconds_bucket[$window])))",
+          "by": null
+        },
+        "worker_stage_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le, stage) (rate(vms_worker_stage_duration_seconds_bucket[$window])))",
+          "by": "stage"
+        },
+        "backlog_end_frames": {
+          "query": "max(vms_worker_backlog_frames)",
+          "by": null
+        },
+        "backlog_max_frames": {
+          "query": "max_over_time(max(vms_worker_backlog_frames)[$window:5s])",
+          "by": null
+        },
+        "backlog_slope_fps": {
+          "query": "deriv(max(vms_worker_backlog_frames)[$window:5s])",
+          "by": null
+        },
+        "backlog_age_max_s": {
+          "query": "max_over_time(max(vms_worker_backlog_age_seconds)[$window:5s])",
+          "by": null
+        },
+        "query_stage_p95_s": {
+          "query": "histogram_quantile(0.95, sum by (le, stage) (rate(vms_query_stage_duration_seconds_bucket[$window])))",
+          "by": "stage"
+        },
+        "cpu_cores": {
+          "query": "sum by (job) (rate(process_cpu_seconds_total{job=~\"ingest|worker|query\"}[$window]))",
+          "by": "job"
+        },
+        "rss_max_bytes": {
+          "query": "max by (job) (max_over_time(process_resident_memory_bytes{job=~\"ingest|worker|query\"}[$window]))",
+          "by": "job"
+        }
+      }
+    }
+  },
+  "scenario": {
+    "name": "profile-query-cpu",
+    "description": "Task 2.6: where the query service spends its time under closed-loop load with the canned planner (no LLM: with a hosted LLM the planner call is 95%+ of each question's latency, E-024, so this profiles the part we own). The compose query service is stopped and the same code runs on the host under py-spy (100 Hz), 8 clients asking the demo questions. Ingest is idle.\n",
+    "kind": "profile",
+    "service": "query",
+    "command": [
+      "python",
+      "-m",
+      "vms.query",
+      "serve"
+    ],
+    "env": {
+      "LLM_MODEL": "",
+      "VMS_LLM__PROVIDER": "canned"
+    },
+    "ready_url": "http://127.0.0.1:8070/readyz",
+    "rate_hz": 100,
+    "warmup_s": 15,
+    "duration_s": 60,
+    "query": {
+      "concurrency": 8,
+      "questions": "configs/demo/canned_plans.v1.jsonl"
+    },
+    "startup": "^(_find_and_load|_call_with_frames_removed) ",
+    "categories": [
+      {
+        "name": "plan",
+        "pattern": "/vms/query/(planner|llm|plan|fewshots|prompts|timerange)\\.py"
+      },
+      {
+        "name": "compile",
+        "pattern": "/vms/query/compiler\\.py"
+      },
+      {
+        "name": "validate_sql",
+        "pattern": "/vms/query/sql_validator\\.py|/sqlglot/"
+      },
+      {
+        "name": "execute",
+        "pattern": "/vms/query/store\\.py|/psycopg"
+      },
+      {
+        "name": "answer",
+        "pattern": "/vms/query/answer\\.py"
+      },
+      {
+        "name": "catalog",
+        "pattern": "/vms/query/catalog\\.py"
+      },
+      {
+        "name": "telemetry",
+        "pattern": "/opentelemetry/|/prometheus_client/|/vms/common/(metrics|telemetry|logs|observability)\\.py"
+      },
+      {
+        "name": "http",
+        "pattern": "/fastapi/|/starlette/|/uvicorn/|/h11/|/httptools/|/pydantic"
+      },
+      {
+        "name": "event_loop",
+        "pattern": "/asyncio/|selectors\\.py"
+      }
+    ]
+  },
+  "metrics": {
+    "profile_file": "bench/profiles/2026-10-14-profile-query-cpu-01M4XXP40EA6Q9CQ3GV2C73DCB.speedscope.json.gz",
+    "ready_s": 2.0360081199996785,
+    "load": {
+      "query": {
+        "questions": 7788,
+        "qps": 129.8,
+        "outcomes": {
+          "abstained": 2344,
+          "ok": 5444
+        },
+        "error_rate": 0.0,
+        "abstain_rate": 0.300976,
+        "tokens_per_question": 0.0,
+        "latency_ms": {
+          "p50": 54.28,
+          "p95": 123.138,
+          "p99": 188.106,
+          "mean": 61.671,
+          "max": 254.144
+        },
+        "client_cpu_cores": null
+      }
+    },
+    "samples": 7790,
+    "seconds": {
+      "startup": 0.8600000000000005,
+      "other": 1.360000000000001,
+      "http": 10.759999999999815,
+      "plan": 3.709999999999965,
+      "event_loop": 2.629999999999988,
+      "execute": 8.029999999999873,
+      "telemetry": 8.909999999999899,
+      "validate_sql": 40.97000000000042,
+      "compile": 0.5700000000000003,
+      "answer": 0.08,
+      "catalog": 0.02
+    },
+    "steady_seconds": 77.03999999999996,
+    "shares": {
+      "plan": 0.048156801661474125,
+      "compile": 0.007398753894081004,
+      "validate_sql": 0.5318016614745643,
+      "execute": 0.10423156801661315,
+      "answer": 0.0010384215991692631,
+      "catalog": 0.0002596053997923158,
+      "telemetry": 0.11565420560747537,
+      "http": 0.1396677050882635,
+      "event_loop": 0.03413811007268937,
+      "other": 0.017653167185877488
+    },
+    "threads": {
+      "": {
+        "startup": 0.8600000000000005,
+        "other": 0.07,
+        "http": 10.759999999999815,
+        "plan": 3.709999999999965,
+        "event_loop": 2.629999999999988,
+        "execute": 8.029999999999873,
+        "telemetry": 6.109999999999914,
+        "validate_sql": 40.97000000000042,
+        "compile": 0.5700000000000003,
+        "answer": 0.08,
+        "catalog": 0.02
+      },
+      "OtelBatchSpanRecordProcessor": {
+        "telemetry": 2.7999999999999843
+      },
+      "s3_0": {
+        "other": 1.290000000000001
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": "py-spy wall-clock samples of running Python threads (see vms.bench.profile). Open the profile at https://www.speedscope.app (gunzip first)."
+}
