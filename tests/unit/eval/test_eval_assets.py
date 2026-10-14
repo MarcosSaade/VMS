@@ -50,7 +50,7 @@ def test_snapshot_manifest_pins_the_spec_and_catalog(eval_settings: EvalSettings
 
 
 def test_coverage(items: list[EvalItem]) -> None:
-    assert 110 <= len(items) <= 140
+    assert 250 <= len(items) <= 320
     per_category = Counter(i.category for i in items)
     assert set(per_category) == set(Category)
     assert min(per_category.values()) >= 6, per_category

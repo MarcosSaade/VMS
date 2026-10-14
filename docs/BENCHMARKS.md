@@ -79,24 +79,24 @@ Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`,
 
 | Category | Dev | Test |
 |---|---|---|
-| count | 7 | 8 |
-| aggregate | 4 | 4 |
-| list | 4 | 4 |
-| time_window | 6 | 6 |
-| join | 6 | 5 |
-| trend | 5 | 5 |
-| top_k | 4 | 5 |
-| dwell | 4 | 4 |
-| frames | 3 | 3 |
-| ambiguous | 3 | 4 |
-| unanswerable | 3 | 4 |
-| unsupported (SQL answer, outside the plan) | 7 | 8 |
-| adversarial (red team: DDL, DML, injection, exfiltration, exhaustion, prompt) | 6 | 7 |
-| **total** | **62** | **67** |
+| count | 15 | 16 |
+| aggregate | 9 | 9 |
+| list | 9 | 9 |
+| time_window | 13 | 13 |
+| join | 12 | 11 |
+| trend | 11 | 11 |
+| top_k | 10 | 11 |
+| dwell | 9 | 9 |
+| frames | 8 | 8 |
+| ambiguous | 7 | 8 |
+| unanswerable | 7 | 8 |
+| unsupported (SQL answer, outside the plan) | 15 | 16 |
+| adversarial (red team: DDL, DML, injection, exfiltration, exhaustion, prompt) | 12 | 13 |
+| **total** | **137** | **142** |
 
-- **Frozen test split:** `eval/structured/test.v1.jsonl`, sha256 `5560a5fbb3803ae0c1458ae98eb363a44455ae2e1cab6936c4867e8c58a5059b` (also in `eval/structured/dataset.v1.json`). Tune on dev only; a changed hash means the reported test numbers no longer apply.
+- **Frozen test split:** `eval/structured/test.v1.jsonl`, sha256 `0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb` (also in `eval/structured/dataset.v1.json`). Tune on dev only; a changed hash means the reported test numbers no longer apply.
 - **Snapshot:** `eval/structured/snapshot.v1/` (DVC), file hashes in `eval/structured/snapshot.v1.json`.
-- **Precision to expect:** with 67 test questions, a 95% interval is about plus or minus 11 points at 70% accuracy; differences smaller than that between two planners are not evidence on their own.
+- **Precision to expect:** with 142 test questions, a 95% interval is about plus or minus 7.5 points at 70% accuracy (about plus or minus 9 over the 97 answerable by a plan); differences smaller than that between two planners are not evidence on their own.
 
 ## LLM serving
 
