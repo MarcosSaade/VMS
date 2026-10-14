@@ -132,7 +132,13 @@ make models        # fetch and verify yolo11n and yolo11s into models/weights/ (
 make worker        # one worker on the host: probes on http://127.0.0.1:8090 (configs/worker.yaml)
 VMS_DETECTOR__WEIGHTS=yolo11n make worker    # the smaller model; VMS_DETECTOR__DEVICE=cuda on a GPU
 make bench-model   # model-only latency (bench/scenarios/worker-model-cpu.yaml); SCENARIO=... for another
+make onnx          # export the pinned weights to ONNX into models/onnx/ (+ a sidecar with the weights' sha256)
+make onnx-parity   # ONNX Runtime vs PyTorch on the detection eval subset and data-mini (WEIGHTS=yolo11s); ~25 min
+VMS_DETECTOR__BACKEND=onnxruntime make worker   # the ONNX backend (needs make onnx first)
 ```
+
+- Backends (`detector.backend`, D5 decides the default): `ultralytics` (PyTorch through Ultralytics' predictor) or `onnxruntime` (`vms.worker.onnx_detector`: the ONNX export with numpy letterbox and NMS that copy Ultralytics'). `model_version` ends in `+onnx` for the latter. The worker refuses an export made from other weights or edited after export ("run `make onnx` again"). The container mounts only `models/weights`, so the containerized worker runs the PyTorch backend until 5.5 mounts the exports. `detector.threads` sets intra-op threads for either backend.
+- `make onnx-parity` exits 1 if parity fails: a letterbox that differs from Ultralytics by one byte, raw outputs beyond the tolerances in `vms.worker.parity.Tolerances`, or a detection on one side only that is not explained by a score at the threshold or an IoU at the NMS threshold. Results in `bench/results/*-onnx-parity-*.json`.
 
 - Several workers can run at once (each `make worker` in its own shell with a different `VMS_HTTP__PORT`). Each leases up to `queue.max_cameras` cameras; a camera stays with one worker while its lease is renewed.
 - Progress: `SELECT status, count(*) FROM frames GROUP BY 1`; `SELECT * FROM camera_leases` shows which worker holds which camera and until when. `/metrics` has `vms_worker_frames_total{outcome}`, `vms_worker_backlog_frames`, `vms_worker_stage_duration_seconds{stage}` and `vms_worker_capture_to_done_seconds` (freshness).
