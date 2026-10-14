@@ -1,0 +1,29 @@
+name: profile-worker-cpu
+description: >
+  Task 2.6: where one saturated CPU worker spends its time. The compose worker is stopped and
+  the same code runs on the host under py-spy (100 Hz, speedscope output), with the container's
+  settings (yolo11n, PyTorch backend, batch size 1), while loadgen offers 4 cameras x 5 FPS,
+  above the ramp-cpu rated capacity, so the worker never idles and the profile is the
+  per-frame cost at saturation. Categories are the worker's stages (vms.bench.profile).
+kind: profile
+service: worker
+command: [python, -m, vms.worker, run]
+env:
+  VMS_DETECTOR__WEIGHTS: yolo11n
+ready_url: http://127.0.0.1:8090/readyz
+rate_hz: 100
+warmup_s: 20
+duration_s: 60
+ingest:
+  cameras: 4
+  fps: 5
+startup: "^(_find_and_load|_call_with_frames_removed|load_detector|build_detector|warmup|<module>) "
+categories:
+  - {name: infer, pattern: "^(detect|detect_batch|predict) .*/vms/worker/(detector|onnx_detector)\\.py"}
+  - {name: decode, pattern: "^decode_jpeg "}
+  - {name: input_stats, pattern: "/vms/worker/stats\\.py"}
+  - {name: tracking, pattern: "/vms/worker/(pipeline|tracking|zones)\\.py"}
+  - {name: db, pattern: "/vms/storage/(work|frames)\\.py|/psycopg"}
+  - {name: object_store, pattern: "/vms/storage/objects\\.py|/(aio)?botocore/|/boto3/"}
+  - {name: telemetry, pattern: "/opentelemetry/|/prometheus_client/|/vms/common/(metrics|telemetry|logs|observability)\\.py"}
+  - {name: event_loop, pattern: "/asyncio/|selectors\\.py|/uvicorn/"}

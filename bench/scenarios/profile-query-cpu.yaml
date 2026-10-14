@@ -1,0 +1,30 @@
+name: profile-query-cpu
+description: >
+  Task 2.6: where the query service spends its time under closed-loop load with the canned
+  planner (no LLM: with a hosted LLM the planner call is 95%+ of each question's latency, E-024,
+  so this profiles the part we own). The compose query service is stopped and the same code
+  runs on the host under py-spy (100 Hz), 8 clients asking the demo questions. Ingest is idle.
+kind: profile
+service: query
+command: [python, -m, vms.query, serve]
+env:
+  LLM_MODEL: ""
+  VMS_LLM__PROVIDER: canned
+ready_url: http://127.0.0.1:8070/readyz
+rate_hz: 100
+warmup_s: 15
+duration_s: 60
+query:
+  concurrency: 8
+  questions: configs/demo/canned_plans.v1.jsonl
+startup: "^(_find_and_load|_call_with_frames_removed|<module>) "
+categories:
+  - {name: plan, pattern: "/vms/query/(planner|llm|plan|fewshots|prompts|timerange)\\.py"}
+  - {name: compile, pattern: "/vms/query/compiler\\.py"}
+  - {name: validate_sql, pattern: "/vms/query/sql_validator\\.py|/sqlglot/"}
+  - {name: execute, pattern: "/vms/query/store\\.py|/psycopg"}
+  - {name: answer, pattern: "/vms/query/answer\\.py"}
+  - {name: catalog, pattern: "/vms/query/catalog\\.py"}
+  - {name: telemetry, pattern: "/opentelemetry/|/prometheus_client/|/vms/common/(metrics|telemetry|logs|observability)\\.py"}
+  - {name: http, pattern: "/fastapi/|/starlette/|/uvicorn/|/h11/|/httptools/|/pydantic"}
+  - {name: event_loop, pattern: "/asyncio/|selectors\\.py"}

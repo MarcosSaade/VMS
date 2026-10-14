@@ -5,6 +5,8 @@
                                                   stack (vms.bench.runner)
                                    run, selftest  loadgen alone (vms.loadgen)
                                    model          worker model-only latency (vms.worker bench)
+                                   profile        one service under load with py-spy
+                                                  (vms.bench.profile)
     report  FILE [FILE ...]      Markdown tables of results files, for docs/BENCHMARKS.md
 
 `make bench SCENARIO=bench/scenarios/<name>.yaml` runs the first. An e2e scenario needs the
@@ -65,6 +67,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         from vms.worker.cli import main as worker_main  # imports torch: only when needed
 
         return worker_main(["bench", "--scenario", str(args.scenario)])
+    if kind == "profile":
+        from vms.bench.profile import run_profile
+
+        configure_logging(SERVICE, "INFO")
+        run_profile(args.scenario, read_yaml(args.scenario))
+        return 0
     if kind != KIND:
         raise SystemExit(f"{args.scenario}: unknown scenario kind {kind!r}")
     return run_e2e(args.scenario)
