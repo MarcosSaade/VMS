@@ -90,3 +90,6 @@ frontend/dist/
 
 # GPU sessions: per-session SSH key, known_hosts and state (scripts/gpu_session.sh)
 .gpu-sessions/
+
+# Claude Code local state (sidebar scratchpad, local settings)
+.claude/
