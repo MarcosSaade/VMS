@@ -208,6 +208,29 @@ bench-report: ## Markdown tables of results files for BENCHMARKS.md (RESULTS="be
 	@test -n "$(RESULTS)" || { echo "make bench-report: set RESULTS=<results JSON files>" >&2; exit 1; }
 	@$(RUN) python -m vms.bench report $(RESULTS)
 
+# Structured-query eval set (task 3.1, RUNBOOK: Evaluation). The snapshot is frozen: regenerate
+# it only as a new version, since that changes every gold answer.
+.PHONY: eval-snapshot
+eval-snapshot: ## Regenerate the synthetic eval snapshot and its manifest (new versions only)
+	$(RUN) python -m vms.eval snapshot
+
+.PHONY: eval-db
+eval-db: ## (Re)create the vms_eval database from the snapshot (pulled or regenerated; hash-checked)
+	$(RUN) python -m vms.eval load
+
+.PHONY: eval-build
+eval-build: ## Run every gold SQL and plan on vms_eval; write the dev/test files and manifest
+	$(RUN) python -m vms.eval build
+
+.PHONY: eval-check
+eval-check: ## Offline checks of the eval set: few-shot leakage, splits, hashes
+	$(RUN) python -m vms.eval check
+
+SPLIT ?= test
+.PHONY: eval-review
+eval-review: ## Print an eval split for human review (SPLIT=test|dev)
+	$(RUN) python -m vms.eval review --split $(SPLIT)
+
 .PHONY: eval
 eval: ## Run eval suites
-	$(call not_yet,3.5)
+	$(call not_yet,3.2)

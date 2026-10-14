@@ -1,0 +1,29 @@
+# Evaluation tooling (python -m vms.eval). Overrides configs/common.yaml; VMS_* environment
+# variables override this file (e.g. VMS_DB=vms_eval_2). Postgres credentials come from
+# POSTGRES_* and POSTGRES_READONLY_* in .env, as for the services.
+
+db: vms_eval                  # the eval snapshot's own database on the stack's Postgres
+statement_timeout_ms: 10000   # per gold query, as the read-only login
+
+snapshot:                     # frozen synthetic database (D29); paths from the repo root
+  spec: configs/eval/snapshot.v1.yaml
+  dir: eval/structured/snapshot.v1          # DVC-tracked
+  manifest: eval/structured/snapshot.v1.json  # in git: seed, eval clock, file hashes
+
+structured:
+  items: eval/structured/items.v1.jsonl     # authored questions with gold plan and SQL
+  dev: eval/structured/dev.v1.jsonl         # built: items + expected rows, dev split
+  test: eval/structured/test.v1.jsonl       # built: frozen test split (hash in BENCHMARKS.md)
+  manifest: eval/structured/dataset.v1.json
+  split_seed: 31
+  test_fraction: 0.5
+
+# Near-duplicate thresholds for leakage checks against the few-shot bank and between groups.
+leakage:
+  min_ratio: 0.85             # difflib similarity of normalized questions
+  min_jaccard: 0.8            # word-set overlap
+
+# Result comparison (vms.eval.compare): numbers equal within these tolerances.
+compare:
+  rel_tol: 1.0e-6
+  abs_tol: 1.0e-6

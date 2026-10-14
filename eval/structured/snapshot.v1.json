@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "seed": 20260331,
+  "now": "2026-03-31T14:30:00Z",
+  "spec": "configs/eval/snapshot.v1.yaml",
+  "spec_sha256": "57635b8971e3deb581032c962e386e148619ac8fe4a2895f9f880d12ce1781a2",
+  "catalog": "configs/eval/cameras.v1.yaml",
+  "catalog_sha256": "b327e36a309611e697a7c20aab7dc3dad94f2106acc727fe015518959953aa74",
+  "files": {
+    "frames.csv.gz": "a711e53b6e1cdd2c43476edf80e76c65835dc11954b5c5d1d412aaebda1f53fb",
+    "tracks.csv.gz": "9be4250dbd98e12a1a900462726916c63fbf89c98816f242c852cc1c51eb11a5",
+    "detections.csv.gz": "78db9d90f3cb60d497c0902e3fb43c063c31ef764c6e1eb0893a95b8ff067ff6",
+    "events.csv.gz": "b3694e6b07cbecf065d5faa658277a2d30f96ad619a112a7d911642ee31a2634"
+  },
+  "rows": {
+    "frames": 332730,
+    "tracks": 31132,
+    "detections": 211193,
+    "events": 26781
+  },
+  "synthetic": true
+}

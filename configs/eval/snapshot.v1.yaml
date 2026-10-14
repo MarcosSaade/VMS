@@ -1,0 +1,116 @@
+# Synthetic eval snapshot v1 (task 3.1, D29): the frozen database the structured-query gold
+# answers are computed on. `python -m vms.eval snapshot` turns this file and the seed into the
+# same bytes on every run (vms.eval.snapshot); the result is DVC-tracked under
+# eval/structured/snapshot.v1/ and its hashes are committed in eval/structured/snapshot.v1.json.
+#
+# SYNTHETIC DATA: tracks, detections and zone events are sampled from the profiles below, not
+# produced by the detector. They look like the pipeline's output (same tables, same semantics)
+# so questions have realistic answers, but they say nothing about detection quality.
+#
+# Frozen: any change here changes gold answers. Make snapshot.v2.yaml instead.
+
+version: 1
+seed: 20260331
+catalog: configs/eval/cameras.v1.yaml
+
+# Data covers [start, now). "now" is the eval clock: the query service must run with it
+# injected, or relative ranges ("today", "last 2 hours") resolve to other days. It is two days
+# after London's DST change (2026-03-29), so "last_week" (Mon 23 to Mon 30 March) spans it.
+start: "2026-03-16T00:00:00Z"
+now: "2026-03-31T14:30:00Z"   # 15:30 in London, 10:30 in New York
+
+frame_interval_s: 20          # each camera stores one processed frame every 20 s, day and night
+loiter_s: 180                 # a loiter event when a visit to a zone lasts this long
+model_version: yolo11n-synthetic-v1
+run_id: eval-v1
+
+# Activity by local hour (0..23), multiplied into each class's hourly rate.
+shapes:
+  store:   [0.02, 0.01, 0.01, 0.01, 0.01, 0.02, 0.05, 0.20, 0.50, 0.70, 0.80, 0.90,
+            1.00, 0.95, 0.85, 0.80, 0.85, 0.95, 0.90, 0.70, 0.45, 0.20, 0.06, 0.03]
+  parking: [0.05, 0.03, 0.03, 0.03, 0.04, 0.08, 0.20, 0.45, 0.70, 0.80, 0.85, 0.90,
+            1.00, 0.95, 0.85, 0.80, 0.85, 0.95, 0.85, 0.65, 0.40, 0.20, 0.10, 0.07]
+  dock:    [0.05, 0.05, 0.05, 0.10, 0.40, 0.80, 1.00, 1.00, 0.90, 0.80, 0.70, 0.60,
+            0.50, 0.40, 0.30, 0.20, 0.15, 0.10, 0.08, 0.05, 0.05, 0.05, 0.05, 0.05]
+  office:  [0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.05, 0.40, 1.00, 0.80, 0.50, 0.40,
+            0.70, 0.60, 0.40, 0.40, 0.50, 0.80, 0.60, 0.25, 0.10, 0.05, 0.02, 0.01]
+
+# Detection confidence per class: [mean, sd], clipped to [0.25, 0.99].
+confidence:
+  default: [0.60, 0.10]
+  person: [0.82, 0.08]
+  car: [0.86, 0.07]
+  truck: [0.74, 0.10]
+  bicycle: [0.66, 0.10]
+  motorcycle: [0.68, 0.10]
+  dog: [0.70, 0.10]
+  handbag: [0.52, 0.10]
+  backpack: [0.56, 0.10]
+  suitcase: [0.62, 0.10]
+  umbrella: [0.58, 0.10]
+  cell phone: [0.46, 0.08]
+  bottle: [0.48, 0.08]
+
+# Untracked low-confidence detections (track_id NULL), the detector's noise.
+false_positive_classes: [person, handbag, bird, chair, potted plant]
+false_positive_confidence: [0.25, 0.45]
+
+# Per camera: hourly track rates per class at shape 1.0, track durations as [median_s, sigma]
+# of a lognormal (capped at max_duration_s), zone visit probabilities and dwell, outages
+# (camera-local, no frames stored), frame size and lighting.
+cameras:
+  - name: entrance
+    shape: store
+    weekend: 1.3
+    size: [1280, 720]
+    indoor: false
+    rates: {person: 55, bicycle: 2.5, dog: 1.2, backpack: 4, handbag: 6}
+    duration_s: {default: [40, 0.6], bicycle: [12, 0.4]}
+    zones:
+      front_door: {classes: [person], p_visit: 0.75, dwell_s: [30, 0.6], p_revisit: 0.08}
+    false_positives_per_hour: 6
+
+  - name: checkout
+    shape: store
+    weekend: 1.3
+    size: [1280, 720]
+    indoor: true
+    rates: {person: 30, handbag: 5, cell phone: 2, bottle: 1}
+    duration_s: {default: [150, 0.6]}
+    zones:
+      register_1: {classes: [person], p_visit: 0.45, dwell_s: [110, 0.5], p_revisit: 0.05}
+      register_2: {classes: [person], p_visit: 0.35, dwell_s: [130, 0.5], p_revisit: 0.05}
+    false_positives_per_hour: 4
+
+  - name: parking_lot
+    shape: parking
+    weekend: 1.1
+    size: [1280, 720]
+    indoor: false
+    rates: {car: 16, person: 12, truck: 1.2, bicycle: 1, motorcycle: 0.7, dog: 0.5}
+    duration_s: {default: [40, 0.6], car: [240, 0.9], truck: [300, 0.6]}
+    false_positives_per_hour: 3
+
+  - name: loading_dock
+    shape: dock
+    weekend: 0.2
+    size: [1280, 720]
+    indoor: false
+    rates: {truck: 3.5, person: 8, car: 1.2}
+    duration_s: {default: [90, 0.7], truck: [900, 0.5]}
+    outages:
+      - ["2026-03-25T00:00:00", "2026-03-26T00:00:00"]   # camera offline all day
+    false_positives_per_hour: 2
+
+  - name: lobby
+    shape: office
+    weekend: 0.1
+    size: [1920, 1080]
+    indoor: true
+    rates: {person: 40, backpack: 5, suitcase: 1.5, umbrella: 1}
+    duration_s: {default: [35, 0.6]}
+    zones:
+      elevators: {classes: [person], p_visit: 0.6, dwell_s: [50, 0.7], p_revisit: 0.0}
+    false_positives_per_hour: 3
+
+max_duration_s: 14400

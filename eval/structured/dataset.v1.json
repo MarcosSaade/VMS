@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "items": "eval/structured/items.v1.jsonl",
+  "items_sha256": "f4f992985770b0f7e16db6dd24f15f94867cc44c7d67b5d9fd57cc12e7dc04e0",
+  "snapshot_manifest": "eval/structured/snapshot.v1.json",
+  "snapshot_files": {
+    "frames.csv.gz": "a711e53b6e1cdd2c43476edf80e76c65835dc11954b5c5d1d412aaebda1f53fb",
+    "tracks.csv.gz": "9be4250dbd98e12a1a900462726916c63fbf89c98816f242c852cc1c51eb11a5",
+    "detections.csv.gz": "78db9d90f3cb60d497c0902e3fb43c063c31ef764c6e1eb0893a95b8ff067ff6",
+    "events.csv.gz": "b3694e6b07cbecf065d5faa658277a2d30f96ad619a112a7d911642ee31a2634"
+  },
+  "now": "2026-03-31T14:30:00+00:00",
+  "split_seed": 31,
+  "test_fraction": 0.5,
+  "dev_sha256": "4d7f2dbff207cfeab18c0eea46524b2cab2f548073f8b25a7c3d6b1c43b29456",
+  "test_sha256": "5560a5fbb3803ae0c1458ae98eb363a44455ae2e1cab6936c4867e8c58a5059b",
+  "counts": {
+    "dev": {
+      "adversarial": 6,
+      "aggregate": 4,
+      "ambiguous": 3,
+      "count": 7,
+      "dwell": 4,
+      "frames": 3,
+      "join": 6,
+      "list": 4,
+      "time_window": 6,
+      "top_k": 4,
+      "trend": 5,
+      "unanswerable": 3,
+      "unsupported": 7
+    },
+    "test": {
+      "adversarial": 7,
+      "aggregate": 4,
+      "ambiguous": 4,
+      "count": 8,
+      "dwell": 4,
+      "frames": 3,
+      "join": 5,
+      "list": 4,
+      "time_window": 6,
+      "top_k": 5,
+      "trend": 5,
+      "unanswerable": 4,
+      "unsupported": 8
+    }
+  },
+  "fewshots": "eval/fewshot/structured.v1.jsonl",
+  "fewshots_sha256": "9158aff9b5109dcebd79346ec24d0b94c8d3701b024c59be9547fa2eb12539da"
+}

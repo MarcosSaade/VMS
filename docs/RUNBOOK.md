@@ -47,6 +47,7 @@ Adding a clip: look at its frames first, keep only static cameras, and label the
 - Large artifacts we produce are tracked with DVC. The default remote is `local`, a gitignored directory `.dvc-storage/` at the repo root (configured in `.dvc/config`). In the cloud, an S3 remote is set in `.dvc/config.local` (not committed).
 - `make data-pull` runs `dvc pull` from the default remote. It is a no-op with a message when no remote is configured, the local remote directory is missing or empty, or nothing is DVC-tracked yet, so a fresh clone works offline.
 - Push new artifacts with `uv run dvc add <path> && uv run dvc push`, then commit the `.dvc` pointer.
+- Tracked now: the structured eval snapshot `eval/structured/snapshot.v1/` (16 MB; regenerable from its spec, see Evaluation).
 
 ## Running locally
 
@@ -230,6 +231,27 @@ make bench-report RESULTS="bench/results/<file>.json ..."  # Markdown tables for
 - Results: `bench/results/<date>-<name>-<run_id>.json`, with the Markdown table printed at the end. Commit the files behind reported numbers, log the run in `EXPERIMENTS.md`, and put the curated number in `BENCHMARKS.md` with links to both.
 - Before trusting a step: `harness_ok` true (loadgen kept its schedule, the query clients used under 0.8 cores), `drain_s` small (else the previous step's backlog spilled over) and the hardware recorded in the file matches the table you add it to.
 
+## Evaluation
+
+### Structured-query eval set (task 3.1)
+
+The questions, gold answers and splits live in `eval/structured/`; the database they are answered on is a synthetic snapshot (D29).
+
+```bash
+make up
+make eval-db         # (re)create the vms_eval database from snapshot v1 (~15 s)
+make eval-build      # run every gold SQL and gold plan on it; write dev/test files and the manifest
+make eval-check      # offline: items valid, no few-shot leakage, splits and hashes in step (also a unit test)
+make eval-review                 # print the test split for review: question, plan, SQL, expected rows
+make eval-review SPLIT=dev
+```
+
+- `make eval-db` drops and recreates `vms_eval` (configs/eval.yaml `db`) on the stack's Postgres: migrations, the read-only login, the eval catalog (`configs/eval/cameras.v1.yaml`), then COPY of `eval/structured/snapshot.v1/`. The snapshot comes from `make data-pull` when the DVC remote has it; otherwise it is generated from `configs/eval/snapshot.v1.yaml` (~5 s). Either way its files must match the sha256s in `eval/structured/snapshot.v1.json`. The dev database is never touched.
+- Anything that answers eval questions must use the eval clock, `now` in `snapshot.v1.json` (2026-03-31 14:30 UTC): "today" and "last week" are relative to it, and gold SQL binds it as `%(now)s`.
+- Adding or editing questions: edit `eval/structured/items.v1.jsonl` (one item per line: `id`, `category`, optional `group` for paraphrases, `question`, gold `plan`, `expressible_by_plan`, gold `sql` unless the question has no answer, `ordered`, `tags`, `notes`), then `make eval-build`. It fails on any disagreement between the gold SQL and the gold plan, a gold SQL the validator rejects, a result at the validator's injected limit (possibly truncated), or a near duplicate of a few-shot question. Changing anything that moves an item into or within the test split changes the test hash: do it before the first reported test number, then update BENCHMARKS.md, and never after (make `items.v2` instead).
+- The snapshot is frozen. Changing `configs/eval/snapshot.v1.yaml` or `cameras.v1.yaml` fails a unit test; a new snapshot is a new version (spec, catalog, items, splits), generated with `make eval-snapshot` and pushed with `uv run dvc add eval/structured/snapshot.v<N> && uv run dvc push`.
+- Review before the test split is used: read every test item and a sample of dev with `make eval-review`; check that the question reads as the plan and SQL interpret it, and that the expected rows are plausible. Fix disagreements in the items file and rebuild.
+
 ## GPU sessions
 
 One on-demand GPU instance per session, launched, used and destroyed by `scripts/gpu_session.sh` (`python -m vms.cloud`; design in ARCHITECTURE 9, D28). Settings: `configs/cloud.yaml`.
@@ -306,6 +328,8 @@ Symptom, cause and fix entries as issues are met.
 - `make loadgen` logs "generator fell behind its schedule": the host or the generator is saturated, so the run offered less load than configured. Reduce cameras, close other load on the machine, or run several loadgen processes with different `camera_prefix` values.
 - `make bench` fails with "backlog still N frames after 900 s": the worker cannot drain what an earlier step or run left. Wait, or start from an empty database (`make down-volumes`). A step with freshness `null` and `ingest_ok: false` means no frame reached the worker in the window: is the worker container running, and scraped (`make ps`, Prometheus targets)?
 - `python -m vms.observe` (the demo's last step) reports "no healthy target": the named container is not running or not ready (`make ps`). "No series for" a metric: the service runs but has not done that work yet (for example no question asked), or runs on the host where Prometheus does not scrape it. "No complete frame trace": check that loadgen, ingest and the worker all export (`docker logs vms-worker-1` for OTLP export errors; `VMS_TELEMETRY__ENABLED` must not be false) and that the frames were sampled (`DEMO_TRACE_RATIO`); then open the newest loadgen trace in Grafana to see where the chain stops.
+- `make eval-db` fails with "snapshot does not match its manifest": the files under `eval/structured/snapshot.v1/` are stale or were regenerated by a changed generator. Delete the directory and re-run (it regenerates); if the regenerated files still differ, the generator's output changed (a code or Python change): restore it, since every gold answer depends on those bytes.
+- `make eval-build` reports "gold plan and gold SQL disagree": one of the two golds misreads the question, or the compiler changed semantics. Run both on `vms_eval` (`psql`, binding `now` from the manifest) and compare; fix the wrong gold, or record a compiler change as a decision.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.
 - `make gpu-preflight` fails with "quota ... is 0": request the on-demand G and VT vCPU quota (`L-DB2E81BA`) in Service Quotas; a spot quota does not help (spot is denied by the SCP). "A dry-run launch was refused ... service control policy": the instance type or a launch option is denied by the managed SCP. "Missing Dependency ... botocore[crt]": run `make setup` (the `aws login` credential provider needs it).
 - A GPU session fails in setup at the CUDA check ("no CUDA"): the instance's NVIDIA driver is older than the image's CUDA build needs (cu126: driver 560 or newer); check `nvidia-smi` in the setup output, and change `TORCH_CUDA` in `deploy/compose/docker-compose.gpu.yml` or the AMI.
