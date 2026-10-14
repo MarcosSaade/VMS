@@ -65,7 +65,7 @@
 ## Phase 3: Evaluation harness
 - [ ] 3.1 Structured-query dataset: about 120 questions incl. `unsupported` and adversarial, gold results, plans and SQL, DVC-tracked DB snapshot, frozen dev/test split (SHRINK). Built 2026-10-14 (279 items on a synthetic snapshot, D29, E-029, E-030); waiting for the user's review of the test split and a dev sample (`make eval-review`)
   - Understand it: how were gold answers produced and checked, and how do you know the test split has not leaked into prompts?
-- [ ] 3.2 Execution-accuracy scorer with bootstrap confidence intervals, error taxonomy, a "measures / does not measure" note per metric, red-team subset. Harness built 2026-10-14 (D30, E-031; gold self-test 100%); red-team and accuracy numbers wait for a real-LLM dev run (paid, needs the go-ahead)
+- [x] 3.2 Execution-accuracy scorer with bootstrap confidence intervals, error taxonomy, a "measures / does not measure" note per metric, red-team subset
   - Understand it: what is a 95% bootstrap CI here, why is it wide, and what does execution accuracy miss?
 - [ ] 3.4 Detection quality subset (mAP@50 and mAP@50-95 with bootstrap CIs)
   - Understand it: what does mAP@50-95 reward that mAP@50 does not, and how representative is the subset of the clips?

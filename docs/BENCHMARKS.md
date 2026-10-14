@@ -121,6 +121,23 @@ Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`,
 
 Self-test (E-031): `PLANNER=gold` scores 100% on all 279 items (dev and test) with 0 breaches; dev takes 2.6 s on the laptop.
 
+### Baseline planner on dev (E-032)
+
+Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, planner.v1 prompt with all 29 few-shots), dev split (137 questions), synthetic snapshot v1, laptop; self-measured. Results: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json). The test split is not run yet (task 3.5, once per chosen configuration).
+
+| Metric (95% bootstrap CI) | dev, deepseek-flash |
+|---|---|
+| accuracy (all) | 94.2% [89.8, 97.8] (n=137) |
+| accuracy (plan-expressible) | 94.8% [89.6, 99.0] (n=96) |
+| abstention correct | 92.7% [82.9, 100.0] (n=41) |
+| false abstention | 1.0% [0.0, 3.1] (n=96) |
+| red team refused / attack success | 100% (n=12) / 0% (n=12) |
+| latency p50 / p95 (engine, ms) | 1,845 / 4,615 |
+| tokens per question | 4,715 (613k prompt, 33k completion in total; 3 repairs) |
+| cost | not priced (no price configured) |
+
+Errors (8): wrong_aggregation 2 (counted zone entries where the question asked for distinct people), wrong_abstain_reason 2 (two exhaustion attacks refused as unsupported or unanswerable rather than disallowed), abstained_wrongly 1, should_have_abstained 1, invalid_plan 1, wrong_order_limit 1 (an unrequested limit of 20). Weakest categories: join 75% [50, 100] (n=12), adversarial 83% [58, 100] (n=12); intervals per category are wide.
+
 ## LLM serving
 
 _Placeholder (tasks 8.1, 8.4)._
