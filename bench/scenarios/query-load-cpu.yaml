@@ -1,0 +1,19 @@
+name: query-load-cpu
+description: >
+  Task 2.5 (b), the CPU baseline for structured-query latency under ingest: closed-loop query
+  clients at concurrency 1, 2, 4, 8 asking the demo questions, while ingest runs at 70% of the
+  ramp-cpu rated capacity (2 cameras at 5 FPS = 10 frames/s, E-039), here 2 cameras at 3.5 FPS
+  = 7 frames/s; same containerized services. The query service uses the canned planner (empty
+  LLM_MODEL): zero cost, and the latency measured is everything except the LLM call, which a
+  hosted model adds on top (p50 ~1.9 s, E-036). The ingest SLO is still judged at each step, so
+  this also shows whether query load hurts freshness.
+kind: e2e
+repeats: 3
+warmup_s: 15
+hold_s: 60
+ingest:
+  cameras: [2]
+  fps: 3.5
+query:
+  concurrency: [1, 2, 4, 8]
+  questions: configs/demo/canned_plans.v1.jsonl
