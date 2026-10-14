@@ -17,7 +17,7 @@ duration_s: 60
 ingest:
   cameras: 4
   fps: 5
-startup: "^(_find_and_load|_call_with_frames_removed|load_detector|build_detector|warmup|<module>) "
+startup: "^(_find_and_load|_call_with_frames_removed|load_detector|build_detector|warmup) "
 categories:
   - {name: infer, pattern: "^(detect|detect_batch|predict) .*/vms/worker/(detector|onnx_detector)\\.py"}
   - {name: decode, pattern: "^decode_jpeg "}

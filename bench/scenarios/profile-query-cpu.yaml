@@ -17,7 +17,7 @@ duration_s: 60
 query:
   concurrency: 8
   questions: configs/demo/canned_plans.v1.jsonl
-startup: "^(_find_and_load|_call_with_frames_removed|<module>) "
+startup: "^(_find_and_load|_call_with_frames_removed) "
 categories:
   - {name: plan, pattern: "/vms/query/(planner|llm|plan|fewshots|prompts|timerange)\\.py"}
   - {name: compile, pattern: "/vms/query/compiler\\.py"}

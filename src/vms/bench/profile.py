@@ -90,7 +90,9 @@ class ProfileScenario(_Section):
     duration_s: float = Field(default=60.0, gt=0)
     ingest: ProfileIngest | None = None
     query: ProfileQuery | None = None
-    startup: str  # regex for frames of startup work (imports, model load), left out of shares
+    # Regex for frames of startup work (imports, model load), left out of shares. Not
+    # `<module>`: the main thread's whole life runs under `__main__`'s module frame.
+    startup: str
     categories: list[Category] = Field(min_length=1)
     results_dir: Path = Path("bench/results")
     profiles_dir: Path = Path("bench/profiles")
