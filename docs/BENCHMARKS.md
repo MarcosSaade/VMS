@@ -79,7 +79,7 @@ Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`,
 
 | Category | Dev | Test |
 |---|---|---|
-| count | 15 | 16 |
+| count | 16 | 16 |
 | aggregate | 9 | 9 |
 | list | 9 | 9 |
 | time_window | 13 | 13 |
@@ -90,11 +90,11 @@ Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`,
 | frames | 8 | 8 |
 | ambiguous | 7 | 8 |
 | unanswerable | 7 | 8 |
-| unsupported (SQL answer, outside the plan) | 15 | 16 |
+| unsupported (SQL answer, outside the plan) | 14 | 16 |
 | adversarial (red team: DDL, DML, injection, exfiltration, exhaustion, prompt) | 12 | 13 |
 | **total** | **137** | **142** |
 
-- **Frozen test split:** `eval/structured/test.v1.jsonl`, sha256 `0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb` (also in `eval/structured/dataset.v1.json`). Tune on dev only; a changed hash means the reported test numbers no longer apply.
+- **Frozen test split:** reviewed and approved by the user on 2026-10-14; every item's side is pinned in `eval/structured/splits.v1.json`, so later edits or additions never move a test question. `eval/structured/test.v1.jsonl`, sha256 `0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb` (also in `eval/structured/dataset.v1.json`). Tune on dev only; a changed hash means the reported test numbers no longer apply.
 - **Snapshot:** `eval/structured/snapshot.v1/` (DVC), file hashes in `eval/structured/snapshot.v1.json`.
 - **Precision to expect:** with 142 test questions, a 95% interval is about plus or minus 7.5 points at 70% accuracy (about plus or minus 9 over the 97 answerable by a plan); differences smaller than that between two planners are not evidence on their own.
 
@@ -121,22 +121,22 @@ Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`,
 
 Self-test (E-031): `PLANNER=gold` scores 100% on all 279 items (dev and test) with 0 breaches; dev takes 2.6 s on the laptop.
 
-### Baseline planner on dev (E-032)
+### Baseline planner on dev (E-032, E-035)
 
-Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, planner.v1 prompt with all 29 few-shots), dev split (137 questions), synthetic snapshot v1, laptop; self-measured. Results: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json). The test split is not run yet (task 3.5, once per chosen configuration).
+Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, planner.v1 prompt with all 29 few-shots, temperature 0), dev split (137 questions), synthetic snapshot v1, laptop; self-measured. Current run: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json) (after sq-103 was accepted as a class listing); first run: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json). The test split is not run yet (task 3.5, once per chosen configuration).
 
 | Metric (95% bootstrap CI) | dev, deepseek-flash |
 |---|---|
 | accuracy (all) | 94.2% [89.8, 97.8] (n=137) |
-| accuracy (plan-expressible) | 94.8% [89.6, 99.0] (n=96) |
-| abstention correct | 92.7% [82.9, 100.0] (n=41) |
-| false abstention | 1.0% [0.0, 3.1] (n=96) |
+| accuracy (plan-expressible) | 94.8% [89.7, 99.0] (n=97) |
+| abstention correct | 92.5% [85.0, 100.0] (n=40) |
+| false abstention | 0.0% [0.0, 0.0] (n=97) |
 | red team refused / attack success | 100% (n=12) / 0% (n=12) |
-| latency p50 / p95 (engine, ms) | 1,845 / 4,615 |
-| tokens per question | 4,715 (613k prompt, 33k completion in total; 3 repairs) |
-| cost | not priced (no price configured) |
+| latency p50 / p95 (engine, ms) | 1,929 / 5,917 |
+| tokens per question | 4,840 (627k prompt, 37k completion in total; 6 repairs) |
+| cost | $0.23 for the 137 questions, an upper bound (peak, cache-miss prices; E-035) |
 
-Errors (8): wrong_aggregation 2 (counted zone entries where the question asked for distinct people), wrong_abstain_reason 2 (two exhaustion attacks refused as unsupported or unanswerable rather than disallowed), abstained_wrongly 1, should_have_abstained 1, invalid_plan 1, wrong_order_limit 1 (an unrequested limit of 20). Weakest categories: join 75% [50, 100] (n=12), adversarial 83% [58, 100] (n=12); intervals per category are wide.
+Errors (8): wrong_aggregation 3 (counted zone entries where the question asked for distinct people), wrong_abstain_reason 2 (two exhaustion attacks refused as unsupported rather than disallowed), should_have_abstained 1 ("what color was the last car" answered with the latest car frame), invalid_plan 1, wrong_order_limit 1 (an unrequested limit). Weakest categories: join 75.0% [50.0, 100.0] (n=12), adversarial 83.3% [58.3, 100.0] (n=12). Run to run at temperature 0, 3 of 137 answers changed between the two runs (same accuracy): differences of a few points between configurations are noise unless the intervals say otherwise.
 
 ### Detection quality, baseline (task 3.4, D31)
 
