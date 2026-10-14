@@ -35,7 +35,7 @@ from vms.worker.onnx_detector import OnnxDetector, letterbox, preprocess
 
 class Tolerances(BaseModel):
     """Why these values: each sits 5x to 50x above the largest difference observed between the
-    two float32 runtimes over 1,446 images and two models (E-037: raw boxes 0.021 px, raw
+    two float32 runtimes over 723 images for each of two models (E-037: raw boxes 0.021 px, raw
     scores 1.1e-4, detection boxes 0.018 px, detection scores 1.6e-5), and far below anything
     that changes a decision.
     A box edge 0.1 px off is a tenth of a pixel: it moves no pixel of a crop and the IoU of a

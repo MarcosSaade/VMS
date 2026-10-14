@@ -278,6 +278,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Status:** shrunk (2026-10-06 re-scope).
 **Prompt:** Write an export script for YOLO11 to ONNX with dynamic batch; weights are fetched by script. Add parity tests comparing ONNX Runtime outputs with PyTorch on fixed inputs (boxes and scores after NMS, and raw head outputs) within a tolerance you justify. No CLIP export and no Triton repository.
 **Done when:** parity tests pass on CPU; tolerance and observed max differences recorded in `EXPERIMENTS.md`.
+**As built (2026-10-14, E-037):** `vms.worker.onnx_detector` (export, `OnnxDetector` with numpy pre/post-processing and `detect_batch`), `detector.backend` and the `build_detector` factory, `vms.worker.parity` and `make onnx-parity` (eval subset + data-mini, results JSON). Unit tests use a seeded random-init YOLO11n (offline); the integration test uses the pinned weights. Parity also holds at the mAP level for yolo11n and yolo11s.
 
 ### 5.2 Precision ladder
 

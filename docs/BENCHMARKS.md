@@ -74,6 +74,23 @@ At the earlier threshold of 0.25 the numbers were the same within noise (E-013, 
 
 At 5 FPS per camera, one CPU worker keeps up with about 2 cameras on yolo11s and about 4 on yolo11n, before the database and object store are added. PyTorch already uses most cores in one call, so a second worker on the same laptop would compete for them rather than add capacity.
 
+### ONNX export parity (task 5.1, E-037)
+
+`make onnx-parity` on `laptop`: ONNX Runtime 1.31 CPU with our numpy pre/post-processing vs Ultralytics PyTorch CPU, both float32, over the detection subset (500 COCO + 73 MOT17) and 150 data-mini frames, at the worker's threshold (0.1) and the eval's (0.001). Correctness only; speed is 5.2.
+
+| Check | yolo11n | yolo11s | Tolerance (`vms.worker.parity.Tolerances`) |
+|---|---|---|---|
+| Letterboxed input vs Ultralytics | identical bytes, 723/723 images | identical, 723/723 | exact |
+| Raw head output, max abs diff: boxes (input px) / scores | 0.0096 / 6.1e-5 | 0.021 / 1.1e-4 | 0.1 / 1e-3 |
+| Detections after NMS, max abs diff: boxes (image px) / scores | 0.0083 / 1.6e-5 | 0.018 / 5.6e-6 | 0.1 / 1e-4 |
+| Detections on one side only (conf 0.001; conf 0.1) | 3 of 133k, all explained (2 at the threshold, 1 IoU at 0.7); 0 | 0 of 116k; 0 | unexplained: 0 |
+| Batch of 8 vs one at a time (boxes) | 0.0002 px | 0.0002 px | 0.1 |
+| COCO / MOT17 mAP@50-95 (PyTorch value) | 37.9 [36.1, 42.2] / 40.3 [38.6, 42.0] (37.9 / 40.3) | 45.8 [44.1, 49.6] / 45.0 [43.1, 47.0] (45.8 / 45.0) | |
+
+Evidence: [`yolo11n parity`](../bench/results/2026-10-14-onnx-parity-yolo11n-01M4XQQGJWF596G49X0GQ06AZY.json), [`yolo11s parity`](../bench/results/2026-10-14-onnx-parity-yolo11s-01M4XSHPCKT13PEV7NGAW18RX5.json), [`yolo11n ONNX mAP`](../eval/results/2026-10-14-detection-yolo11n-onnx-01M4XSHQVKYXR93NSRME7F6SRC.json), [`yolo11s ONNX mAP`](../eval/results/2026-10-14-detection-yolo11s-onnx-01M4XSKH477FFM21CWP6P58Z66.json).
+
+**Why these tolerances.** Two float32 runtimes run the same graph with different kernels (oneDNN in PyTorch, MLAS in ONNX Runtime) and summation orders, so exact equality is not expected; differences come from rounding that accumulates over about 300 layers. A tenth of a pixel moves no pixel of a crop and the IoU of a 20 px box by about 1%; 1e-4 in score is 1/1500 of the gap between the worker's 0.1 and 0.25 thresholds. The tolerances sit 5x to 50x above the observed maxima, so a real bug (a half-pixel letterbox shift, RGB/BGR swapped, a wrong NMS rule) fails them by orders of magnitude while rounding never does. Where outputs can legitimately differ, near a threshold, the check classifies the case instead of loosening the tolerance.
+
 ## Evaluation
 
 ### Structured-query eval set v1 (task 3.1, D29, E-029)
@@ -192,5 +209,6 @@ One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/s
 
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
+- ONNX parity: `make models`, `make eval-detection-data`, `make data-mini`, `make onnx`, then `make onnx-parity` and `make onnx-parity WEIGHTS=yolo11s` (~25 min each); ONNX mAP: `VMS_DETECTOR__BACKEND=onnxruntime make eval SUITE=detection` (and `WEIGHTS=yolo11n`).
 - Structured eval set: `make up`, `make eval-db` (pulls or regenerates the snapshot and checks its hashes), `make eval-build` (re-runs every gold; the split files must come out unchanged), `make eval-check`.
 - Load generator ceiling: `make data-mini`, then `make loadgen-selftest`; `make loadgen-stub STUB_WORKERS=6` in one shell and `make loadgen SCENARIO=bench/scenarios/loadgen-stub-max.yaml` in another; restart the stub with `STUB_WORKERS=1` and run `make loadgen SCENARIO=bench/scenarios/loadgen-stub-20x5.yaml`. Check that port 8080 is free before starting each stub.

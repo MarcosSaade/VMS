@@ -73,7 +73,7 @@
   - Understand it: is the difference between the two LLMs real given the CIs, and what are the top error classes?
 
 ## Phase 5: Model internals
-- [ ] 5.1 Export YOLO11 to ONNX with parity tests (SHRINK: no Triton, no CLIP)
+- [x] 5.1 Export YOLO11 to ONNX with parity tests (SHRINK: no Triton, no CLIP)
   - Understand it: what tolerance did parity use and why, and where do ONNX and PyTorch outputs differ?
 - [ ] 5.2 Precision ladder: PyTorch, ORT, TensorRT FP16, TensorRT INT8, each with mAP (CI) and latency (CPU ladder as fallback)
   - Understand it: why does INT8 need calibration, what did it cost in mAP, and is that drop inside the CI?

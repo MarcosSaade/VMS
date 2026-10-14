@@ -58,7 +58,7 @@ Status: proposed    Date: 2026-10-05
 Context: YOLO11 detection and the CLIP image and text encoders run in Triton from Phase 5. Phase 1 runs them in-process with PyTorch at batch size 1. Any speedup must report its quality cost (ARCHITECTURE 4.5).
 Options: PyTorch eager; ONNX Runtime CUDA; TensorRT FP16; TensorRT INT8. Also dynamic batching and instance count settings, and GPU pre- and post-processing (DALI, TensorRT NMS) if profiling shows they are CPU-bound.
 Decision: pending (Phase 5, task 5.5). Since the 2026-10-06 re-scope the options are in-process backends only (PyTorch, ONNX Runtime CUDA, TensorRT FP16, TensorRT INT8, or a CPU ladder if no GPU is available) with a batch-size sweep; Triton, its dynamic batching and GPU pre/post-processing (5.4) are deferred.
-Evidence: pending. To measure: img/s, latency, GPU memory, mAP and recall@k delta against PyTorch.
+Evidence: pending. To measure: img/s, latency, GPU memory, mAP and recall@k delta against PyTorch. Prerequisite done (5.1, E-037): the ONNX export with our numpy pre/post-processing matches PyTorch within 0.02 px and 1.1e-4 in score, and gives the same mAP to 0.01 points for yolo11n and yolo11s, so any ladder step built on it starts from verified outputs.
 Trade-offs and consequences: pending. TensorRT engines must be built on the target GPU.
 
 ## D6: Service boundaries
