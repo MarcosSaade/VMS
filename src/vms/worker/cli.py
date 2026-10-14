@@ -2,6 +2,8 @@
 
 run                         (default; make worker) lease cameras, claim frames, detect
 weights [NAME ...]          (make models) fetch and verify pinned weights
+export-onnx [NAME ...]      (make onnx) export pinned weights to ONNX (models/onnx/)
+onnx-parity [--weights N]   (make onnx-parity) ONNX Runtime vs PyTorch parity, results JSON
 bench --scenario FILE       model-only latency (bench/scenarios/worker-model-*.yaml)
 render CLIP:CAMERA ... --out FILE.mp4
                             review video: detections, tracks, zones and events on clips
@@ -26,6 +28,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("run", help="run the worker (default)")
     weights = commands.add_parser("weights", help="fetch and verify pinned weights")
     weights.add_argument("names", nargs="*", help="default: every configured model")
+    export = commands.add_parser("export-onnx", help="export pinned weights to ONNX")
+    export.add_argument("names", nargs="*", help="default: every configured model")
+    parity = commands.add_parser("onnx-parity", help="ONNX Runtime vs PyTorch parity")
+    parity.add_argument("--weights", default="yolo11n")
+    parity.add_argument("--eval-images", type=int, help="first N subset images (smoke only)")
     bench = commands.add_parser("bench", help="model-only latency benchmark")
     bench.add_argument("--scenario", type=Path, required=True)
     render = commands.add_parser("render", help="draw detections, tracks and zones on clips")
@@ -56,6 +63,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             log.info("weights verified", extra={"weights": name, "path": str(path)})
         return 0
 
+    if args.command == "export-onnx":
+        from vms.worker.detector import DetectorSettings
+        from vms.worker.onnx_detector import export_onnx
+        from vms.worker.weights import ensure_weights, load_models_config
+
+        models = load_models_config()
+        imgsz = DetectorSettings().imgsz
+        for name in args.names or sorted(models.weights):
+            path = export_onnx(
+                ensure_weights(models, name),
+                models.weights[name].sha256,
+                name,
+                models.onnx_dir,
+                imgsz,
+            )
+            log.info("onnx exported", extra={"weights": name, "path": str(path)})
+        return 0
+
+    if args.command == "onnx-parity":
+        from vms.worker.parity import ParityConfig, run_parity
+
+        _, ok = run_parity(ParityConfig(weights=args.weights, eval_images=args.eval_images))
+        return 0 if ok else 1
+
     if args.command == "render":
         return _render(args)
 
@@ -71,21 +102,16 @@ def _render(args: argparse.Namespace) -> int:
     from vms.loadgen.frames import load_clip
     from vms.loadgen.settings import FrameSettings
     from vms.storage.catalog import load_catalog
-    from vms.worker.detector import YoloDetector
+    from vms.worker.detector import build_detector
     from vms.worker.render import Segment, render, zones_for
     from vms.worker.settings import WorkerSettings
     from vms.worker.tracking import CameraTracker
-    from vms.worker.weights import ensure_weights, load_models_config
 
     settings = load_settings(WorkerSettings, "worker")
     if args.weights:  # only the weights; the rest of the detector section stays as configured
         detector_settings = settings.detector.model_copy(update={"weights": args.weights})
         settings = settings.model_copy(update={"detector": detector_settings})
-    models = load_models_config()
-    name = settings.detector.weights
-    detector = YoloDetector(
-        ensure_weights(models, name), models.weights[name].sha256, settings.detector
-    )
+    detector = build_detector(settings.detector)
     catalog = load_catalog()
     segments = []
     for spec in args.segments:

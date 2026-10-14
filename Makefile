@@ -149,6 +149,14 @@ zones: ui-build ## Zone editor on http://127.0.0.1:8075: draw zones on clip fram
 models: ## Fetch and verify the pinned detector weights into models/weights/
 	$(RUN) python -m vms.worker weights
 
+.PHONY: onnx
+onnx: ## Export the pinned weights to ONNX into models/onnx/ (needed by detector.backend=onnxruntime)
+	$(RUN) python -m vms.worker export-onnx
+
+.PHONY: onnx-parity
+onnx-parity: ## ONNX Runtime vs PyTorch parity on the eval subset and data-mini (WEIGHTS=yolo11n|yolo11s)
+	$(RUN) python -m vms.worker onnx-parity --weights $(or $(WEIGHTS),yolo11n)
+
 # --- Load generation ------------------------------------------------------------
 
 SCENARIO ?=

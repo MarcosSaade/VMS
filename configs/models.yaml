@@ -7,6 +7,7 @@
 # project; a closed deployment would need an Ultralytics Enterprise license or another detector.
 
 weights_dir: models/weights
+onnx_dir: models/onnx        # ONNX exports and their sidecars (make onnx), gitignored
 
 weights:
   yolo11n:

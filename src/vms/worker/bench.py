@@ -36,15 +36,14 @@ from vms.common.logs import get_logger
 from vms.common.settings import deep_merge, load_settings
 from vms.loadgen.frames import load_clip
 from vms.loadgen.settings import FrameSettings
-from vms.worker.detector import YoloDetector
+from vms.worker.detector import build_detector
 from vms.worker.service import decode_jpeg
 from vms.worker.settings import WorkerSettings
 from vms.worker.stats import input_stats
-from vms.worker.weights import ensure_weights, load_models_config
 
 log = get_logger(__name__)
 
-PACKAGES = (*DEFAULT_PACKAGES, "torch", "torchvision", "ultralytics")
+PACKAGES = (*DEFAULT_PACKAGES, "torch", "torchvision", "ultralytics", "onnxruntime")
 STAGES = ("decode", "stats", "infer")
 
 
@@ -94,11 +93,7 @@ def run(scenario: Scenario, scenario_raw: dict[str, Any]) -> Path:
     base = load_settings(WorkerSettings, "worker")
     # configs/worker.yaml (+ env), then the scenario's `config:` merged section by section.
     settings = WorkerSettings.model_validate(deep_merge(base.model_dump(), scenario.config))
-    models = load_models_config()
-    name = settings.detector.weights
-    detector = YoloDetector(
-        ensure_weights(models, name), models.weights[name].sha256, settings.detector
-    )
+    detector = build_detector(settings.detector)
     frames: list[bytes] = []
     clip_info: dict[str, Any] = {}
     for clip_id in scenario.bench.clips:

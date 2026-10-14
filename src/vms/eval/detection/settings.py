@@ -46,7 +46,6 @@ class DetectionEvalSettings(ServiceSettings):
     results_dir: Path = Path("eval/results")
     predictions_dir: Path = Path("data/eval/detection/predictions")
     sources: list[Literal["coco", "mot17"]] = Field(default=["coco", "mot17"], min_length=1)
-    backend: Literal["ultralytics"] = "ultralytics"  # 5.1 adds onnxruntime
     detector: DetectorSettings = Field(
         default_factory=lambda: DetectorSettings(conf=0.001, max_det=300)
     )

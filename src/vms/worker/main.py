@@ -19,10 +19,10 @@ from vms.storage.config import ObjectStoreSettings, PostgresSettings
 from vms.storage.objects import S3ObjectStore
 from vms.storage.work import PostgresWorkQueue
 from vms.worker.app import create_app
-from vms.worker.detector import Detector, YoloDetector
+from vms.worker.detector import Detector, YoloDetector, build_detector
+from vms.worker.onnx_detector import OnnxDetector
 from vms.worker.service import Worker
 from vms.worker.settings import WorkerSettings
-from vms.worker.weights import ensure_weights, load_models_config
 
 SERVICE = "worker"
 
@@ -32,17 +32,15 @@ def worker_id() -> str:
     return f"{socket.gethostname()}-{os.getpid()}-{new_ulid()[-6:].lower()}"
 
 
-def load_detector(settings: WorkerSettings, obs: Observability) -> YoloDetector:
-    models = load_models_config()
-    name = settings.detector.weights
-    path = ensure_weights(models, name)
+def load_detector(settings: WorkerSettings, obs: Observability) -> YoloDetector | OnnxDetector:
     t0 = time.monotonic()
-    detector = YoloDetector(path, models.weights[name].sha256, settings.detector)
+    detector = build_detector(settings.detector)
     detector.warmup()
     obs.logger.info(
         "model loaded",
         extra={
             "model_version": detector.model_version,
+            "backend": settings.detector.backend,
             "device": settings.detector.device,
             "load_and_warmup_s": round(time.monotonic() - t0, 3),
         },

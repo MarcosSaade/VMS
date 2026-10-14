@@ -13,10 +13,9 @@ results_dir: eval/results
 predictions_dir: data/eval/detection/predictions   # raw detections per run (gitignored)
 sources: [coco, mot17]
 
-# Any backend behind the worker's Detector interface; 5.1 adds onnxruntime.
-backend: ultralytics
-detector:
+detector:                       # any backend behind the worker's Detector interface
   weights: yolo11s              # the worker's default (configs/worker.yaml)
+  backend: ultralytics          # ultralytics | onnxruntime (make onnx first)
   device: cpu
   imgsz: 640
   conf: 0.001                   # mAP needs the whole precision-recall curve, not the worker's 0.25

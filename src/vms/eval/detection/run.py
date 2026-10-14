@@ -1,9 +1,10 @@
 """Score a detector on the frozen subset: mAP@50 and mAP@50-95 with bootstrap intervals.
 
 The detector is anything behind the worker's `Detector` interface, built from settings by
-`build_detector` (only Ultralytics PyTorch until 5.1 adds an ONNX backend). COCO images go in
-as stored; MOT17 frames go through loadgen's resize and re-encode first, with their boxes
-scaled to match, so the mot17 numbers describe the frames the worker actually sees.
+`vms.worker.detector.build_detector` (`detector.backend`: Ultralytics PyTorch or ONNX
+Runtime). COCO images go in as stored; MOT17 frames go through loadgen's resize and re-encode
+first, with their boxes scaled to match, so the mot17 numbers describe the frames the worker
+actually sees.
 """
 
 from __future__ import annotations
@@ -31,24 +32,16 @@ from vms.eval.detection.metrics import ImageGt, ImagePred, evaluate, match_datas
 from vms.eval.detection.settings import DetectionEvalSettings
 from vms.eval.detection.subset import GtImage, SubsetManifest, image_ok, read_subset
 from vms.loadgen.frames import prepare_frame
-from vms.worker.detector import Detector, YoloDetector
+from vms.worker.detector import Detector, build_detector
 from vms.worker.service import decode_jpeg
-from vms.worker.weights import ensure_weights, load_models_config
 
 log = get_logger(__name__)
 
-PACKAGES = (*DEFAULT_PACKAGES, "torch", "torchvision", "ultralytics")
+PACKAGES = (*DEFAULT_PACKAGES, "torch", "torchvision", "ultralytics", "onnxruntime")
 
 
 class SubsetNotReadyError(RuntimeError):
     pass
-
-
-def build_detector(settings: DetectionEvalSettings, root: Path) -> Detector:
-    models = load_models_config(root / "configs/models.yaml")
-    name = settings.detector.weights
-    path = ensure_weights(models, name, root=root)
-    return YoloDetector(path, models.weights[name].sha256, settings.detector)
 
 
 def load_image(
@@ -134,7 +127,7 @@ def run(
             f"{len(missing)} images missing or corrupt under {images_dir} (first: {missing[0]}); "
             "run `make eval-detection-data`"
         )
-    detector = detector or build_detector(settings, root)
+    detector = detector or build_detector(settings.detector, root)
     run_id = new_ulid()
     started = datetime.now(UTC)
 

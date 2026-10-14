@@ -17,15 +17,16 @@ queue:                         # Postgres as the queue (D3), camera leases (D20)
   backlog_every_s: 5
   shutdown_grace_s: 10
 
-detector:                      # in-process PyTorch, batch size 1 (Phase 1 baseline)
+detector:                      # in-process, batch size 1 (Phase 1 baseline)
   weights: yolo11s             # configs/models.yaml
+  backend: ultralytics         # ultralytics (PyTorch) | onnxruntime (needs make onnx); D5
   device: cpu                  # cpu | cuda
   imgsz: 640
   conf: 0.1                    # low on purpose: ByteTrack's second round uses unsure boxes;
                                # tracker.store_min_conf decides what is stored
   iou: 0.7
   max_det: 300
-  torch_threads: null          # null: PyTorch default (one per physical core)
+  threads: null                # intra-op threads; null: backend default (one per physical core)
 
 tracker:                       # ByteTrack per camera (vms.worker.tracking)
   fps: 5.0                     # cameras' analysis rate; turns buffer_s into frames

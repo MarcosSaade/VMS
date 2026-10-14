@@ -48,6 +48,7 @@ htmlcov/
 *.bin
 *.gguf
 models/weights/
+models/onnx/
 models/triton/**/[0-9]*/
 
 # Results: small JSON summaries under bench/results and eval/results are committed.

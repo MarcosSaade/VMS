@@ -29,6 +29,7 @@ class ModelsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     weights_dir: Path
+    onnx_dir: Path = Path("models/onnx")  # exports made by `make onnx` (vms.worker.onnx_detector)
     weights: dict[str, WeightSpec]
 
 
