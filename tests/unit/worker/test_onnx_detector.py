@@ -259,3 +259,14 @@ def test_build_detector_needs_an_export_for_onnxruntime(tmp_path: Path) -> None:
     settings = DetectorSettings(weights="tiny", backend="onnxruntime")
     with pytest.raises(FileNotFoundError, match="make onnx"):
         build_detector(settings, tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("ref", "got"), [([], []), ([det("person", 0.9, 0)], []), ([], [det("car", 0.5, 0)])]
+)
+def test_compare_handles_images_without_detections(
+    ref: list[Detection], got: list[Detection]
+) -> None:
+    diff = compare_detections(ref, got, conf=0.25, iou=0.7, tol=Tolerances())
+    assert diff.matched == 0
+    assert len(diff.unexplained) == len(ref) + len(got)

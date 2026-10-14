@@ -106,9 +106,10 @@ def compare_detections(
     b_box = np.array([_box(d) for d in got]).reshape(-1, 4)
     a_score = np.array([d.confidence for d in ref])
     b_score = np.array([d.confidence for d in got])
-    same_class = np.array([[a.class_name == b.class_name for b in got] for a in ref]).reshape(
-        len(ref), len(got)
-    )
+    # dtype explicit: an image without detections must still give a boolean (n, m) matrix.
+    same_class = np.array(
+        [[a.class_name == b.class_name for b in got] for a in ref], dtype=bool
+    ).reshape(len(ref), len(got))
     box_diff = np.abs(a_box[:, None, :] - b_box[None, :, :]).max(axis=2, initial=0.0)
     score_diff = np.abs(a_score[:, None] - b_score[None, :])
     ok = same_class & (box_diff <= tol.box_atol) & (score_diff <= tol.score_atol)
