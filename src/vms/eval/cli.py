@@ -219,9 +219,10 @@ def cmd_load(settings: EvalSettings) -> int:
 # --- build and check -------------------------------------------------------------------------
 
 
-def query_settings(root: Path) -> QuerySettings:
-    """The query service's settings: the SQL policy, classes and few-shot bank it runs with."""
-    return load_settings(QuerySettings, "query", config_dir=root / "configs")
+def query_settings(root: Path, *, env_file: Path | None = None) -> QuerySettings:
+    """The query service's settings: the SQL policy, classes and few-shot bank it runs with.
+    `env_file` adds the VMS_* overrides from a dotenv file, as compose gives the service."""
+    return load_settings(QuerySettings, "query", config_dir=root / "configs", env_file=env_file)
 
 
 def offline_problems(settings: EvalSettings, items: list[EvalItem], root: Path) -> list[str]:
@@ -431,7 +432,10 @@ def cmd_run(
         log.warning("test split: use only for reported numbers, never for tuning (AGENTS 8)")
     manifest = snap.read_manifest(settings.snapshot.manifest)
     check_eval_db(settings, manifest)
-    qs = query_settings(REPO_ROOT)
+    # The service runs with .env's VMS_* overrides (compose env_file), e.g. the LLM's
+    # response_format; evaluate the same configuration.
+    dotenv = REPO_ROOT / ".env"
+    qs = query_settings(REPO_ROOT, env_file=dotenv if dotenv.is_file() else None)
     endpoint = LlmEndpointSettings()
     llm = build_llm_for(planner, qs, load_items(settings.structured.items), REPO_ROOT)
     model = "gold" if planner == "gold" else (endpoint.model or "canned")
