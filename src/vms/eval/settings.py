@@ -24,6 +24,7 @@ class StructuredPaths(_Section):
     dev: Path = Path("eval/structured/dev.v1.jsonl")
     test: Path = Path("eval/structured/test.v1.jsonl")
     manifest: Path = Path("eval/structured/dataset.v1.json")
+    splits: Path = Path("eval/structured/splits.v1.json")  # frozen item -> split assignment
     split_seed: int = 31
     test_fraction: float = Field(default=0.5, gt=0, lt=1)
 

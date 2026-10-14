@@ -50,12 +50,14 @@ from vms.eval.dataset import (
     built_problems,
     leakage_problems,
     load_items,
+    load_pinned_splits,
     read_dataset_manifest,
     sha256_file,
     split_counts,
     structure_problems,
     write_dataset_manifest,
     write_items,
+    write_pinned_splits,
 )
 from vms.eval.gold import GoldChecker, connection_executor, load_catalog_rows
 from vms.eval.harness import (
@@ -281,7 +283,13 @@ def cmd_build(settings: EvalSettings) -> int:
         built, problems = run_golds(settings, items, conn, snapshot_manifest.now)
     if problems:
         return _report(problems, "")
-    splits = assign_splits(items, seed=s.split_seed, test_fraction=s.test_fraction)
+    splits = assign_splits(
+        items,
+        seed=s.split_seed,
+        test_fraction=s.test_fraction,
+        pinned=load_pinned_splits(s.splits),
+    )
+    write_pinned_splits(s.splits, splits)
     built = [b.model_copy(update={"split": splits[b.id]}) for b in built]
     dev_sha = write_items(s.dev, [b for b in built if b.split is Split.DEV])
     test_sha = write_items(s.test, [b for b in built if b.split is Split.TEST])
@@ -297,6 +305,7 @@ def cmd_build(settings: EvalSettings) -> int:
         test_fraction=s.test_fraction,
         dev_sha256=dev_sha,
         test_sha256=test_sha,
+        splits_sha256=sha256_file(s.splits),
         counts=split_counts(built),
         fewshots=str(qs.assets.fewshots),
         fewshots_sha256=sha256_file(REPO_ROOT / qs.assets.fewshots),
@@ -314,7 +323,12 @@ def check_dataset(settings: EvalSettings, root: Path) -> list[str]:
     manifest = read_dataset_manifest(root / s.manifest)
     snapshot_manifest = snap.read_manifest(root / settings.snapshot.manifest)
     built = [*load_items(root / s.dev), *load_items(root / s.test)]
-    splits = assign_splits(items, seed=manifest.split_seed, test_fraction=manifest.test_fraction)
+    pinned = load_pinned_splits(root / s.splits)
+    if set(pinned) != {i.id for i in items}:
+        problems.append(f"{s.splits} does not list exactly the items; rebuild (make eval-build)")
+    splits = assign_splits(
+        items, seed=manifest.split_seed, test_fraction=manifest.test_fraction, pinned=pinned
+    )
     problems.extend(built_problems(items, built, splits))
     for item in load_items(root / s.dev):
         if item.split is not Split.DEV:
@@ -326,6 +340,7 @@ def check_dataset(settings: EvalSettings, root: Path) -> list[str]:
         "items_sha256": (manifest.items_sha256, sha256_file(root / s.items)),
         "dev_sha256": (manifest.dev_sha256, sha256_file(root / s.dev)),
         "test_sha256": (manifest.test_sha256, sha256_file(root / s.test)),
+        "splits_sha256": (manifest.splits_sha256, sha256_file(root / s.splits)),
         "snapshot_files": (manifest.snapshot_files, snapshot_manifest.files),
         "now": (manifest.now, snapshot_manifest.now.isoformat()),
     }

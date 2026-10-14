@@ -252,29 +252,63 @@ def leakage_problems(
 
 
 def assign_splits(
-    items: Sequence[EvalItem], *, seed: int, test_fraction: float
+    items: Sequence[EvalItem],
+    *,
+    seed: int,
+    test_fraction: float,
+    pinned: dict[str, Split] | None = None,
 ) -> dict[str, Split]:
     """item id -> split. Whole groups go to one side; within each category, groups are
     shuffled with a seeded stream and each goes to the side furthest below its target size,
-    so every category is split close to `test_fraction` and the result is reproducible."""
+    so every category is split close to `test_fraction` and the result is reproducible.
+
+    `pinned` freezes earlier assignments (`splits.v<N>.json`): a pinned item keeps its side
+    and counts toward its category's sizes, and a new item in a pinned group joins the group's
+    side, so adding or editing items never moves a reviewed test question.
+    """
+    pinned = pinned or {}
     by_category: dict[Category, dict[str, list[str]]] = defaultdict(dict)
     for item in items:
         by_category[item.category].setdefault(item.group_key, []).append(item.id)
     splits: dict[str, Split] = {}
     for category in sorted(by_category):
         groups = by_category[category]
-        keys = sorted(groups)
-        random.Random(f"{seed}:{category}").shuffle(keys)
         total = sum(len(ids) for ids in groups.values())
         target = {Split.TEST: total * test_fraction, Split.DEV: total * (1 - test_fraction)}
         size = {Split.TEST: 0, Split.DEV: 0}
-        for key in keys:
+        free = []
+        for key in sorted(groups):
+            sides = {pinned[i] for i in groups[key] if i in pinned}
+            if len(sides) > 1:
+                raise ValueError(f"group {key} is pinned to both splits")
+            if sides:
+                side = sides.pop()
+                for item_id in groups[key]:
+                    splits[item_id] = side
+                size[side] += len(groups[key])
+            else:
+                free.append(key)
+        random.Random(f"{seed}:{category}").shuffle(free)
+        for key in free:
             # Deficit relative to target; ties go to test, so a 1-item category is tested.
             side = max((Split.TEST, Split.DEV), key=lambda s: target[s] - size[s])
             for item_id in groups[key]:
                 splits[item_id] = side
             size[side] += len(groups[key])
     return splits
+
+
+def load_pinned_splits(path: Path) -> dict[str, Split]:
+    """The frozen assignment, empty if there is none yet."""
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {item_id: Split(side) for item_id, side in data.items()}
+
+
+def write_pinned_splits(path: Path, splits: dict[str, Split]) -> None:
+    data = {item_id: splits[item_id].value for item_id in sorted(splits)}
+    path.write_text(json.dumps(data, indent=0) + "\n", encoding="utf-8")
 
 
 def split_counts(items: Iterable[EvalItem]) -> dict[str, dict[str, int]]:
@@ -301,6 +335,7 @@ class DatasetManifest(BaseModel):
     test_fraction: float
     dev_sha256: str
     test_sha256: str
+    splits_sha256: str
     counts: dict[str, dict[str, int]]
     fewshots: str
     fewshots_sha256: str

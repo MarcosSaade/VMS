@@ -4,6 +4,7 @@ together, and the leakage checks against the few-shot bank."""
 from __future__ import annotations
 
 from collections import Counter
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -16,9 +17,11 @@ from vms.eval.dataset import (
     assign_splits,
     built_problems,
     leakage_problems,
+    load_pinned_splits,
     near_duplicates,
     split_counts,
     structure_problems,
+    write_pinned_splits,
 )
 
 COUNT_PLAN = {"intent": "count", "target": "tracks", "filters": {"cameras": ["lobby"]}}
@@ -213,3 +216,31 @@ def test_built_problems_find_drift_from_the_items_file() -> None:
     assert built_problems(items, good[:1], splits) == [
         "built files differ from items: missing ['sq-002'], extra []"
     ]
+
+
+def test_pinned_items_keep_their_side_and_new_items_fill_the_gap() -> None:
+    items = [item(n, question=f"Question {n}?") for n in range(1, 11)]
+    first = assign_splits(items, seed=31, test_fraction=0.5)
+    # A changed seed would reshuffle everything; pins keep every earlier assignment.
+    assert assign_splits(items, seed=99, test_fraction=0.5, pinned=first) == first
+    more = [*items, *(item(n, question=f"Question {n}?") for n in range(11, 15))]
+    grown = assign_splits(more, seed=31, test_fraction=0.5, pinned=first)
+    assert {k: grown[k] for k in first} == first
+    assert Counter(grown.values())[Split.TEST] == 7  # the new items balance the category
+
+
+def test_a_new_paraphrase_joins_its_pinned_group() -> None:
+    items = [item(1, question="Q one?", group="g-a"), item(2, question="Q two?")]
+    pinned = {"sq-001": Split.DEV, "sq-002": Split.TEST}
+    grown = [*items, item(3, question="Q three?", group="g-a")]
+    assert assign_splits(grown, seed=1, test_fraction=0.5, pinned=pinned)["sq-003"] is Split.DEV
+    with pytest.raises(ValueError, match="pinned to both splits"):
+        assign_splits(grown, seed=1, test_fraction=0.5, pinned={**pinned, "sq-003": Split.TEST})
+
+
+def test_pinned_splits_file_round_trip(tmp_path: Path) -> None:
+    path = tmp_path / "splits.json"
+    assert load_pinned_splits(path) == {}
+    write_pinned_splits(path, {"sq-002": Split.TEST, "sq-001": Split.DEV})
+    assert load_pinned_splits(path) == {"sq-001": Split.DEV, "sq-002": Split.TEST}
+    assert path.read_text().index("sq-001") < path.read_text().index("sq-002")

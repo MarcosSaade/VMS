@@ -1,7 +1,7 @@
 {
   "version": 1,
   "items": "eval/structured/items.v1.jsonl",
-  "items_sha256": "73ab238125adb8041563ccb9b6e5f2286d97eff3d4a7fb4de204cc9ffbfa7469",
+  "items_sha256": "57f30c0829f81fde23f708277985758cc828a308c6a5ab32e608f5112343cadd",
   "snapshot_manifest": "eval/structured/snapshot.v1.json",
   "snapshot_files": {
     "frames.csv.gz": "a711e53b6e1cdd2c43476edf80e76c65835dc11954b5c5d1d412aaebda1f53fb",
@@ -12,14 +12,15 @@
   "now": "2026-03-31T14:30:00+00:00",
   "split_seed": 31,
   "test_fraction": 0.5,
-  "dev_sha256": "0ed3a3641524fd860395af6c71119f303847f838207dafcc41c7a73920d03bc0",
+  "dev_sha256": "1bced9b2441b18c64d9ea99709166108ac34f12493d95cf918caf84a6c79688c",
   "test_sha256": "0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb",
+  "splits_sha256": "807f766b2d7ad642c48c62e11efede02bb3fd6a6a769dfb7546653c43503d3a0",
   "counts": {
     "dev": {
       "adversarial": 12,
       "aggregate": 9,
       "ambiguous": 7,
-      "count": 15,
+      "count": 16,
       "dwell": 9,
       "frames": 8,
       "join": 12,
@@ -28,7 +29,7 @@
       "top_k": 10,
       "trend": 11,
       "unanswerable": 7,
-      "unsupported": 15
+      "unsupported": 14
     },
     "test": {
       "adversarial": 13,

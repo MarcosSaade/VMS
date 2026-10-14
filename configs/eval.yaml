@@ -15,6 +15,7 @@ structured:
   dev: eval/structured/dev.v1.jsonl         # built: items + expected rows, dev split
   test: eval/structured/test.v1.jsonl       # built: frozen test split (hash in BENCHMARKS.md)
   manifest: eval/structured/dataset.v1.json
+  splits: eval/structured/splits.v1.json    # frozen assignment: items never change sides
   split_seed: 31
   test_fraction: 0.5
 
@@ -38,4 +39,9 @@ run:
 
 # USD per million tokens, by LLM_MODEL. A model not listed gets no cost in its results.
 # Fill in from the provider's price page on the day of the run; note the date in EXPERIMENTS.md.
-prices: {}
+# DeepSeek (prices given by the user on 2026-10-14): peak-hour, cache-miss input rates, so
+# reported costs are upper bounds (off-peak halves them; cached prompt tokens cost ~1% as much,
+# and the planner prompt is mostly a cacheable prefix). Usage does not report cache hits yet.
+prices:
+  deepseek-flash: {prompt_per_mtok: 0.30, completion_per_mtok: 1.20}
+  deepseek-v4-pro: {prompt_per_mtok: 1.32, completion_per_mtok: 3.96}
