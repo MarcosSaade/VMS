@@ -174,6 +174,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Status:** shrunk (2026-10-06 re-scope).
 **Prompt:** Write scenarios for (a) an ingest ramp: step cameras through 1, 2, 4, 8, 16, ... at 5 FPS, hold each step long enough for steady state, and record freshness p95, backlog growth and drops to find rated capacity; (b) a small structured-query load (a few concurrency levels, fake or local LLM so cost stays zero) while ingest runs at about 70% of rated capacity. Run on CPU locally and once on the GPU instance.
 **Done when:** results files exist for both environments; rated capacity determined per the definition in `ARCHITECTURE.md` section 2, with variance across repetitions.
+**Also on that session (2026-10-14 revision):** the 3.5 second-LLM dev run on a local model (see 3.5).
 
 ### 2.6 Baseline report
 
@@ -217,6 +218,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 **Prompt:** Run the structured and detection suites on the baseline system. For the structured suite, compare two LLMs on dev (for example a local model through Ollama and one hosted model) and pick the default for D7; run test once for the chosen one. Record results in `BENCHMARKS.md` and `EXPERIMENTS.md` (tag `query-eval`), and add a CI job that runs the harness on a tiny subset with a fake LLM to keep it from breaking.
 **Done when:** baseline quality numbers published; CI harness job green.
+**Revision (2026-10-14):** the two-LLM comparison is moved to the first GPU session: serve a local open model there (e.g. qwen2.5:7b through Ollama, or vLLM, with at least an 8k context for the ~4.7k-token prompt) and run `make eval SPLIT=dev` against it with the same harness, then compare with the DeepSeek dev run and settle D7. 3.5 is done without it: DeepSeek is the provisional planner and its test split is run once. If the local model wins on dev, it gets its own single test run.
 
 ---
 
