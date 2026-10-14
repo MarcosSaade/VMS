@@ -137,6 +137,7 @@ Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, 
 | cost | not priced (no price configured) |
 
 Errors (8): wrong_aggregation 2 (counted zone entries where the question asked for distinct people), wrong_abstain_reason 2 (two exhaustion attacks refused as unsupported or unanswerable rather than disallowed), abstained_wrongly 1, should_have_abstained 1, invalid_plan 1, wrong_order_limit 1 (an unrequested limit of 20). Weakest categories: join 75% [50, 100] (n=12), adversarial 83% [58, 100] (n=12); intervals per category are wide.
+
 ### Detection quality, baseline (task 3.4, D31)
 
 Self-measured on `laptop`, `make eval SUITE=detection` (PyTorch CPU, imgsz 640, conf 0.001, NMS IoU 0.7, max 300 detections). mAP follows pycocotools (area all, 100 detections per image and class); intervals are 95% percentile bootstrap over images, 2,000 resamples, seed 20261014. Subset v1: `eval/detection/subset.v1.jsonl`, sha256 `1661781dd3045ca39c1baba92807b0815f5c09e5f7a161fc42a061a3183f87dc`.
