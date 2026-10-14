@@ -1,0 +1,17 @@
+name: ramp-cpu
+description: >
+  Task 2.5 (a), the CPU baseline: rated capacity of the containerized pipeline (ingest, one
+  yolo11n worker on the PyTorch CPU backend at batch size 1, Postgres, object store) on the
+  data-mini clips at 5 FPS per camera, 1280x720 q85. Steps 1, 2, 3, 4 cameras: model-only
+  yolo11n does about 10 to 20 frames/s on this laptop (E-014, E-016) and one saturated worker
+  did 8 to 12 end to end (E-026), so the edge is expected between 1 and 4 cameras and the
+  powers of two the plan suggests would step over it. No query load (that is query-load-cpu).
+  Hold 90 s after 20 s warmup, so a backlog growing by 0.5 frames/s (the steady-state limit)
+  shows up as 45 frames over the window. Run on a quiet host: nothing else CPU-heavy (E-027).
+kind: e2e
+repeats: 3
+warmup_s: 20
+hold_s: 90
+ingest:
+  cameras: [1, 2, 3, 4]
+  fps: 5
