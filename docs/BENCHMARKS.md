@@ -22,20 +22,35 @@ One entry per environment used (CPU, RAM, GPU model, driver, CUDA, instance type
 
 | ID | Machine | Notes |
 |---|---|---|
-| laptop | Intel i7-1355U (10 cores, 12 threads), 15 GiB RAM, no GPU, Linux 6.8 | Development laptop with other work running; numbers are indicative, not a quiet benchmark host. |
+| laptop | Intel i7-1355U (2 performance + 8 efficiency cores, 12 threads), 15 GiB RAM, no GPU, Linux 6.8 | Development laptop. Runs before 2026-10-14 had other work running and are indicative. The 2.5/2.6 runs (E-039 to E-042) stopped the unrelated containers; a browser and desktop stayed open, so it is quieter, not a dedicated host. |
 
 ## Headline results
 
-Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity (cameras at 5 FPS, CPU and GPU), freshness p95, query p95 under load, cost per camera-hour, drift detection delay.
+Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity on a GPU, the optimized worker (5.5), cost per camera-hour, drift detection delay.
 
 | Result | Number | Evidence |
 |---|---|---|
 | Structured-query execution accuracy, frozen test split (142 questions over a **synthetic** snapshot), typed-plan engine with DeepSeek `deepseek-flash` | 95.8% [92.3, 98.6]; plan-expressible 95.9% [91.8, 99.0]; red team 13/13 refused, 0 breaches; $0.24 for the split (upper bound) | E-036, [`2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json`](../eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json) |
+| Rated capacity, CPU (one yolo11n worker, PyTorch, batch 1) | **2 cameras at 5 FPS** (3/3 repetitions; freshness p95 0.24 s, 0 lost); the worker saturates at 14.2 frames/s | E-039, [`ramp-cpu`](../bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json) |
+| Structured-query latency under ingest, CPU, canned planner (LLM excluded) | p95 39 ms at 1 client, 98 ms at 8 (159 q/s, one core saturated) | E-040, [`query-load-cpu`](../bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json) |
 | Detection quality, yolo11s (PyTorch CPU) | COCO-500 mAP@50-95 45.8 [44.1, 49.6]; MOT17 person mAP@50-95 45.0 [43.1, 47.0] | E-034 (Evaluation, detection quality) |
 
 ## Ingest and pipeline capacity
 
-_Rated capacity: placeholder (tasks 2.5, 5.5)._
+### Baseline ramp, CPU (task 2.5, E-039)
+
+`make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` on `laptop`, commit 7803f35: containerized ingest, one worker (yolo11n, PyTorch CPU build, batch size 1, imgsz 640), Postgres and SeaweedFS from `make up`; loadgen replays the data-mini clips at 5 FPS per camera (1280x720 q85); no query load. Warmup 20 s, hold 90 s, 3 repetitions; mean (std). GPU column: waits for the GPU quota (2.4).
+
+| Cameras | Offered = accepted fps | Worker done fps | Freshness p50 / p95 s | Backlog slope fps (max frames) | Lost | Worker cores | Ingest SLO |
+|---|---|---|---|---|---|---|---|
+| 1 | 5.0 | 5.0 | 0.17 / 0.24 | 0.00 (1) | 0 | 1.40 | 3/3 |
+| **2** | 10.0 | 10.0 | 0.16 / 0.24 | 0.00 (2) | 0 | 2.59 | **3/3** |
+| 3 | 15.0 | 14.2 (0.3) | 4.67 / 9.41 | +0.85 (99) | 0 | 3.53 | 0/3 |
+| 4 | 20.0 | 13.9 (0.2) | 19.5 / 37.8 | +5.82 (633) | 0 | 3.54 | 0/3 |
+
+**Rated capacity on CPU: 2 cameras at 5 FPS.** The worker's ceiling is 14.2 frames/s (2.8 cameras); whole-camera steps hide that headroom, so a gain of about 1.1x would rate 3 cameras. Above the ceiling nothing is lost (frames queue in Postgres); freshness grows with the queue instead, which is what `worker.queue_wait` shows (p95 9.4 s at 3 cameras, equal to freshness). Per-frame stage p95 at every load: infer 73 ms, decode 9.5, fetch 8.5, write 9, stats 8, track 4.5, which sum to about the 70 ms per frame the ceiling implies, because the stages run one after another (section "Baseline bottlenecks"). Harness: loadgen 0.04 cores and `generator_ok` in every step; ingest 0.15 cores at 20 frames/s.
+
+Evidence: [`bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json`](../bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json). A first attempt was aborted by a full disk (E-038).
 
 ### Load generator ceiling (harness, not the system)
 
@@ -51,7 +66,51 @@ One process should offer at most ~70% of 1,250 frames/s (~175 cameras at 5 FPS) 
 
 ## Query latency
 
-_Placeholder (task 2.5)._
+### Under ingest load, CPU, canned planner (task 2.5, E-040)
+
+`make bench SCENARIO=bench/scenarios/query-load-cpu.yaml` on `laptop`, commit 7803f35: closed-loop clients asking the 10 demo questions (30% are intended abstentions) against the containerized query service with the canned planner, while ingest runs at 70% of the rated capacity (2 cameras x 3.5 FPS = 7 frames/s). Warmup 15 s, hold 60 s, 3 repetitions; mean (std across repetitions below 2 ms and 2 q/s everywhere).
+
+| Clients | Query p50 / p95 / p99 ms | Queries/s | Query service cores | Freshness p95 s (ingest SLO) |
+|---|---|---|---|---|
+| 1 | 16 / 39 / 54 | 58 | 0.58 | 0.24 (3/3) |
+| 2 | 20 / 46 / 67 | 95 | 0.85 | 0.24 (3/3) |
+| 4 | 28 / 63 / 98 | 130 | 0.98 | 0.24 (3/3) |
+| 8 | 46 / 98 / 131 | 159 | 1.00 | 0.24 (3/3) |
+
+What this measures: everything a question costs except the LLM call (plan lookup, validation, compile, SQL validation, execution as the read-only login, answer, `query_log`), with ingest running. It does not include the planner: with the hosted LLM, the call alone has p50 1.9 s and p95 5.1 s (E-036), so the 1.5 s p95 SLO fails on the LLM, not on this path. From 4 clients the service pins one core (one Python process), so latency then grows with the queue; query load did not disturb ingest.
+
+Evidence: [`bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json`](../bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json).
+
+### Baseline bottlenecks, CPU (task 2.6, E-041, E-042)
+
+Profiles: `make bench SCENARIO=bench/scenarios/profile-worker-cpu.yaml` and `profile-query-cpu.yaml` (py-spy at 100 Hz on the service's code run on the host, the container stopped; RUNBOOK, "Profiling"). Shares are of sampled Python-thread time, startup excluded; native time (PyTorch, OpenCV, libpq) counts against the Python frame that called it. Open a profile at https://www.speedscope.app after `gunzip`.
+
+**Worker at saturation** (4 cameras offered, 14 frames/s done; [results](../bench/results/2026-10-14-profile-worker-cpu-01M4XXTACAXZPASNPFMDASJC9D.json), [profile](../bench/profiles/2026-10-14-profile-worker-cpu-01M4XXTACAXZPASNPFMDASJC9D.speedscope.json.gz)):
+
+| Stage | Share | Thread |
+|---|---|---|
+| PyTorch forward pass | 65.9% | inference |
+| JPEG decode | 6.6% | inference |
+| Input statistics (brightness, contrast, Laplacian) | 6.1% | inference |
+| Database (claim, write) | 5.0% | event loop |
+| Event loop | 4.1% | event loop |
+| Tracking and zones | 2.8% | inference |
+| Object store fetch | 2.1% | event loop, s3 |
+| Ultralytics letterbox / NMS and box scaling | 1.8% / 1.5% | inference |
+| Other, telemetry | 3.5% | |
+
+The inference thread was busy 57 s of the 80 s under load (71%).
+
+**Query service, canned planner, 8 clients** (130 q/s with the profiler attached; [results](../bench/results/2026-10-14-profile-query-cpu-01M4XXP40EA6Q9CQ3GV2C73DCB.json), [profile](../bench/profiles/2026-10-14-profile-query-cpu-01M4XXP40EA6Q9CQ3GV2C73DCB.speedscope.json.gz)): SQL validation (sqlglot parse and regenerate) 53.2%, HTTP and pydantic 14.0%, OpenTelemetry 11.6%, execution 10.4%, planning 4.8%, event loop 3.4%, compile 0.7%.
+
+**Ranked bottlenecks** (for the CPU deployment; the GPU column comes with the quota):
+
+1. **The detector's forward pass** sets the worker's ceiling: 66% of the worker's time at saturation, infer p95 73 ms per frame, at batch size 1. PyTorch runs 10 intra-op threads on a 2P+8E hybrid CPU yet the worker uses only 3.5 cores at saturation; whether fewer threads (on the performance cores) are faster is a hypothesis for 5.2, not measured here. This is what Phase 5 attacks: ONNX Runtime (already at parity, 5.1), the precision ladder (5.2) and batching (5.3). Fix first: largest share, and the levers are planned.
+2. **The worker runs each frame's stages one after another**: claim, fetch, infer, write. The inference thread idles 29% of the time while the event loop does I/O, a ceiling of about 1/0.71 = 1.4x left on the table. Overlapping the next frame's fetch and the previous frame's write with inference is part of 5.5 (batching across cameras); no plan change needed.
+3. **Pre-model CPU work in the inference thread**: decode 6.6% + input statistics 6.1%, about 9 ms per frame. Statistics compute a full-resolution float64 Laplacian (E-013); a downscaled float32 version would remove most of it. Small, cheap, and in the same thread as the model; it matters more once the model is faster.
+4. **Query service, only without an LLM**: one process, one core, ~160 q/s, half of it SQL validation. Not a bottleneck while the planner is a hosted LLM (~1.9 s per question); with a fast local planner, cache validated SQL per plan or run more server processes.
+
+Not bottlenecks: ingest (0.15 cores at 20 frames/s), loadgen (0.04 cores), tracking (2.8%), Ultralytics pre- and post-processing (3.3% together, which is why GPU pre/post-processing, 5.4, stays deferred).
 
 ## Storage
 
@@ -209,6 +268,7 @@ One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/s
 
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
+- CPU baseline: `make up`, `make data-mini`, `make models`, then start the app containers with the canned planner (`LLM_MODEL= docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile app up -d --wait ingest worker query` after `make app`), stop other CPU-heavy work, and run `make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` (~45 min), `query-load-cpu.yaml` (~20 min), `profile-worker-cpu.yaml` and `profile-query-cpu.yaml` (~2 min each).
 - ONNX parity: `make models`, `make eval-detection-data`, `make data-mini`, `make onnx`, then `make onnx-parity` and `make onnx-parity WEIGHTS=yolo11s` (~25 min each); ONNX mAP: `VMS_DETECTOR__BACKEND=onnxruntime make eval SUITE=detection` (and `WEIGHTS=yolo11n`).
 - Structured eval set: `make up`, `make eval-db` (pulls or regenerates the snapshot and checks its hashes), `make eval-build` (re-runs every gold; the split files must come out unchanged), `make eval-check`.
 - Load generator ceiling: `make data-mini`, then `make loadgen-selftest`; `make loadgen-stub STUB_WORKERS=6` in one shell and `make loadgen SCENARIO=bench/scenarios/loadgen-stub-max.yaml` in another; restart the stub with `STUB_WORKERS=1` and run `make loadgen SCENARIO=bench/scenarios/loadgen-stub-20x5.yaml`. Check that port 8080 is free before starting each stub.

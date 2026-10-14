@@ -57,9 +57,9 @@
   - Understand it: why exclude warmup, how many repetitions, and how is variance reported?
 - [ ] 2.4 GPU session on AWS: one tagged on-demand instance by script (spot is denied by the account's SCP, D28), Budgets alarm, verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote). Built and budget created 2026-10-13; waiting for the on-demand G quota for the real session
   - Understand it: how do you know nothing is still billing after a session, and what does an hour cost?
-- [ ] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK)
+- [ ] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK). CPU part done 2026-10-14 (rated 2 cameras, E-039; query load E-040); the GPU run waits for the quota
   - Understand it: what is the definition of rated capacity, and where did the ramp break?
-- [ ] 2.6 Baseline report and bottleneck analysis (profiling)
+- [ ] 2.6 Baseline report and bottleneck analysis (profiling). CPU part done 2026-10-14 (E-041, E-042; ranked list in BENCHMARKS); the GPU profile waits for the quota
   - Understand it: rank the top three bottlenecks with evidence, and say which one you would fix first and why.
 
 ## Phase 3: Evaluation harness

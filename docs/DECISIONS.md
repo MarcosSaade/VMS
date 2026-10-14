@@ -67,8 +67,8 @@ Status: accepted (default, not benchmarked)    Date: 2026-10-06
 Context: One codebase (modular monolith) with several deployables. A service boundary needs a measured reason, such as a different scaling profile (ARCHITECTURE 1, 10). Each deployable is a Dockerfile target, so splitting or merging services is a deployment change.
 Options: deploy each of loadgen, ingest-gateway, inference-worker, query-service, llm-service and drift-monitor separately, or merge some of them.
 Decision: One Python package and one image; loadgen, ingest, worker and query run as separate compose services, plus the UI. Rationale: separate processes keep traces and metrics per component readable; 6.6 (capacity and chaos tests) was deferred in the 2026-10-06 re-scope, so no Kubernetes boundary is decided.
-Evidence: none; 6.6 deferred.
-Trade-offs and consequences: No measured case for or against merging services. Evidence that would change it: CPU, GPU and memory profiles from 2.5 and 2.6 showing two services that always scale together (merge) or one that needs independent scaling (keep split).
+Evidence: none from 6.6 (deferred). CPU baseline (E-039, E-040): the worker uses 3.5 cores at saturation and is the only service near a limit; ingest uses 0.15 cores at 20 frames/s; the query service pins one core only at ~160 q/s without an LLM. Their profiles differ (model-bound vs CPU-bound Python vs I/O), which supports keeping them separate; no evidence for merging.
+Trade-offs and consequences: No measured case for merging services. Evidence that would change it: CPU, GPU and memory profiles from 2.5 and 2.6 showing two services that always scale together (merge) or one that needs independent scaling (keep split).
 
 ## D7: LLM strategy
 

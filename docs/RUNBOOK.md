@@ -235,7 +235,21 @@ make bench-report RESULTS="bench/results/<file>.json ..."  # Markdown tables for
 - What it needs: the e2e runner talks to the endpoints in `configs/bench.yaml` (ingest 8080, query 8070, Prometheus 9090; `VMS_INGEST_URL`, `VMS_QUERY_URL`, `VMS_PROMETHEUS_URL` override). The services must run in containers (`make demo` or `make app` plus `compose --profile app up ingest worker`): Prometheus does not scrape host processes, so a step against `make worker` has no freshness and fails. The canned planner keeps query load free; with `LLM_*` set the questions cost tokens.
 - While it runs: one JSON log line per step with its freshness p95, lost frames and verdict. Ctrl-C finishes the current step and writes partial results (`interrupted: true`). Nothing else should send frames or questions meanwhile; the database is shared, so a demo running alongside changes the numbers.
 - Results: `bench/results/<date>-<name>-<run_id>.json`, with the Markdown table printed at the end. Commit the files behind reported numbers, log the run in `EXPERIMENTS.md`, and put the curated number in `BENCHMARKS.md` with links to both.
+- Before a long run: check free disk (`df -h /`). A full disk makes SeaweedFS refuse writes, every frame then fails at ingest, and the object store needs `docker restart vms-objectstore-1` after space is freed (E-038). Each 5 FPS camera writes about 3 GB per hour of frames.
 - Before trusting a step: `harness_ok` true (loadgen kept its schedule, the query clients used under 0.8 cores), `drain_s` small (else the previous step's backlog spilled over) and the hardware recorded in the file matches the table you add it to.
+
+### Profiling
+
+```bash
+make bench SCENARIO=bench/scenarios/profile-worker-cpu.yaml   # worker at saturation (~2 min)
+make bench SCENARIO=bench/scenarios/profile-query-cpu.yaml    # query service, canned planner (~2 min)
+gunzip -k bench/profiles/<file>.speedscope.json.gz            # then open it at https://www.speedscope.app
+```
+
+- `kind: profile` (`vms.bench.profile`) stops the service's container (`docker compose stop worker|query`), runs the same code on the host as a child of `py-spy record` (no ptrace privileges needed for a child), drives loadgen or query clients at it, then sends SIGTERM and starts the container again, also on failure. Needs the stack and the other app containers up, as for e2e scenarios.
+- Results: `bench/results/<date>-<name>-<run_id>.json` with seconds and shares per category and per thread, and the profile in `bench/profiles/` (gzipped speedscope, tens of KB). Categories are regexes in the scenario, matched against our own frames innermost first (`any_frame: true` also matches library frames, to split a stage).
+- Caveats: the host process is not scraped by Prometheus (no freshness during a profile); the profile includes the warmup; samples are wall time of running Python threads, so native threads (PyTorch's own pool) do not appear.
+- If a profile run is interrupted before its `finally`, start the container by hand: `docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile app start worker`.
 
 ## Evaluation
 

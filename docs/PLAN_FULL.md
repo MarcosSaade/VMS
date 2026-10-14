@@ -175,11 +175,13 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Prompt:** Write scenarios for (a) an ingest ramp: step cameras through 1, 2, 4, 8, 16, ... at 5 FPS, hold each step long enough for steady state, and record freshness p95, backlog growth and drops to find rated capacity; (b) a small structured-query load (a few concurrency levels, fake or local LLM so cost stays zero) while ingest runs at about 70% of rated capacity. Run on CPU locally and once on the GPU instance.
 **Done when:** results files exist for both environments; rated capacity determined per the definition in `ARCHITECTURE.md` section 2, with variance across repetitions.
 **Also on that session (2026-10-14 revision):** the 3.5 second-LLM dev run on a local model (see 3.5).
+**CPU part as built (2026-10-14, E-039, E-040):** `bench/scenarios/ramp-cpu.yaml` (1 to 4 cameras: the CPU edge is between 2 and 3, so powers of two would step over it) and `query-load-cpu.yaml` (ingest at 70% of rated as 2 cameras x 3.5 FPS, concurrency 1 to 8, canned planner). Rated capacity on CPU: 2 cameras. Remaining: the same ramp on the GPU instance (a GPU scenario with steps sized to the GPU) once the quota arrives.
 
 ### 2.6 Baseline report
 
 **Prompt:** Profile the worker and query service under load (py-spy flame graphs, trace breakdowns, GPU utilization). Write the baseline section of `BENCHMARKS.md`: tables, hardware, methodology, and a ranked list of bottlenecks with evidence. Use the list to check whether Phase 5 targets the real bottleneck, and propose a swap under the scope lock if it does not.
 **Done when:** baseline section complete; bottleneck list links to traces or profiles saved as artifacts.
+**CPU part as built (2026-10-14, E-041, E-042):** `kind: profile` scenarios (`vms.bench.profile`, py-spy on the host with the container stopped) for the worker at saturation and the query service; the ranked list is in BENCHMARKS ("Baseline bottlenecks"). Phase 5 targets the top bottleneck (the forward pass); the second (serial per-frame I/O) fits inside 5.5, so no scope swap. Remaining: a GPU worker profile with GPU utilization on the GPU session.
 
 ---
 
