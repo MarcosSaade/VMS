@@ -13,11 +13,16 @@ build      run every item's gold SQL and gold plan on the eval database, require
 check      offline consistency: items valid, no leakage into the few-shot bank, split files
            match the items, the seed and the manifest's hashes (no database needed).
 review     print a split for human review: question, gold plan, gold SQL, expected rows.
+run        ask every question of a split, score it and write a results JSON to eval/results/
+           (task 3.2; see vms.eval.harness). --planner gold answers with the gold plans: a
+           self-test that must score 100%.
+report     Markdown tables of results files, for BENCHMARKS.md.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import datetime as dt
 import json
 import sys
@@ -31,6 +36,8 @@ from alembic import command
 from alembic.config import Config as AlembicConfig
 from psycopg import sql
 
+from vms.bench.results import RunResult, git_info, hardware, package_versions, write_result
+from vms.common.ids import new_ulid
 from vms.common.logs import configure_logging, get_logger
 from vms.common.settings import load_settings
 from vms.eval import snapshot as snap
@@ -51,8 +58,20 @@ from vms.eval.dataset import (
     write_items,
 )
 from vms.eval.gold import GoldChecker, connection_executor, load_catalog_rows
+from vms.eval.harness import (
+    PlannerChoice,
+    build_llm_for,
+    cost_usd,
+    db_fingerprint,
+    eval_reader_conninfo,
+    plan_engine,
+    run_items,
+)
+from vms.eval.report import render
+from vms.eval.scorer import METRIC_NOTES, ItemScore, summarize
 from vms.eval.settings import EvalSettings
 from vms.query.fewshots import load_fewshots
+from vms.query.llm import LlmEndpointSettings
 from vms.query.settings import QuerySettings
 from vms.storage.catalog import load_catalog, sync_catalog
 from vms.storage.config import PostgresSettings
@@ -78,6 +97,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     review = commands.add_parser("review", help="print a split for human review")
     review.add_argument("--split", choices=[s.value for s in Split], default=Split.TEST.value)
     review.add_argument("--max-rows", type=int, default=8)
+    run = commands.add_parser("run", help="evaluate an engine on a split; write results JSON")
+    run.add_argument("--suite", choices=["structured", "detection"], default="structured")
+    run.add_argument("--split", choices=[s.value for s in Split], default=Split.DEV.value)
+    run.add_argument("--planner", choices=["config", "gold"], default="config")
+    run.add_argument("--limit", type=int, help="first N items only (smoke runs; not reportable)")
+    run.add_argument("--ids", nargs="*", help="these item ids only (debugging; not reportable)")
+    report = commands.add_parser("report", help="Markdown tables of results files")
+    report.add_argument("files", nargs="+", type=Path)
     args = parser.parse_args(argv)
     configure_logging("eval", args.log_level)
     settings = load_settings(EvalSettings, "eval")
@@ -88,6 +115,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cmd_load(settings)
     if args.command == "build":
         return cmd_build(settings)
+    if args.command == "run":
+        if args.suite != "structured":
+            raise SystemExit("the detection suite arrives with task 3.4")
+        return cmd_run(settings, Split(args.split), args.planner, args.limit, args.ids)
+    if args.command == "report":
+        results = [json.loads(p.read_text(encoding="utf-8")) for p in args.files]
+        sys.stdout.write(render(results))
+        return 0
     if args.command == "check":
         problems = check_dataset(settings, REPO_ROOT)
         return _report(problems, "dataset consistent")
@@ -337,3 +372,169 @@ def cmd_review(settings: EvalSettings, split: Split, max_rows: int) -> int:
     for item in items:
         sys.stdout.write(format_item(item, max_rows) + "\n")
     return 0
+
+
+# --- run -------------------------------------------------------------------------------------
+
+
+def owner_conninfo(settings: EvalSettings) -> str:
+    pg = PostgresSettings().model_copy(update={"db": settings.db})
+    return pg.conninfo(application_name="vms-eval")
+
+
+def check_eval_db(settings: EvalSettings, manifest: snap.SnapshotManifest) -> None:
+    """The eval database must hold the snapshot the gold answers were computed on."""
+    try:
+        with psycopg.connect(owner_conninfo(settings)) as conn:
+            counts = {
+                t: int(conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0])  # type: ignore[index]
+                for t in snap.TABLES
+            }
+    except psycopg.Error as exc:
+        raise SystemExit(
+            f"eval database {settings.db!r} unavailable ({exc}); run make eval-db"
+        ) from exc
+    if counts != manifest.rows:
+        raise SystemExit(
+            f"eval database holds {counts}, not snapshot v{manifest.version}; run make eval-db"
+        )
+
+
+def select_items(
+    settings: EvalSettings, split: Split, limit: int | None, ids: list[str] | None
+) -> tuple[list[EvalItem], str]:
+    """The split's items, after checking the file is the one the manifest pins."""
+    s = settings.structured
+    path = s.test if split is Split.TEST else s.dev
+    manifest = read_dataset_manifest(s.manifest)
+    recorded = manifest.test_sha256 if split is Split.TEST else manifest.dev_sha256
+    actual = sha256_file(path)
+    if actual != recorded:
+        raise SystemExit(f"{path} does not match {s.manifest}; run make eval-build")
+    items = load_items(path)
+    if ids:
+        items = [i for i in items if i.id in set(ids)]
+    if limit is not None:
+        items = items[:limit]
+    return items, actual
+
+
+def cmd_run(
+    settings: EvalSettings,
+    split: Split,
+    planner: PlannerChoice,
+    limit: int | None,
+    ids: list[str] | None,
+) -> int:
+    items, split_sha = select_items(settings, split, limit, ids)
+    if split is Split.TEST:
+        log.warning("test split: use only for reported numbers, never for tuning (AGENTS 8)")
+    manifest = snap.read_manifest(settings.snapshot.manifest)
+    check_eval_db(settings, manifest)
+    qs = query_settings(REPO_ROOT)
+    endpoint = LlmEndpointSettings()
+    llm = build_llm_for(planner, qs, load_items(settings.structured.items), REPO_ROOT)
+    model = "gold" if planner == "gold" else (endpoint.model or "canned")
+    started = dt.datetime.now(dt.UTC)
+    log.info("eval run", extra={"split": split.value, "items": len(items), "llm": model})
+
+    def progress(score: ItemScore) -> None:
+        log.info(
+            "scored",
+            extra={"id": score.id, "correct": score.correct, "error": score.error_class},
+        )
+
+    async def go() -> list[ItemScore]:
+        async with plan_engine(
+            eval_reader_conninfo(settings, qs), qs, manifest.now, llm, REPO_ROOT
+        ) as engine:
+            return await run_items(
+                engine,
+                items,
+                concurrency=settings.run.concurrency,
+                tolerance=Tolerance(settings.compare.rel_tol, settings.compare.abs_tol),
+                fingerprint=lambda: db_fingerprint(owner_conninfo(settings)),
+                progress=progress,
+            )
+
+    scores = asyncio.run(go())
+    ended = dt.datetime.now(dt.UTC)
+    summary = summarize(
+        scores,
+        resamples=settings.run.resamples,
+        seed=settings.run.seed,
+        confidence=settings.run.confidence,
+    )
+    cost = cost_usd(
+        settings.prices, model, summary["tokens"]["prompt"], summary["tokens"]["completion"]
+    )
+    partial = limit is not None or bool(ids)
+    result = RunResult(
+        run_id=new_ulid(),
+        name=f"structured-{split.value}-{_slug(model)}",
+        kind="eval.structured",
+        started_at=started,
+        ended_at=ended,
+        seed=settings.run.seed,
+        git=git_info(REPO_ROOT),
+        hardware=hardware(),
+        packages=package_versions(("aiohttp", "psycopg", "pydantic", "sqlglot")),
+        config={
+            "eval": settings.model_dump(mode="json"),
+            "query": {
+                "llm": qs.llm.model_dump(mode="json"),
+                "planner": qs.planner.model_dump(mode="json"),
+                "assets": qs.assets.model_dump(mode="json"),
+            },
+            "llm_endpoint": {"base_url": endpoint.base_url, "model": endpoint.model},
+        },
+        metrics={
+            "run": {
+                "suite": "structured",
+                "split": split.value,
+                "split_sha256": split_sha,
+                "planner": planner,
+                "llm": model,
+                "eval_clock": manifest.now.isoformat(),
+                "snapshot_files": manifest.files,
+                "partial": partial,
+                "cost_usd": cost,
+            },
+            "summary": summary,
+            "notes": {
+                k: {"measures": m, "does_not_measure": d} for k, (m, d) in METRIC_NOTES.items()
+            },
+            "items": [_item_record(s) for s in scores],
+        },
+        cost_usd=cost or 0.0,
+        notes="partial run (--limit/--ids): not reportable" if partial else "",
+    )
+    path = write_result(REPO_ROOT / settings.run.results_dir, result)
+    sys.stdout.write(render([result.model_dump(mode="json")]))
+    log.info("results written", extra={"path": str(path)})
+    return 0
+
+
+def _slug(text: str) -> str:
+    return "".join(c if c.isalnum() or c in "-." else "-" for c in text.lower()).strip("-")
+
+
+def _item_record(score: ItemScore) -> dict[str, Any]:
+    a = score.answer
+    return {
+        "id": score.id,
+        "category": score.category.value,
+        "correct": score.correct,
+        "error_class": score.error_class.value if score.error_class else None,
+        "detail": score.detail[:300],
+        "breach": score.breach,
+        "status": a.status,
+        "abstain_reason": a.abstain_reason,
+        "error_type": a.error_type,
+        "plan": a.plan,
+        "row_count": len(a.rows),
+        "latency_ms": round(a.latency_ms, 1),
+        "prompt_tokens": a.prompt_tokens,
+        "completion_tokens": a.completion_tokens,
+        "repaired": a.repaired,
+    }

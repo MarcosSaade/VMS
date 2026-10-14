@@ -63,6 +63,7 @@ class PlanAttempt:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""
+    parsed: bool = True  # False: the reply was not a schema-valid plan (else: failed semantics)
 
     @property
     def tokens(self) -> int:
@@ -246,7 +247,12 @@ class Planner:
                 )
             attempts.append(
                 PlanAttempt(
-                    reply.text, errors, reply.prompt_tokens, reply.completion_tokens, reply.model
+                    reply.text,
+                    errors,
+                    reply.prompt_tokens,
+                    reply.completion_tokens,
+                    reply.model,
+                    parsed=plan is not None,
                 )
             )
             if plan is not None and not errors:

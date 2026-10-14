@@ -169,3 +169,8 @@ Tried: doubling the structured eval set from 129 to 279 items (150 new: 106 plan
 Why: 67 test items gave about +/-11 points (95%) at 70% accuracy, too wide to separate two planners.
 Result: build checks caught 3 near duplicates (one of the few-shot bank, two across groups; reworded), one frames list over the 100-row validator limit (window narrowed) and 3 empty answers (thresholds or windows changed); no boundary ties in ordered items. Test split now 142 items (about +/-7.5 points), sha256 0330b3db... ; the 129 old items were re-split with the new ones (no test number was reported on the old split).
 Outcome: keep; BENCHMARKS.md and D29 updated.
+
+### E-031 | 2026-10-14 | query-eval
+Tried: the 3.2 harness end to end. (1) `make eval PLANNER=gold` (gold plans as the LLM's replies) on dev, and the same over dev+test in the integration test. (2) A free real-LLM smoke run: `--limit 4` on dev with local Ollama qwen3:1.7b (CPU), concurrency 1, 180 s LLM timeout. Laptop of E-013.
+Result: (1) 100% on every metric, 279/279 items, 0 breaches; dev in 2.6 s (p50 12 ms, p95 45 ms per question). (2) No answer after 10 min; stopped. Ollama ran the model with a 4,096-token context, shorter than the ~4,600-token planner prompt, so the prompt would be truncated anyway.
+Outcome: the harness, scorer and dataset agree with each other. Real-planner numbers need a hosted model (DeepSeek, as in E-017), which costs money: waiting for the user's go-ahead. A local model needs a larger context and a faster machine.

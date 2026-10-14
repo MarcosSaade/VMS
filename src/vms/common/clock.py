@@ -36,6 +36,25 @@ class SystemClock:
         return time.monotonic()
 
 
+class PinnedClock:
+    """Wall-clock time fixed at one instant, real monotonic time.
+
+    For evaluation against a frozen snapshot: "today" and "last week" must resolve against the
+    snapshot's eval clock, while latencies are still measured for real.
+    """
+
+    def __init__(self, now: datetime) -> None:
+        if now.tzinfo is None:
+            raise ValueError("PinnedClock time must be timezone-aware")
+        self._now = now.astimezone(UTC)
+
+    def now(self) -> datetime:
+        return self._now
+
+    def monotonic(self) -> float:
+        return time.monotonic()
+
+
 class FakeClock:
     """A clock that only moves when told to. Both readings advance together."""
 

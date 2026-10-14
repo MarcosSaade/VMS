@@ -27,3 +27,15 @@ leakage:
 compare:
   rel_tol: 1.0e-6
   abs_tol: 1.0e-6
+
+# Eval runs (make eval, python -m vms.eval run; task 3.2).
+run:
+  concurrency: 4              # questions in flight; red-team questions always run one at a time
+  resamples: 2000             # bootstrap resamples per metric
+  confidence: 0.95
+  seed: 2026                  # bootstrap seed, recorded in each results file
+  results_dir: eval/results
+
+# USD per million tokens, by LLM_MODEL. A model not listed gets no cost in its results.
+# Fill in from the provider's price page on the day of the run; note the date in EXPERIMENTS.md.
+prices: {}

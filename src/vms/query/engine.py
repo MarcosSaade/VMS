@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
-from typing import Any, Protocol, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 from opentelemetry import trace
 from pydantic import BaseModel, Field
@@ -92,6 +92,9 @@ class QueryError(BaseModel):
     type: ErrorType
     detail: str
     errors: list[str] = Field(default_factory=list)  # plan validation errors, if any
+    # For invalid_plan: whether the last reply was not a schema-valid plan ("schema") or a
+    # valid plan that failed the checks against the catalog and policy ("semantic").
+    plan_check: Literal["schema", "semantic"] | None = None
 
 
 class QueryResponse(BaseModel):
@@ -112,6 +115,8 @@ class QueryResponse(BaseModel):
     llm: str
     repaired: bool = False
     tokens: int = 0
+    prompt_tokens: int = 0  # tokens apart: prompt and completion are priced differently
+    completion_tokens: int = 0
     timings_ms: dict[str, float] = Field(default_factory=dict)
 
     @property
@@ -243,12 +248,13 @@ class PlanEngine:
 
         def failed(kind: ErrorType, detail: str, **extra: Any) -> QueryResponse:
             errors = extra.pop("errors", [])
+            plan_check = extra.pop("plan_check", None)
             return QueryResponse(
                 **base,
                 **extra,
                 status=QueryStatus.ERROR,
                 answer=_ERROR_ANSWERS[kind],
-                error=QueryError(type=kind, detail=detail, errors=errors),
+                error=QueryError(type=kind, detail=detail, errors=errors, plan_check=plan_check),
             )
 
         try:
@@ -266,11 +272,15 @@ class PlanEngine:
             tokens = sum(a.tokens for a in exc.attempts)
             self._count_tokens(exc.attempts)
             self._repairs.inc(1 if len(exc.attempts) > 1 else 0)
+            last = exc.attempts[-1] if exc.attempts else None
             return failed(
                 ErrorType.INVALID_PLAN,
                 "the planner did not produce a valid plan",
                 errors=exc.errors,
+                plan_check="semantic" if last is not None and last.parsed else "schema",
                 tokens=tokens,
+                prompt_tokens=sum(a.prompt_tokens for a in exc.attempts),
+                completion_tokens=sum(a.completion_tokens for a in exc.attempts),
                 repaired=len(exc.attempts) > 1,
             )
         self._count_tokens(result.attempts)
@@ -280,6 +290,8 @@ class PlanEngine:
         base.update(
             plan=plan.compact(),
             tokens=result.tokens,
+            prompt_tokens=sum(a.prompt_tokens for a in result.attempts),
+            completion_tokens=sum(a.completion_tokens for a in result.attempts),
             repaired=result.repaired,
         )
 

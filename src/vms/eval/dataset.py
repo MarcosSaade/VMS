@@ -188,9 +188,12 @@ class NearDuplicate:
 def similarity(a: str, b: str) -> tuple[float, float]:
     na, nb = normalize_question(a), normalize_question(b)
     ratio = difflib.SequenceMatcher(None, na, nb, autojunk=False).ratio()
+    return ratio, _jaccard(na, nb)
+
+
+def _jaccard(na: str, nb: str) -> float:
     wa, wb = set(_WORD.findall(na)), set(_WORD.findall(nb))
-    jaccard = len(wa & wb) / len(wa | wb) if wa | wb else 1.0
-    return ratio, jaccard
+    return len(wa & wb) / len(wa | wb) if wa | wb else 1.0
 
 
 def near_duplicates(
@@ -207,6 +210,11 @@ def near_duplicates(
     for i, (la, qa) in enumerate(left):
         for j, (lb, qb) in enumerate(right):
             if same and j <= i:
+                continue
+            na, nb = normalize_question(qa), normalize_question(qb)
+            matcher = difflib.SequenceMatcher(None, na, nb, autojunk=False)
+            # quick_ratio() is an upper bound on ratio(): skip the slow part for clear misses.
+            if matcher.quick_ratio() < min_ratio and _jaccard(na, nb) < min_jaccard:
                 continue
             ratio, jaccard = similarity(qa, qb)
             if ratio >= min_ratio or jaccard >= min_jaccard:

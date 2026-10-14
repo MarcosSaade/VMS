@@ -243,7 +243,7 @@ make eval-db         # (re)create the vms_eval database from snapshot v1 (~15 s)
 make eval-build      # run every gold SQL and gold plan on it; write dev/test files and the manifest
 make eval-check      # offline: items valid, no few-shot leakage, splits and hashes in step (also a unit test)
 make eval-review                 # print the test split for review: question, plan, SQL, expected rows
-make eval-review SPLIT=dev
+make eval-review REVIEW=dev
 ```
 
 - `make eval-db` drops and recreates `vms_eval` (configs/eval.yaml `db`) on the stack's Postgres: migrations, the read-only login, the eval catalog (`configs/eval/cameras.v1.yaml`), then COPY of `eval/structured/snapshot.v1/`. The snapshot comes from `make data-pull` when the DVC remote has it; otherwise it is generated from `configs/eval/snapshot.v1.yaml` (~5 s). Either way its files must match the sha256s in `eval/structured/snapshot.v1.json`. The dev database is never touched.
@@ -251,6 +251,22 @@ make eval-review SPLIT=dev
 - Adding or editing questions: edit `eval/structured/items.v1.jsonl` (one item per line: `id`, `category`, optional `group` for paraphrases, `question`, gold `plan`, `expressible_by_plan`, gold `sql` unless the question has no answer, `ordered`, `tags`, `notes`), then `make eval-build`. It fails on any disagreement between the gold SQL and the gold plan, a gold SQL the validator rejects, a result at the validator's injected limit (possibly truncated), or a near duplicate of a few-shot question. Changing anything that moves an item into or within the test split changes the test hash: do it before the first reported test number, then update BENCHMARKS.md, and never after (make `items.v2` instead).
 - The snapshot is frozen. Changing `configs/eval/snapshot.v1.yaml` or `cameras.v1.yaml` fails a unit test; a new snapshot is a new version (spec, catalog, items, splits), generated with `make eval-snapshot` and pushed with `uv run dvc add eval/structured/snapshot.v<N> && uv run dvc push`.
 - Review before the test split is used: read every test item and a sample of dev with `make eval-review`; check that the question reads as the plan and SQL interpret it, and that the expected rows are plausible. Fix disagreements in the items file and rebuild.
+
+### Running evals (task 3.2)
+
+```bash
+make eval-db                                    # once per snapshot version
+make eval PLANNER=gold                          # harness self-test: must print 100% everywhere
+make eval SPLIT=dev                             # the configured LLM (LLM_* in .env); costs tokens
+make eval-report RESULTS="eval/results/a.json eval/results/b.json"   # side by side, for BENCHMARKS.md
+uv run python -m vms.eval run --limit 5         # smoke run; marked partial, not reportable
+```
+
+- The engine is the query service's typed-plan engine, built in-process against `vms_eval` as the read-only login, with the clock pinned to the eval clock. Nothing is written to `query_log`.
+- Another model: set `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` for the command (and `VMS_LLM__RESPONSE_FORMAT=json_object` for providers without `json_schema`, such as DeepSeek). Add its price per million tokens under `prices` in `configs/eval.yaml` to get a cost.
+- The run refuses a split file whose hash differs from `dataset.v1.json`, and an eval database that does not hold the snapshot. Run the test split only for numbers that will be reported, once per configuration; tune on dev.
+- Red-team questions run one at a time, each between two database fingerprints; the run reports any change as a breach.
+- Commit the results files behind reported numbers; log each run in EXPERIMENTS.md.
 
 ## GPU sessions
 
@@ -328,6 +344,8 @@ Symptom, cause and fix entries as issues are met.
 - `make loadgen` logs "generator fell behind its schedule": the host or the generator is saturated, so the run offered less load than configured. Reduce cameras, close other load on the machine, or run several loadgen processes with different `camera_prefix` values.
 - `make bench` fails with "backlog still N frames after 900 s": the worker cannot drain what an earlier step or run left. Wait, or start from an empty database (`make down-volumes`). A step with freshness `null` and `ingest_ok: false` means no frame reached the worker in the window: is the worker container running, and scraped (`make ps`, Prometheus targets)?
 - `python -m vms.observe` (the demo's last step) reports "no healthy target": the named container is not running or not ready (`make ps`). "No series for" a metric: the service runs but has not done that work yet (for example no question asked), or runs on the host where Prometheus does not scrape it. "No complete frame trace": check that loadgen, ingest and the worker all export (`docker logs vms-worker-1` for OTLP export errors; `VMS_TELEMETRY__ENABLED` must not be false) and that the frames were sampled (`DEMO_TRACE_RATIO`); then open the newest loadgen trace in Grafana to see where the chain stops.
+- `make eval` stops with "eval database ... not snapshot v1" or "unavailable": run `make eval-db`. "does not match dataset.v1.json": the split files changed after the build; run `make eval-build` (and update the test hash in BENCHMARKS.md if the test file changed).
+- `make eval` with a local Ollama model is very slow or scores near 0: Ollama's default context (4,096 tokens here) is shorter than the planner prompt (~4,600), so the prompt is cut; raise the server's context (`OLLAMA_CONTEXT_LENGTH=8192 ollama serve`) and expect minutes per question on a laptop CPU (E-031).
 - `make eval-db` fails with "snapshot does not match its manifest": the files under `eval/structured/snapshot.v1/` are stale or were regenerated by a changed generator. Delete the directory and re-run (it regenerates); if the regenerated files still differ, the generator's output changed (a code or Python change): restore it, since every gold answer depends on those bytes.
 - `make eval-build` reports "gold plan and gold SQL disagree": one of the two golds misreads the question, or the compiler changed semantics. Run both on `vms_eval` (`psql`, binding `now` from the manifest) and compare; fix the wrong gold, or record a compiler change as a decision.
 - Sudden `AccessDenied` errors on AWS operations that used to work: check the project's spend limit status in AWS Settings > Billing.

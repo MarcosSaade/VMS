@@ -226,11 +226,21 @@ eval-build: ## Run every gold SQL and plan on vms_eval; write the dev/test files
 eval-check: ## Offline checks of the eval set: few-shot leakage, splits, hashes
 	$(RUN) python -m vms.eval check
 
-SPLIT ?= test
+REVIEW ?= test
 .PHONY: eval-review
-eval-review: ## Print an eval split for human review (SPLIT=test|dev)
-	$(RUN) python -m vms.eval review --split $(SPLIT)
+eval-review: ## Print an eval split for human review (REVIEW=test|dev)
+	$(RUN) python -m vms.eval review --split $(REVIEW)
 
+# make eval SUITE=structured SPLIT=dev (needs make eval-db). PLANNER=gold is the harness
+# self-test (must score 100%). The LLM comes from LLM_* in .env and may cost money.
+SUITE ?= structured
+SPLIT ?= dev
+PLANNER ?= config
 .PHONY: eval
-eval: ## Run eval suites
-	$(call not_yet,3.2)
+eval: ## Run an eval suite on a split, write eval/results/*.json (SUITE=structured SPLIT=dev PLANNER=config|gold)
+	$(RUN) python -m vms.eval run --suite $(SUITE) --split $(SPLIT) --planner $(PLANNER)
+
+.PHONY: eval-report
+eval-report: ## Markdown tables of eval results files (RESULTS="eval/results/a.json ...")
+	@test -n "$(RESULTS)" || { echo "make eval-report: set RESULTS=<results JSON files>" >&2; exit 1; }
+	@$(RUN) python -m vms.eval report $(RESULTS)

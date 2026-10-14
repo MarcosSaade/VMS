@@ -38,6 +38,23 @@ class CompareSettings(_Section):
     abs_tol: float = Field(default=1e-6, ge=0)
 
 
+class RunSettings(_Section):
+    """How an eval run asks and scores (task 3.2)."""
+
+    concurrency: int = Field(default=4, ge=1, le=8)  # at most the reader pool's size
+    resamples: int = Field(default=2000, ge=1000)
+    confidence: float = Field(default=0.95, gt=0, lt=1)
+    seed: int = 2026  # bootstrap resampling
+    results_dir: Path = Path("eval/results")
+
+
+class Price(_Section):
+    """USD per million tokens."""
+
+    prompt_per_mtok: float = Field(ge=0)
+    completion_per_mtok: float = Field(ge=0)
+
+
 class EvalSettings(ServiceSettings):
     db: str = "vms_eval"
     statement_timeout_ms: int = Field(default=10_000, ge=1)
@@ -45,3 +62,6 @@ class EvalSettings(ServiceSettings):
     structured: StructuredPaths = Field(default_factory=StructuredPaths)
     leakage: LeakageSettings = Field(default_factory=LeakageSettings)
     compare: CompareSettings = Field(default_factory=CompareSettings)
+    run: RunSettings = Field(default_factory=RunSettings)
+    # LLM prices by model name (LLM_MODEL); runs with a model not listed report no cost.
+    prices: dict[str, Price] = Field(default_factory=dict)

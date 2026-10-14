@@ -197,6 +197,8 @@ def test_invalid_plan_after_repair(query_settings: QuerySettings) -> None:
     assert r.error is not None
     assert r.error.type is ErrorType.INVALID_PLAN
     assert "unknown camera(s) 'garage'" in r.error.errors[0]
+    assert r.error.plan_check == "semantic"  # a schema-valid plan that failed the catalog
+    assert (r.prompt_tokens, r.completion_tokens) == (20, 20)
     assert r.repaired is True
     assert h.reader.executed == []
     assert h.log.entries[0].error_type == "invalid_plan"
@@ -212,6 +214,15 @@ def test_repaired_plan_succeeds(query_settings: QuerySettings) -> None:
     assert r.status is QueryStatus.OK
     assert r.repaired is True
     assert r.tokens == 40
+    assert (r.prompt_tokens, r.completion_tokens) == (20, 20)
+
+
+def test_unparseable_plan_is_a_schema_failure(query_settings: QuerySettings) -> None:
+    h = Harness(query_settings, ScriptedLlm("oops", "still not json"))
+    r = h.ask()
+    assert r.error is not None
+    assert r.error.type is ErrorType.INVALID_PLAN
+    assert r.error.plan_check == "schema"
 
 
 def test_planner_unavailable(query_settings: QuerySettings) -> None:
