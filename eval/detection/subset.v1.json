@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "spec_sha256": "f6030d96dbf01a67b2e101f646ec9d87bb94dccff4e2baa936154cada32f7b16",
+  "subset_sha256": "1661781dd3045ca39c1baba92807b0815f5c09e5f7a161fc42a061a3183f87dc",
+  "coco_annotations_sha256": "e8c7f7908f1d7278341fae127d0da654f102f11bd7b21d8aeefa635b8c810b6f",
+  "seed": 20261014,
+  "images": {
+    "coco": 500,
+    "mot17": 73
+  },
+  "boxes": {
+    "coco": 3833,
+    "mot17": 1961
+  },
+  "ignored": {
+    "coco": 49,
+    "mot17": 980
+  }
+}

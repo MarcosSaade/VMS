@@ -267,6 +267,19 @@ uv run python -m vms.eval run --limit 5         # smoke run; marked partial, not
 - The run refuses a split file whose hash differs from `dataset.v1.json`, and an eval database that does not hold the snapshot. Run the test split only for numbers that will be reported, once per configuration; tune on dev.
 - Red-team questions run one at a time, each between two database fingerprints; the run reports any change as a breach.
 - Commit the results files behind reported numbers; log each run in EXPERIMENTS.md.
+### Detection eval subset (task 3.4)
+
+```bash
+make eval-detection-data                    # fetch and verify the 573 listed images (~95 MB, about a minute)
+make eval SUITE=detection                   # yolo11s (configs/eval-detection.yaml), ~1.5 min on the laptop
+make eval SUITE=detection WEIGHTS=yolo11n   # any key of configs/models.yaml (make models first)
+uv run python -m vms.eval.detection check   # offline: spec and list match the manifest (also a unit test)
+```
+
+- No stack, database or LLM needed. Images land in `data/eval/detection/v1/` (gitignored), each checked against the sha256 in `eval/detection/subset.v1.jsonl`; a missing or corrupt image is fetched again, and `make eval SUITE=detection` refuses to run on an incomplete set. COCO comes from the path-style S3 URL because `images.cocodataset.org` serves a certificate for another name.
+- Each run writes `eval/results/<date>-detection-<weights>-<run_id>.json` (mAP@50 and mAP@50-95 per source with interval, bootstrap std and mean, per-class AP) and the raw detections to `data/eval/detection/predictions/<run_id>.jsonl.gz`. A smoke run on a few images (`VMS_MAX_IMAGES=20`) is marked `partial` and is never a reported number.
+- Licenses: COCO annotations are CC BY 4.0 and its images keep their Flickr licenses; MOT17 is CC BY-NC-SA 3.0. Neither is redistributed; never commit or publish the images.
+- The subset is frozen. Changing `configs/eval/detection.v1.yaml` or the list fails a unit test; a new selection is v2 (`detection.v2.yaml`, then `uv run python -m vms.eval.detection build` with the v2 paths, which writes the list and manifest once and on later runs only checks that a rebuild is identical). Images used to calibrate INT8 (5.2) or fine-tune (9.5) must not be in the list.
 
 ## GPU sessions
 

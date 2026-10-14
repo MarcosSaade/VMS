@@ -1,0 +1,37 @@
+# Detection quality eval (python -m vms.eval.detection; make eval-detection). Overrides
+# configs/common.yaml; VMS_* environment variables override this file
+# (e.g. VMS_DETECTOR__WEIGHTS=yolo11n).
+
+paths:
+  spec: configs/eval/detection.v1.yaml        # frozen selection rules (never edited, D31)
+  subset: eval/detection/subset.v1.jsonl      # frozen file list + ground truth, in git
+  manifest: eval/detection/subset.v1.json     # its hashes and counts, in git
+  images_dir: data/eval/detection/v1          # fetched images (gitignored)
+  fetch_workers: 8                            # concurrent range requests
+
+results_dir: eval/results
+predictions_dir: data/eval/detection/predictions   # raw detections per run (gitignored)
+sources: [coco, mot17]
+
+# Any backend behind the worker's Detector interface; 5.1 adds onnxruntime.
+backend: ultralytics
+detector:
+  weights: yolo11s              # the worker's default (configs/worker.yaml)
+  device: cpu
+  imgsz: 640
+  conf: 0.001                   # mAP needs the whole precision-recall curve, not the worker's 0.25
+  iou: 0.7                      # NMS, as Ultralytics' own val
+  max_det: 300
+
+max_dets_per_class: 100         # per image and class, the COCO protocol's maxDets
+
+# MOT17 frames go through the same resize and re-encode as loadgen's (configs/loadgen.yaml).
+mot_frame:
+  width: 1280
+  height: 720
+  jpeg_quality: 85
+
+bootstrap:
+  seed: 20261014                # not the shared VMS_SEED: a .env default must not move intervals
+  resamples: 2000               # over images, with replacement
+  confidence: 0.95

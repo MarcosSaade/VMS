@@ -116,8 +116,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "build":
         return cmd_build(settings)
     if args.command == "run":
-        if args.suite != "structured":
-            raise SystemExit("the detection suite arrives with task 3.4")
+        if args.suite == "detection":  # no split or planner: one frozen subset (D31)
+            from vms.eval.detection.cli import main as detection_main
+
+            return detection_main(["--log-level", args.log_level, "run"])
         return cmd_run(settings, Split(args.split), args.planner, args.limit, args.ids)
     if args.command == "report":
         results = [json.loads(p.read_text(encoding="utf-8")) for p in args.files]

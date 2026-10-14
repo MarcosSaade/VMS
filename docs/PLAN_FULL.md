@@ -211,6 +211,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 **Prompt:** Fix a labeled evaluation subset for detection (about 500 images from COCO val2017 for all classes, plus MOT17 ground truth for person boxes on frames disjoint from anything used for calibration or fine-tuning) with a frozen file list. Implement mAP@50 and mAP@50-95 for any inference backend behind the worker's model interface, with bootstrap 95% confidence intervals over images.
 **Done when:** `make eval SUITE=detection` reports baseline mAP with CIs for PyTorch YOLO11.
+**Considerations (as built, D31):** 500 COCO images give an interval about 5.5 points wide on mAP@50-95; compare two backends with a paired bootstrap over the same resamples (the saved per-run predictions make this cheap) rather than by overlapping intervals. The MOT17 frames are correlated within a sequence, so their interval is optimistic. Calibration (5.2) and fine-tuning (9.5) data must come from outside `eval/detection/subset.v1.jsonl` (COCO train2017, MOT17-05/10/11/13).
 
 ### 3.5 Baseline eval
 

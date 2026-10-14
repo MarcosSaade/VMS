@@ -1,0 +1,51 @@
+# Frozen detection eval subset, version 1 (task 3.4, D31). Read by `python -m vms.eval.detection
+# build`, which selects the images, reads their ground truth and writes the frozen file list with
+# per-image sha256 and boxes to eval/detection/subset.v1.jsonl (in git). Images are fetched by
+# `make eval-detection-data` into data/eval/detection/v1/ (gitignored) and checked against it.
+#
+# Never edit this file after the subset is built: every reported mAP depends on it. A different
+# selection is a new version (detection.v2.yaml, subset.v2.jsonl). A unit test enforces this.
+
+version: 1
+seed: 20261014                  # COCO sample
+
+licenses:
+  coco:
+    name: COCO annotations CC BY 4.0; images under their Flickr licenses
+    url: https://cocodataset.org/#termsofuse
+    notes: >-
+      The annotations are CC BY 4.0. Each image keeps the Flickr license recorded in the
+      annotation file (most are CC BY, CC BY-SA or CC BY-NC variants); images are not
+      redistributed, only fetched from the COCO bucket.
+  mot17:
+    name: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+    url: https://creativecommons.org/licenses/by-nc-sa/3.0/
+    notes: MOTChallenge data (Milan et al., arXiv:1603.00831). No commercial use.
+
+coco:
+  # Path-style HTTPS: images.cocodataset.org serves a certificate for another name.
+  images_url: https://s3.amazonaws.com/images.cocodataset.org/zips/val2017.zip
+  images_bytes: 815585330
+  annotations_url: https://s3.amazonaws.com/images.cocodataset.org/annotations/annotations_trainval2017.zip
+  annotations_bytes: 252907541
+  annotations_member: annotations/instances_val2017.json
+  # sha256 of the annotations member, pinned on the first build (2026-10-14).
+  annotations_sha256: e8c7f7908f1d7278341fae127d0da654f102f11bd7b21d8aeefa635b8c810b6f
+  images: 500                   # sampled uniformly without replacement from val2017 (5,000)
+
+mot17:
+  url: https://motchallenge.net/data/MOT17.zip
+  archive_bytes: 5860214001
+  # The three static train sequences that are also demo cameras (configs/data/sources.yaml), so
+  # the subset measures the camera scenes. MOT17-08 has no public ground truth.
+  sequences: [MOT17-02-FRCNN, MOT17-04-FRCNN, MOT17-09-FRCNN]
+  frame_stride: 30              # one frame per second: neighbouring frames are near copies
+  # MOT17 gt.txt classes. Positives: every person a camera user would count, at least
+  # min_visibility visible: pedestrians (1), persons on a vehicle (2) and static persons (7);
+  # the MOT benchmark ignores 2 and 7, but a person standing in a zone is what the VMS counts.
+  # Ignore regions (a detection there is neither a hit nor a miss): those persons below
+  # min_visibility, distractors (8, look like persons) and reflections (12).
+  positive_classes: [1, 2, 7]
+  ignore_classes: [8, 12]
+  crowd_classes: [13]           # crowd: any number of detections may fall inside
+  min_visibility: 0.25

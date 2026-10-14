@@ -233,12 +233,22 @@ eval-review: ## Print an eval split for human review (REVIEW=test|dev)
 
 # make eval SUITE=structured SPLIT=dev (needs make eval-db). PLANNER=gold is the harness
 # self-test (must score 100%). The LLM comes from LLM_* in .env and may cost money.
+# make eval SUITE=detection [WEIGHTS=yolo11n] (needs make models and make eval-detection-data).
 SUITE ?= structured
 SPLIT ?= dev
 PLANNER ?= config
 .PHONY: eval
-eval: ## Run an eval suite on a split, write eval/results/*.json (SUITE=structured SPLIT=dev PLANNER=config|gold)
-	$(RUN) python -m vms.eval run --suite $(SUITE) --split $(SPLIT) --planner $(PLANNER)
+eval: ## Run an eval suite, write eval/results/*.json (SUITE=structured SPLIT=dev PLANNER=config|gold, or SUITE=detection)
+	@if [ "$(SUITE)" = "detection" ]; then $(MAKE) --no-print-directory eval-detection; \
+	else $(RUN) python -m vms.eval run --suite $(SUITE) --split $(SPLIT) --planner $(PLANNER); fi
+
+.PHONY: eval-detection-data
+eval-detection-data: ## Fetch and verify the detection eval images (500 COCO val2017 + 73 MOT17 frames, ~95 MB)
+	$(RUN) python -m vms.eval.detection fetch
+
+.PHONY: eval-detection
+eval-detection: ## Detection mAP@50 and mAP@50-95 with bootstrap CIs (WEIGHTS=yolo11s|yolo11n)
+	$(if $(WEIGHTS),VMS_DETECTOR__WEIGHTS=$(WEIGHTS)) $(RUN) python -m vms.eval.detection run
 
 .PHONY: eval-report
 eval-report: ## Markdown tables of eval results files (RESULTS="eval/results/a.json ...")
