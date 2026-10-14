@@ -95,6 +95,17 @@ jobs:
       - name: make test-integration
         run: make test-integration
 
+      # Eval harness self-test through the CLI (task 3.5): load the eval snapshot (generated
+      # from its seed; no DVC remote in CI), then answer the dev split with the gold plans as a
+      # fake LLM (no network, no cost). Fails unless every item scores correct with no breach.
+      # Results go to the runner's temp dir, not eval/results.
+      - name: make eval (gold planner, dev split)
+        env:
+          VMS_RUN__RESULTS_DIR: ${{ runner.temp }}/eval-results
+        run: |
+          make eval-db
+          make eval PLANNER=gold SPLIT=dev
+
       # The demo, shortened: app image, ingest + yolo11n worker + query service in containers,
       # 4 cameras x 5 FPS for 30 s, canned planner (no LLM). --check fails on any error answer.
       - name: make demo (shortened)

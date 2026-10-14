@@ -256,10 +256,10 @@ make eval-review REVIEW=dev
 
 ```bash
 make eval-db                                    # once per snapshot version
-make eval PLANNER=gold                          # harness self-test: must print 100% everywhere
+make eval PLANNER=gold                          # harness self-test: exits 1 unless 100% with no breach
 make eval SPLIT=dev                             # the configured LLM (LLM_* in .env); costs tokens
 make eval-report RESULTS="eval/results/a.json eval/results/b.json"   # side by side, for BENCHMARKS.md
-uv run python -m vms.eval run --limit 5         # smoke run; marked partial, not reportable
+make eval SPLIT=dev LIMIT=5                     # smoke run; marked partial, not reportable
 ```
 
 - The engine is the query service's typed-plan engine, built in-process against `vms_eval` as the read-only login, with the clock pinned to the eval clock. Nothing is written to `query_log`.
@@ -267,6 +267,8 @@ uv run python -m vms.eval run --limit 5         # smoke run; marked partial, not
 - The run refuses a split file whose hash differs from `dataset.v1.json`, and an eval database that does not hold the snapshot. Run the test split only for numbers that will be reported, once per configuration; tune on dev.
 - Red-team questions run one at a time, each between two database fingerprints; the run reports any change as a breach.
 - Commit the results files behind reported numbers; log each run in EXPERIMENTS.md.
+- CI runs the gold self-test on dev after `make eval-db` in the integration job, with results written to the runner's temp dir (`VMS_RUN__RESULTS_DIR`). If it fails there, the failing item ids and error classes are printed above the error line; reproduce with `make eval PLANNER=gold` locally.
+
 ### Detection eval subset (task 3.4)
 
 ```bash

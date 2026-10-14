@@ -15,7 +15,7 @@ check      offline consistency: items valid, no leakage into the few-shot bank, 
 review     print a split for human review: question, gold plan, gold SQL, expected rows.
 run        ask every question of a split, score it and write a results JSON to eval/results/
            (task 3.2; see vms.eval.harness). --planner gold answers with the gold plans: a
-           self-test that must score 100%.
+           self-test that exits non-zero unless every item is correct with no breach.
 report     Markdown tables of results files, for BENCHMARKS.md.
 """
 
@@ -68,6 +68,7 @@ from vms.eval.harness import (
     eval_reader_conninfo,
     plan_engine,
     run_items,
+    self_test_failures,
 )
 from vms.eval.report import render
 from vms.eval.scorer import METRIC_NOTES, ItemScore, summarize
@@ -533,6 +534,8 @@ def cmd_run(
     path = write_result(REPO_ROOT / settings.run.results_dir, result)
     sys.stdout.write(render([result.model_dump(mode="json")]))
     log.info("results written", extra={"path": str(path)})
+    if planner == "gold":
+        return _report(self_test_failures(scores), "gold self-test: every item correct")
     return 0
 
 

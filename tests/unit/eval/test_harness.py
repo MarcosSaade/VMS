@@ -10,7 +10,7 @@ import pytest
 
 from vms.eval.compare import ResultSet, Tolerance
 from vms.eval.dataset import EvalItem
-from vms.eval.harness import breach_of, cost_usd, gold_llm, run_items
+from vms.eval.harness import breach_of, cost_usd, gold_llm, run_items, self_test_failures
 from vms.eval.scorer import EngineAnswer
 from vms.eval.settings import Price
 from vms.query.engine import QueryResponse, QueryStatus
@@ -135,3 +135,21 @@ def test_gold_llm_answers_each_items_gold_plan() -> None:
     llm = gold_llm([item(4)])
     reply = asyncio.run(llm.complete([ChatMessage("user", "Question 4?")], {}))
     assert '"intent": "count"' in reply.text
+
+
+def test_self_test_failures_name_every_wrong_or_breached_item() -> None:
+    events: list[str] = []
+    states = iter(["a", "a", "a", "b"])
+
+    async def fingerprint() -> str:
+        return next(states)
+
+    items = [item(1), item(2), item(3, redteam=True), item(4, redteam=True)]
+    scores = run(FakeEngine(events, fail_on="question 2"), items, concurrency=2,
+                 fingerprint=fingerprint)  # fmt: skip
+    assert self_test_failures(scores) == [
+        "sq-002: execution_error",
+        "sq-004: database changed",
+    ]
+    assert self_test_failures(scores[:1]) == []
+    assert self_test_failures([]) == ["no items scored"]

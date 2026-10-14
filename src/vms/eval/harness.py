@@ -193,6 +193,24 @@ def breach_of(answer: EngineAnswer, before: str | None, after: str | None) -> st
     return None
 
 
+def self_test_failures(scores: Sequence[ItemScore]) -> list[str]:
+    """Why a gold-planner run is not perfect: one line per wrong or breached item.
+
+    The gold planner answers with the gold plans, so anything short of every item correct and
+    no breach is a bug in the harness, scorer, compiler or dataset (`make eval PLANNER=gold`
+    exits non-zero on it; CI runs it).
+    """
+    if not scores:
+        return ["no items scored"]
+    failures = []
+    for s in scores:
+        if s.breach is not None:
+            failures.append(f"{s.id}: {s.breach}")
+        elif not s.correct:
+            failures.append(f"{s.id}: {s.error_class.value if s.error_class else 'wrong'}")
+    return failures
+
+
 async def db_fingerprint(conninfo: str) -> str:
     async with await psycopg.AsyncConnection.connect(conninfo, autocommit=True) as conn:
         cur = await conn.execute(FINGERPRINT_SQL)
