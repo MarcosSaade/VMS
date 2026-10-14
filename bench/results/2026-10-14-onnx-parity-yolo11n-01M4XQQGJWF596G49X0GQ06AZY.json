@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "run_id": "01M4XQQGJWF596G49X0GQ06AZY",
+  "name": "onnx-parity-yolo11n",
+  "kind": "worker.onnx_parity",
+  "started_at": "2026-10-14T17:07:02.698062Z",
+  "ended_at": "2026-10-14T17:35:28.860244Z",
+  "seed": 0,
+  "git": {
+    "sha": "fe9cda29fac3c1b1f56739b91439be63bc82d693",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439496704,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0",
+    "torch": "2.14.1+cpu",
+    "ultralytics": "8.4.175",
+    "onnx": "1.23.2",
+    "onnxruntime": "1.31.0"
+  },
+  "config": {
+    "weights": "yolo11n",
+    "confs": [
+      0.1,
+      0.001
+    ],
+    "eval_images": null,
+    "clips": [
+      "mot17-09-mini",
+      "mot17-04-mini",
+      "commons-roncesvalles"
+    ],
+    "frames_per_clip": 50,
+    "batch_size": 8,
+    "data_dir": "data",
+    "results_dir": "bench/results",
+    "tolerances": {
+      "raw_box_atol": 0.1,
+      "raw_score_atol": 0.001,
+      "box_atol": 0.1,
+      "score_atol": 0.0001,
+      "iou_atol": 0.001
+    },
+    "detector": {
+      "weights": "yolo11n",
+      "backend": "ultralytics",
+      "device": "cpu",
+      "imgsz": 640,
+      "conf": 0.25,
+      "iou": 0.7,
+      "max_det": 300,
+      "threads": null
+    }
+  },
+  "scenario": null,
+  "metrics": {
+    "ok": true,
+    "export": {
+      "weights": "yolo11n",
+      "weights_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
+      "onnx_sha256": "27385fecd62d3012b56cfc3ccc2e3814a3369e6a9b30722a8c58fb16dadf9e6e",
+      "opset": 18,
+      "imgsz": 640,
+      "dynamic": true,
+      "packages": {
+        "python": "3.12.14",
+        "torch": "2.14.1+cpu",
+        "ultralytics": "8.4.175",
+        "onnx": "1.23.2",
+        "onnxruntime": "1.31.0"
+      },
+      "exported_at": "2026-10-14T17:06:56.890274Z"
+    },
+    "sets": {
+      "eval-coco": {
+        "images": 500,
+        "letterbox_mismatches": 0,
+        "raw_max_box_diff_px": 0.009552001953125,
+        "raw_max_score_diff": 0.00006097555160522461,
+        "detections": {
+          "conf=0.1": {
+            "matched": 5038,
+            "max_box_diff_px": 0.004119873046875,
+            "max_score_diff": 0.000016033649444580078,
+            "threshold_flips": 0,
+            "nms_flips": 0,
+            "unexplained": 0,
+            "unexplained_examples": []
+          },
+          "conf=0.001": {
+            "matched": 68246,
+            "max_box_diff_px": 0.00830841064453125,
+            "max_score_diff": 0.000016033649444580078,
+            "threshold_flips": 2,
+            "nms_flips": 1,
+            "unexplained": 0,
+            "unexplained_examples": []
+          }
+        },
+        "ok": true,
+        "seconds": 1189.9567505100003
+      },
+      "eval-mot17": {
+        "images": 73,
+        "letterbox_mismatches": 0,
+        "raw_max_box_diff_px": 0.006805419921875,
+        "raw_max_score_diff": 0.000016123056411743164,
+        "detections": {
+          "conf=0.1": {
+            "matched": 2090,
+            "max_box_diff_px": 0.000732421875,
+            "max_score_diff": 2.1457672119140625e-6,
+            "threshold_flips": 0,
+            "nms_flips": 0,
+            "unexplained": 0,
+            "unexplained_examples": []
+          },
+          "conf=0.001": {
+            "matched": 21713,
+            "max_box_diff_px": 0.00238037109375,
+            "max_score_diff": 2.1457672119140625e-6,
+            "threshold_flips": 0,
+            "nms_flips": 0,
+            "unexplained": 0,
+            "unexplained_examples": []
+          }
+        },
+        "ok": true,
+        "seconds": 164.10687329599932
+      },
+      "data-mini": {
+        "images": 150,
+        "letterbox_mismatches": 0,
+        "raw_max_box_diff_px": 0.00653076171875,
+        "raw_max_score_diff": 0.000028252601623535156,
+        "detections": {
+          "conf=0.1": {
+            "matched": 3485,
+            "max_box_diff_px": 0.00244140625,
+            "max_score_diff": 2.86102294921875e-6,
+            "threshold_flips": 0,
+            "nms_flips": 0,
+            "unexplained": 0,
+            "unexplained_examples": []
+          },
+          "conf=0.001": {
+            "matched": 43435,
+            "max_box_diff_px": 0.005096435546875,
+            "max_score_diff": 2.86102294921875e-6,
+            "threshold_flips": 0,
+            "nms_flips": 0,
+            "unexplained": 0,
+            "unexplained_examples": []
+          }
+        },
+        "ok": true,
+        "seconds": 337.91076371300005
+      },
+      "data-mini-batched": {
+        "batch_size": 8,
+        "matched": 3485,
+        "max_box_diff_px": 0.000244140625,
+        "max_score_diff": 1.1920928955078125e-6,
+        "threshold_flips": 0,
+        "nms_flips": 0,
+        "unexplained": 0,
+        "unexplained_examples": []
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": "ONNX Runtime CPU vs Ultralytics PyTorch CPU, float32. Raw diffs are on the same input tensor; detection diffs are over one-to-one matches (see vms.worker.parity)."
+}
