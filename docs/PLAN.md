@@ -67,7 +67,7 @@
   - Understand it: how were gold answers produced and checked, and how do you know the test split has not leaked into prompts?
 - [x] 3.2 Execution-accuracy scorer with bootstrap confidence intervals, error taxonomy, a "measures / does not measure" note per metric, red-team subset
   - Understand it: what is a 95% bootstrap CI here, why is it wide, and what does execution accuracy miss?
-- [ ] 3.4 Detection quality subset (mAP@50 and mAP@50-95 with bootstrap CIs)
+- [x] 3.4 Detection quality subset (mAP@50 and mAP@50-95 with bootstrap CIs)
   - Understand it: what does mAP@50-95 reward that mAP@50 does not, and how representative is the subset of the clips?
 - [ ] 3.5 Baseline eval numbers and `make eval` (structured and detection suites; two LLMs compared on dev)
   - Understand it: is the difference between the two LLMs real given the CIs, and what are the top error classes?

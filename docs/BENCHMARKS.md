@@ -58,7 +58,7 @@ _Precision ladder and batch sweep: placeholder (tasks 5.2, 5.3)._ Model-only and
 
 ### Worker model-only latency, CPU baseline
 
-Self-measured on `laptop` with `make bench-model`: the worker's per-frame work in its own thread (JPEG decode, input statistics, YOLO11 pre-processing + forward + NMS; tracking is not included), batch size 1, imgsz 640, detector threshold 0.1 (the tracking default, D21), PyTorch 2.14.1 CPU build, 150 frames from the three data-mini clips at 1280x720 q85, 10 warmup frames excluded, 3 repetitions. No database, object store or HTTP, so end-to-end throughput will be lower (task 2.5). No accuracy number yet: mAP comes in task 3.4, so the yolo11n speedup has an unmeasured quality cost.
+Self-measured on `laptop` with `make bench-model`: the worker's per-frame work in its own thread (JPEG decode, input statistics, YOLO11 pre-processing + forward + NMS; tracking is not included), batch size 1, imgsz 640, detector threshold 0.1 (the tracking default, D21), PyTorch 2.14.1 CPU build, 150 frames from the three data-mini clips at 1280x720 q85, 10 warmup frames excluded, 3 repetitions. No database, object store or HTTP, so end-to-end throughput will be lower (task 2.5). Its quality cost: yolo11n scores about 8 points lower COCO mAP@50-95 and 5 points lower MOT17 person mAP@50-95 than yolo11s (Evaluation, detection quality).
 
 | Model | Frames/s (mean, std) | Infer p50 / p95 ms | Total p95 ms | CPU cores | Raw detections/frame | Evidence |
 |---|---|---|---|---|---|---|
@@ -137,6 +137,21 @@ Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, 
 | cost | not priced (no price configured) |
 
 Errors (8): wrong_aggregation 2 (counted zone entries where the question asked for distinct people), wrong_abstain_reason 2 (two exhaustion attacks refused as unsupported or unanswerable rather than disallowed), abstained_wrongly 1, should_have_abstained 1, invalid_plan 1, wrong_order_limit 1 (an unrequested limit of 20). Weakest categories: join 75% [50, 100] (n=12), adversarial 83% [58, 100] (n=12); intervals per category are wide.
+### Detection quality, baseline (task 3.4, D31)
+
+Self-measured on `laptop`, `make eval SUITE=detection` (PyTorch CPU, imgsz 640, conf 0.001, NMS IoU 0.7, max 300 detections). mAP follows pycocotools (area all, 100 detections per image and class); intervals are 95% percentile bootstrap over images, 2,000 resamples, seed 20261014. Subset v1: `eval/detection/subset.v1.jsonl`, sha256 `1661781dd3045ca39c1baba92807b0815f5c09e5f7a161fc42a061a3183f87dc`.
+
+| Model | COCO mAP@50-95 | COCO mAP@50 | MOT17 person mAP@50-95 | MOT17 person mAP@50 | Evidence |
+|---|---|---|---|---|---|
+| yolo11s | 45.8 [44.1, 49.6] | 61.7 [59.5, 65.8] | 45.0 [43.1, 47.0] | 72.9 [70.5, 75.1] | E-034, `eval/results/2026-10-14-detection-yolo11s-01M4X1QXXBF2VN2NKXY9AYPBV9.json` |
+| yolo11n | 37.9 [36.1, 42.2] | 52.6 [50.6, 57.3] | 40.3 [38.6, 42.0] | 66.7 [64.5, 68.6] | E-034, `eval/results/2026-10-14-detection-yolo11n-01M4X1TQS363MBH227YJQGFH7A.json` |
+
+What each metric measures and does not:
+
+- **COCO mAP@50-95** (500 val2017 images, 79 classes with boxes): box quality across classes, rewarding tight localization (IoU up to 0.95). Comparable with published numbers (yolo11s 47.0, yolo11n 39.5 on all 5,000 images; both inside the intervals). Does not measure the camera scenes, the worker's operating threshold (0.1 to 0.25), or speed.
+- **COCO mAP@50**: whether objects are found and classified with a loose box; less sensitive to localization.
+- **MOT17 person mAP**: finding people in 73 frames of the three static demo scenes, fed as the worker receives them (1280x720 q85). Positives are visible persons including static ones (not MOTChallenge's convention, so not comparable with its tables). Labels box people behind occluders at full extent while detectors box the visible part, which caps mAP@50-95. Frames within a sequence are correlated, so the interval is optimistic and says nothing about other scenes.
+- **Intervals**: the bootstrap mean is about 1 point above the COCO point estimate (`boot_mean` in the results; the precision envelope is a running maximum), so COCO intervals lean high by about that much. Overlapping intervals do not show two models are equal: compare with a paired bootstrap on the same resamples.
 
 ## LLM serving
 
@@ -155,5 +170,6 @@ _Placeholder (task 10.3)._
 One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/scenarios/<name>.yaml` reruns any scenario named in a table (`make demo` first for end-to-end ones; `make loadgen-stub` for the stub scenarios; `make data-mini` and `make models` for the model-only ones), and `make bench-report RESULTS=...` renders a results file as the table rows above.
 
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` (LLM from `LLM_*`), `make eval-report RESULTS=...`.
+- Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
 - Structured eval set: `make up`, `make eval-db` (pulls or regenerates the snapshot and checks its hashes), `make eval-build` (re-runs every gold; the split files must come out unchanged), `make eval-check`.
 - Load generator ceiling: `make data-mini`, then `make loadgen-selftest`; `make loadgen-stub STUB_WORKERS=6` in one shell and `make loadgen SCENARIO=bench/scenarios/loadgen-stub-max.yaml` in another; restart the stub with `STUB_WORKERS=1` and run `make loadgen SCENARIO=bench/scenarios/loadgen-stub-20x5.yaml`. Check that port 8080 is free before starting each stub.
