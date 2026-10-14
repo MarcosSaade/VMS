@@ -129,3 +129,23 @@ def test_child_pids_lists_direct_children() -> None:
         child.communicate(b"")
     assert child.pid not in child_pids(os.getpid())
     assert child_pids(2**22 + 12345) == []  # no such process
+
+
+def test_any_frame_categories_split_a_stage_by_library_frames() -> None:
+    frames = [
+        ("_analyze", "/app/src/vms/worker/service.py"),  # 0
+        ("detect", "/app/src/vms/worker/detector.py"),  # 1
+        ("inference", "/venv/ultralytics/engine/predictor.py"),  # 2
+        ("postprocess", "/venv/ultralytics/models/yolo/detect/predict.py"),  # 3
+        ("forward", "/venv/torch/nn/modules/module.py"),  # 4
+        ("check_cfg", "/venv/ultralytics/cfg/__init__.py"),  # 5
+    ]
+    categories = [
+        Category(name="forward", pattern=r"^inference .*ultralytics/", any_frame=True),
+        Category(name="post", pattern=r"^postprocess .*ultralytics/", any_frame=True),
+        *CATEGORIES,
+    ]
+    doc = speedscope(frames, {"infer": [[0, 1, 2, 4], [0, 1, 3], [0, 1, 5]]})
+    out = summarize(doc, STARTUP_RE, categories)
+    # Library frames under detect pick the split; anything else under detect stays infer.
+    assert out["threads"]["infer"] == {"forward": 1, "post": 1, "infer": 1}

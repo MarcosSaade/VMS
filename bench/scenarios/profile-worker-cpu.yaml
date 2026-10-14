@@ -19,6 +19,11 @@ ingest:
   fps: 5
 startup: "^(_find_and_load|_call_with_frames_removed|load_detector|build_detector|warmup) "
 categories:
+  # Inside detect: Ultralytics' letterbox (preprocess), the PyTorch forward pass (inference)
+  # and NMS + box scaling (postprocess); whatever else detect does stays `infer`.
+  - {name: infer_preprocess, pattern: "^(preprocess|pre_transform|setup_source) .*/ultralytics/", any_frame: true}
+  - {name: infer_forward, pattern: "^inference .*/ultralytics/engine/predictor\\.py", any_frame: true}
+  - {name: infer_postprocess, pattern: "^(postprocess|construct_results?) .*/ultralytics/", any_frame: true}
   - {name: infer, pattern: "^(detect|detect_batch|predict) .*/vms/worker/(detector|onnx_detector)\\.py"}
   - {name: decode, pattern: "^decode_jpeg "}
   - {name: input_stats, pattern: "/vms/worker/stats\\.py"}

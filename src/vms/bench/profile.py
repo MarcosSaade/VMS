@@ -55,6 +55,10 @@ class _Section(BaseModel):
 class Category(_Section):
     name: str
     pattern: str  # regex on "function (file)" of one frame
+    # Also match library frames in the first pass, to split a stage of our own by what the
+    # library does under it (e.g. Ultralytics' preprocess, forward and postprocess under
+    # `detect`). List such categories before the stage's own category.
+    any_frame: bool = False
 
     @model_validator(mode="after")
     def _compiles(self) -> Category:
@@ -127,17 +131,23 @@ class Frame:
 def classify(
     stack: Sequence[Frame],
     startup: re.Pattern[str],
-    categories: Sequence[tuple[str, re.Pattern[str]]],
+    categories: Sequence[tuple[str, re.Pattern[str], bool]],
 ) -> str:
-    """Category of one sample; `stack` is outermost first (speedscope's order)."""
+    """Category of one sample; `stack` is outermost first (speedscope's order).
+
+    First pass, innermost frame first: our own frames against every category, library frames
+    against `any_frame` categories only. Second pass: any frame against every category."""
     if any(startup.search(f.label) for f in stack):
         return STARTUP
     inner_first = list(reversed(stack))
-    for frames in ([f for f in inner_first if f.ours], inner_first):
-        for frame in frames:
-            for name, pattern in categories:
-                if pattern.search(frame.label):
-                    return name
+    for frame in inner_first:
+        for name, pattern, any_frame in categories:
+            if (frame.ours or any_frame) and pattern.search(frame.label):
+                return name
+    for frame in inner_first:
+        for name, pattern, _ in categories:
+            if pattern.search(frame.label):
+                return name
     return OTHER
 
 
@@ -149,7 +159,7 @@ def summarize(
     py-spy weights each sample by its interval in seconds (`unit: seconds`, 1/rate each);
     a profile without weights counts one per sample."""
     frames = [Frame(f["name"], f.get("file") or "") for f in speedscope["shared"]["frames"]]
-    rules = [(c.name, re.compile(c.pattern)) for c in categories]
+    rules = [(c.name, re.compile(c.pattern), c.any_frame) for c in categories]
     startup_re = re.compile(startup)
     threads: dict[str, dict[str, float]] = {}
     total: dict[str, float] = {}
