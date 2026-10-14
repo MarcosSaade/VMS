@@ -50,3 +50,19 @@ def test_fake_clock_rejects_naive_datetimes(bad: datetime) -> None:
 def test_fake_clock_cannot_advance_backwards() -> None:
     with pytest.raises(ValueError, match="backwards"):
         FakeClock().advance(-1)
+
+
+def test_pinned_clock_fixes_wall_time_but_not_monotonic_time() -> None:
+    from datetime import UTC, datetime, timedelta, timezone
+
+    import pytest
+
+    from vms.common.clock import PinnedClock
+
+    pinned = datetime(2026, 3, 31, 15, 30, tzinfo=timezone(timedelta(hours=1)))
+    clock = PinnedClock(pinned)
+    assert clock.now() == datetime(2026, 3, 31, 14, 30, tzinfo=UTC)
+    assert clock.now().tzinfo is UTC
+    assert clock.monotonic() <= clock.monotonic()
+    with pytest.raises(ValueError, match="timezone-aware"):
+        PinnedClock(datetime(2026, 3, 31))
