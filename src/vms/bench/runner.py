@@ -28,7 +28,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from vms.bench import stats
 from vms.bench.ingestload import IngestLoad, IngestRun
@@ -132,6 +132,8 @@ class E2EMetrics(_Model):
     rated_capacity: RatedCapacity | None
     loadgen_config: dict[str, Any] | None  # resolved loadgen settings of the first ingest step
     interrupted: bool = False
+    # Labels of each running worker's vms_worker_model_info when the run started.
+    workers: list[dict[str, str]] = Field(default_factory=list)
 
 
 QueryClientFactory = Callable[[int], QueryClient]
@@ -182,6 +184,8 @@ class BenchRunner:
                 f"hold_s {self._sc.hold_s} is shorter than min_window_s {self._s.min_window_s}"
             )
         self._anchor = (self._clock.now().timestamp(), asyncio.get_running_loop().time())
+        workers = await worker_models(self._prom, self._wall())
+        check_workers(workers, self._sc.expect_worker)
         results: list[StepResult] = []
         for rep in range(self._sc.repeats):
             for step in self._sc.steps():
@@ -196,6 +200,7 @@ class BenchRunner:
             else None,
             loadgen_config=self._loadgen_config,
             interrupted=self._stop.is_set(),
+            workers=workers,
         )
 
     async def _step(self, step: Step, rep: int) -> StepResult:
@@ -317,6 +322,31 @@ class BenchRunner:
                 raise RuntimeError(f"backlog still {left:.0f} frames after {d.timeout_s} s")
             log.info("waiting for the worker backlog to drain", extra={"backlog": left})
             await asyncio.sleep(d.interval_s)
+
+
+class WorkerMismatchError(ValueError):
+    pass
+
+
+async def worker_models(prom: Prometheus, at_unix_s: float) -> list[dict[str, str]]:
+    """Labels of every worker's `vms_worker_model_info` (job and instance dropped)."""
+    rows = await prom.query("vms_worker_model_info", at_unix_s)
+    drop = {"__name__", "job", "instance"}
+    return sorted(
+        ({k: v for k, v in labels.items() if k not in drop} for labels, _ in rows),
+        key=lambda d: sorted(d.items()),
+    )
+
+
+def check_workers(workers: list[dict[str, str]], expect: dict[str, str]) -> None:
+    if not expect:
+        return
+    if not workers:
+        raise WorkerMismatchError("expect_worker is set but no worker reports its model info")
+    for w in workers:
+        wrong = {k: w.get(k) for k, v in expect.items() if w.get(k) != v}
+        if wrong:
+            raise WorkerMismatchError(f"worker {w} does not match expect_worker: {wrong}")
 
 
 def lost_frames(loadgen: dict[str, Any] | None, prometheus: dict[str, Reading]) -> int | None:

@@ -1,0 +1,19 @@
+name: ramp-cpu-ort-b4
+description: >
+  Task 5.5, one variable changed from ramp-cpu-ort: up to 4 claimed frames (any cameras) per forward pass (infer_batch 4; E-046: +16% model-only for ONNX Runtime at batch 4). The worker takes what is claimed and never waits to fill a batch.
+  Containerized ingest + one yolo11n worker + Postgres + object store, data-mini at 5 FPS per
+  camera (1280x720 q85), steps of 1 to 5 cameras (5 added over ramp-cpu in case 4 passes),
+  warmup 20 s, hold 90 s, 3 repetitions, no query load. Start the worker with
+  WORKER_BACKEND=onnxruntime WORKER_INFER_BATCH=4; expect_worker refuses any other configuration.
+  Quiet host: nothing else CPU-heavy.
+kind: e2e
+repeats: 3
+warmup_s: 20
+hold_s: 90
+expect_worker:
+  backend: onnxruntime
+  precision: fp32
+  infer_batch: "4"
+ingest:
+  cameras: [1, 2, 3, 4, 5]
+  fps: 5

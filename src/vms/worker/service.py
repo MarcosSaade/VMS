@@ -5,9 +5,12 @@ One iteration (`step`):
 1. Leases: renew this worker's camera leases every `renew_every_s`, and lease more cameras
    (up to `max_cameras`) on the same cadence or whenever there was nothing to claim.
 2. Claim up to `claim_batch` pending frames of leased cameras, oldest first.
-3. For each frame, in order: fetch the JPEG, then decode, input statistics and detection in
-   the inference thread (CPU bound, so off the event loop), then one transaction that writes
-   the detections and marks the frame done, fenced on this worker's claim.
+3. In batches of up to `infer_batch` frames (task 5.5; 1 is one frame at a time): fetch the
+   JPEGs concurrently, then in the inference thread (CPU bound, so off the event loop) decode
+   and input statistics per frame and one `detect_batch` call per image shape, then tracking
+   frame by frame in claim order; then for each frame one transaction that writes its
+   detections and marks it done, fenced on this worker's claim. A batch is whatever is
+   claimed: the worker never waits for more frames to fill one.
 
 Failures: an undecodable JPEG fails the frame for good (retrying cannot fix it); an object
 store, model or database error puts it back to pending until `max_attempts`. A frame whose
@@ -40,13 +43,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Protocol, TypeVar, cast
+from typing import Any, Protocol, TypeVar, cast
 
 import cv2
 import numpy as np
@@ -80,6 +84,7 @@ from vms.worker.zones import ZoneDef, ZoneEvent, ZoneSettings, ZoneTracker
 log = get_logger(__name__)
 
 T = TypeVar("T")
+A = TypeVar("A")
 
 # Dense from 25 to 300 ms, where CPU inference lives (E-013): with only 0.1 and 0.25 there, the
 # inference p95 read as a flat 100 ms bucket edge (E-026).
@@ -155,8 +160,8 @@ class Worker:
         self._zone_settings = zone_settings or ZoneSettings()
         self._tracker_factory = tracker_factory
         self._cameras: dict[str, CameraState] = {}
-        # One inference thread: batch size 1, frames in order, and PyTorch already uses
-        # several cores inside one call.
+        # One inference thread: frames in order, and the backends already use several cores
+        # inside one call.
         self._executor = executor or ThreadPoolExecutor(1, thread_name_prefix="infer")
         self._owns_executor = executor is None
         self._tracer = tracer or trace.get_tracer(__name__)
@@ -199,6 +204,12 @@ class Worker:
             "seconds",
             "Frame claimed minus frame received by ingest",
             buckets=FRESHNESS_BUCKETS_S,
+        )
+        self._batch_size = metrics.histogram(
+            "infer_batch",
+            "frames",
+            "Frames per detect_batch call",
+            buckets=(1, 2, 3, 4, 6, 8, 12, 16, 24, 32),
         )
         self._leased = metrics.gauge("leased", "cameras", "Cameras leased by this worker")
         # Both are global (every worker reports the same value): aggregate with max, not sum.
@@ -257,11 +268,12 @@ class Worker:
             # Nothing to do with the cameras held: look for new ones right away.
             await self._acquire()
             return 0
-        for i, frame in enumerate(frames):
+        size = self._settings.infer_batch
+        for i in range(0, len(frames), size):
             if stop is not None and stop.is_set():
                 log.info("stopping; handing back claimed frames", extra={"n": len(frames) - i})
                 break
-            await self.process(frame)
+            await self.process_batch(frames[i : i + size])
         return len(frames)
 
     async def _renew_and_acquire(self) -> None:
@@ -297,13 +309,74 @@ class Worker:
         if self._owns_executor:
             self._executor.shutdown(wait=True)
 
-    # --- One frame ----------------------------------------------------------------------
+    # --- Frames -------------------------------------------------------------------------
 
     async def process(self, frame: ClaimedFrame) -> Outcome:
+        """One frame on its own (a batch of one)."""
+        return (await self.process_batch([frame]))[0]
+
+    async def process_batch(self, frames: list[ClaimedFrame]) -> list[Outcome]:
+        """Fetch the frames concurrently, detect them in one `detect_batch` call per image
+        shape, track them in claim order (capture order per camera), then write each in its
+        own fenced transaction. Outcomes are per frame: one bad JPEG or failed write does not
+        fail the others; a model error fails (and retries) the whole batch."""
+        now = self._clock.now()
+        spans = [self._frame_span(frame, now) for frame in frames]
+        outcomes: list[Outcome | None] = [None] * len(frames)
+        try:
+            for frame in frames:
+                self._wait.observe(max(0.0, (now - frame.received_at).total_seconds()))
+            states = {f.camera_id: await self._camera_state(f.camera_id) for f in frames}
+
+            async def fetch(i: int) -> bytes:
+                with trace.use_span(spans[i], end_on_exit=False), self._timed("fetch"):
+                    return await self._fetcher.get(frames[i].object_key)
+
+            fetched = await asyncio.gather(
+                *(fetch(i) for i in range(len(frames))), return_exceptions=True
+            )
+            todo: list[tuple[int, bytes]] = []
+            for i, got in enumerate(fetched):
+                if isinstance(got, bytes):
+                    todo.append((i, got))
+                    continue
+                with trace.use_span(spans[i], end_on_exit=False):
+                    if isinstance(got, ObjectStoreError):
+                        outcomes[i] = await self._fail(frames[i], f"fetch: {got}", retry=True)
+                    else:
+                        outcomes[i] = await self._fail(
+                            frames[i], f"fetch: {type(got).__name__}: {got}", retry=True
+                        )
+            if todo:
+                try:
+                    analyses, infer_s = await self._in_thread(
+                        lambda items: self._analyze_batch(items, frames, states, spans), todo
+                    )
+                except Exception as exc:  # the model: out of memory, a CUDA error, a bug
+                    log.exception("inference failed", extra={"frames": len(todo)})
+                    for i, _ in todo:
+                        with trace.use_span(spans[i], end_on_exit=False):
+                            outcomes[i] = await self._fail(
+                                frames[i], f"inference: {type(exc).__name__}: {exc}", True
+                            )
+                else:
+                    for seconds, size in infer_s:
+                        self._stage.labels(stage="infer").observe(seconds)
+                        self._batch_size.observe(size)
+                    for i, analysis in analyses:
+                        with trace.use_span(spans[i], end_on_exit=False):
+                            outcomes[i] = await self._complete(frames[i], analysis)
+        finally:
+            for span, outcome in zip(spans, outcomes, strict=True):
+                if outcome is not None:
+                    span.set_attribute("outcome", outcome.value)
+                span.end()
+        return [o if o is not None else Outcome.RETRY for o in outcomes]
+
+    def _frame_span(self, frame: ClaimedFrame, now: datetime) -> trace.Span:
         # Continue the frame's trace from ingest (D25): the time in the queue becomes a span of
         # its own, so a trace shows waiting apart from working.
         parent = context_from_traceparent(frame.traceparent)
-        now = self._clock.now()
         if parent is not None:
             wait = self._tracer.start_span(
                 "worker.queue_wait",
@@ -312,7 +385,7 @@ class Worker:
                 attributes={"camera_id": frame.camera_id, "frame_id": frame.frame_id},
             )
             wait.end(end_time=_unix_ns(now))
-        with self._tracer.start_as_current_span(
+        return self._tracer.start_span(
             "worker.frame",
             context=parent,
             kind=trace.SpanKind.CONSUMER,
@@ -321,38 +394,13 @@ class Worker:
                 "frame_id": frame.frame_id,
                 "attempt": frame.attempts,
             },
-        ) as span:
-            outcome = await self._process(frame, now)
-            span.set_attribute("outcome", outcome.value)
-            return outcome
+        )
 
-    async def _process(self, frame: ClaimedFrame, claimed_at: datetime) -> Outcome:
-        self._wait.observe(max(0.0, (claimed_at - frame.received_at).total_seconds()))
-        state = await self._camera_state(frame.camera_id)
-        key = (frame.ts, frame.seq)
-        track = state.last_key is None or key > state.last_key
-        if not track:
-            self._late.inc()
-        elif state.last_key is not None and (
-            (frame.ts - state.last_key[0]).total_seconds() > self._tracking.buffer_s
-        ):
-            self._reset_tracker(state)
-        try:
-            with self._timed("fetch"):
-                jpeg = await self._fetcher.get(frame.object_key)
-            analysis = await self._in_thread(
-                lambda data: self._analyze(data, frame, state if track else None), jpeg
-            )
-        except DecodeError as exc:
-            return await self._fail(frame, f"decode: {exc}", retry=False)
-        except ObjectStoreError as exc:
-            return await self._fail(frame, f"fetch: {exc}", retry=True)
-        except Exception as exc:  # the model: out of memory, a CUDA error, a bug
-            log.exception("inference failed", extra={"frame_id": frame.frame_id})
-            return await self._fail(frame, f"inference: {type(exc).__name__}: {exc}", True)
+    async def _complete(self, frame: ClaimedFrame, analysis: Analysis | DecodeError) -> Outcome:
+        if isinstance(analysis, DecodeError):
+            return await self._fail(frame, f"decode: {analysis}", retry=False)
         for stage, seconds in analysis.timings_s.items():
             self._stage.labels(stage=stage).observe(seconds)
-
         result = FrameResult(
             frame_id=frame.frame_id,
             camera_id=frame.camera_id,
@@ -390,35 +438,94 @@ class Worker:
         trace.get_current_span().set_attribute("freshness_s", freshness_s)
         return Outcome.DONE
 
-    def _analyze(self, jpeg: bytes, frame: ClaimedFrame, state: CameraState | None) -> Analysis:
-        """Decode, input statistics, detection and (if `state`) tracking and zones; runs in the
-        inference thread. `state` is None for frames that must not be tracked (late)."""
-        timings: dict[str, float] = {}
-        with self._stage_timer(timings, "decode"):
-            image = decode_jpeg(jpeg)
-        with self._stage_timer(timings, "stats"):
-            stats = input_stats(image)
-        with self._stage_timer(timings, "infer"):
-            found = self._detector.detect(image)
-        height, width = image.shape[:2]
+    def _analyze_batch(
+        self,
+        items: list[tuple[int, bytes]],
+        frames: list[ClaimedFrame],
+        states: dict[str, CameraState],
+        spans: list[trace.Span],
+    ) -> tuple[list[tuple[int, Analysis | DecodeError]], list[tuple[float, int]]]:
+        """Runs in the inference thread: per frame decode and input statistics, then one
+        `detect_batch` per image shape (mixed shapes would be letterboxed to squares, changing
+        the detections), then tracking and zones frame by frame in claim order. Returns each
+        frame's analysis (or its decode error) and (seconds, size) per detect_batch call."""
+        out: dict[int, Analysis | DecodeError] = {}
+        timings: dict[int, dict[str, float]] = {}
+        decoded: dict[int, tuple[NDArray[np.uint8], Any]] = {}
+        for i, jpeg in items:
+            timings[i] = {}
+            with self._frame_context(spans[i]):
+                try:
+                    with self._stage_timer(timings[i], "decode"):
+                        image = decode_jpeg(jpeg)
+                except DecodeError as exc:
+                    out[i] = exc
+                    continue
+                with self._stage_timer(timings[i], "stats"):
+                    decoded[i] = (image, input_stats(image))
 
-        if state is not None:
-            with self._stage_timer(timings, "track"):
-                tracked = self._track(found, frame, state, width, height)
-        else:
-            tracked = self._track(found, frame, None, width, height)
-        return Analysis(
-            width,
-            height,
-            stats.brightness,
-            stats.contrast,
-            stats.blur_var,
-            tracked.detections,
-            tracked.tracks,
-            tracked.zone_events,
-            state is not None,
-            timings,
-        )
+        found: dict[int, list[Detection]] = {}
+        infer_s: list[tuple[float, int]] = []
+        by_shape: dict[tuple[int, ...], list[int]] = {}
+        for i, (image, _) in decoded.items():
+            by_shape.setdefault(image.shape, []).append(i)
+        for group in by_shape.values():
+            start_ns = time.time_ns()
+            t0 = self._clock.monotonic()
+            results = self._detector.detect_batch([decoded[i][0] for i in group])
+            infer_s.append((self._clock.monotonic() - t0, len(group)))
+            end_ns = time.time_ns()
+            for i, dets in zip(group, results, strict=True):
+                found[i] = dets
+                # The shared forward pass appears in each frame's trace, with its batch size.
+                self._tracer.start_span(
+                    "worker.infer",
+                    context=trace.set_span_in_context(spans[i]),
+                    start_time=start_ns,
+                    attributes={"batch_size": len(group)},
+                ).end(end_time=end_ns)
+
+        for i, _ in items:  # claim order: capture order within each camera
+            if i not in decoded:
+                continue
+            frame, (image, stats) = frames[i], decoded[i]
+            state = states[frame.camera_id]
+            height, width = image.shape[:2]
+            key = (frame.ts, frame.seq)
+            track = state.last_key is None or key > state.last_key
+            if not track:
+                self._late.inc()
+            elif state.last_key is not None and (
+                (frame.ts - state.last_key[0]).total_seconds() > self._tracking.buffer_s
+            ):
+                self._reset_tracker(state)
+            with self._frame_context(spans[i]):
+                if track:
+                    with self._stage_timer(timings[i], "track"):
+                        tracked = self._track(found[i], frame, state, width, height)
+                else:
+                    tracked = self._track(found[i], frame, None, width, height)
+            out[i] = Analysis(
+                width,
+                height,
+                stats.brightness,
+                stats.contrast,
+                stats.blur_var,
+                tracked.detections,
+                tracked.tracks,
+                tracked.zone_events,
+                track,
+                timings[i],
+            )
+        return [(i, out[i]) for i, _ in items], infer_s
+
+    @contextmanager
+    def _frame_context(self, span: trace.Span) -> Iterator[None]:
+        token = otel_context.attach(trace.set_span_in_context(span))
+        try:
+            yield
+        finally:
+            otel_context.detach(token)
 
     def _track(
         self,
@@ -502,7 +609,7 @@ class Worker:
         )
         return outcome
 
-    async def _in_thread(self, fn: Callable[[bytes], T], arg: bytes) -> T:
+    async def _in_thread(self, fn: Callable[[A], T], arg: A) -> T:
         ctx = otel_context.get_current()
 
         def call() -> T:

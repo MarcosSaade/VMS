@@ -89,6 +89,10 @@ class BenchScenario(_Section):
     hold_s: float = Field(default=60.0, gt=0)
     ingest: IngestLoad | None = None
     query: QueryLoad | None = None
+    # Labels every running worker's `vms_worker_model_info` must carry (e.g. backend:
+    # onnxruntime, infer_batch: "4"), checked before the first step: the scenario does not
+    # start the services, so this catches a run against the wrong worker configuration.
+    expect_worker: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _some_load(self) -> BenchScenario:

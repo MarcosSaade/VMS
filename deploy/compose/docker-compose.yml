@@ -216,9 +216,13 @@ services:
       VMS_HTTP__PORT: "8090"
       # yolo11n keeps up with more cameras on CPU than yolo11s (E-013, E-014).
       VMS_DETECTOR__WEIGHTS: ${DEMO_WEIGHTS:-yolo11n}
+      # Backend and frames per forward pass (D5, task 5.5); onnxruntime needs `make onnx`.
+      VMS_DETECTOR__BACKEND: ${WORKER_BACKEND:-ultralytics}
+      VMS_QUEUE__INFER_BATCH: ${WORKER_INFER_BATCH:-1}
     volumes:
-      # Fetched and verified on the host (make models); read-only in the container.
+      # Fetched, verified and exported on the host (make models, make onnx); read-only here.
       - ../../models/weights:/app/models/weights:ro
+      - ../../models/onnx:/app/models/onnx:ro
     ports:
       - "127.0.0.1:${WORKER_PORT:-8090}:8090"
     depends_on:

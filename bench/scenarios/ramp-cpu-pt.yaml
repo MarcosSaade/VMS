@@ -1,0 +1,19 @@
+name: ramp-cpu-pt
+description: >
+  Baseline re-run for task 5.5: the E-039 configuration (one yolo11n worker, PyTorch CPU, batch 1) with the 5.5 worker code, in the same session as the ONNX Runtime runs, so the before/after comparison shares host conditions. Also checks that the batched worker loop at infer_batch 1 behaves as before.
+  Containerized ingest + one yolo11n worker + Postgres + object store, data-mini at 5 FPS per
+  camera (1280x720 q85), steps of 1 to 5 cameras (5 added over ramp-cpu in case 4 passes),
+  warmup 20 s, hold 90 s, 3 repetitions, no query load. Start the worker with
+  WORKER_BACKEND=ultralytics WORKER_INFER_BATCH=1; expect_worker refuses any other configuration.
+  Quiet host: nothing else CPU-heavy.
+kind: e2e
+repeats: 3
+warmup_s: 20
+hold_s: 90
+expect_worker:
+  backend: ultralytics
+  precision: fp32
+  infer_batch: "1"
+ingest:
+  cameras: [1, 2, 3, 4, 5]
+  fps: 5

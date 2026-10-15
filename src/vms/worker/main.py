@@ -70,6 +70,20 @@ def build_app(settings: WorkerSettings, obs: Observability, detector: Detector) 
         zone_settings=settings.zones,
         tracer=obs.tracer,
     )
+    # Which model and settings this worker serves, for dashboards and for benchmark results
+    # (the e2e runner records it and can require it: `expect_worker` in a scenario).
+    obs.metrics.gauge(
+        "model",
+        "info",
+        "Model served by this worker (value 1)",
+        ["model_version", "backend", "precision", "device", "infer_batch"],
+    ).labels(
+        model_version=detector.model_version,
+        backend=settings.detector.backend,
+        precision=settings.detector.precision,
+        device=settings.detector.device,
+        infer_batch=str(settings.queue.infer_batch),
+    ).set(1)
     stop = asyncio.Event()
     task: asyncio.Task[None] | None = None
 

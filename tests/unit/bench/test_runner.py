@@ -11,6 +11,7 @@ from vms.bench.runner import (
     StepResult,
     Verdict,
     Window,
+    WorkerMismatchError,
     judge,
     lost_frames,
     rated_capacity,
@@ -293,3 +294,26 @@ def test_shipped_config_has_the_queries_the_verdict_reads(settings: BenchSetting
     assert {"freshness_p95_s", "worker_lost_frames", "backlog_slope_fps"} <= settings.queries.keys()
     assert all("$window" in q.query or "[" not in q.query for q in settings.queries.values())
     assert settings.min_window_s >= 3 * 5  # three scrapes at the services' 5 s interval
+
+
+ORT = {"model_version": "yolo11n@0ebbc80d4a76+onnx", "backend": "onnxruntime", "infer_batch": "4"}
+
+
+def test_the_workers_model_is_recorded(vrun: VRun, settings: BenchSettings) -> None:
+    prom = FakePrometheus(settings, HEALTHY.get, workers=[ORT])
+    metrics: E2EMetrics = vrun(make_runner(scenario(), settings, FakeIngest(), prom).run())
+    assert metrics.workers == [ORT]  # job and instance labels dropped
+
+
+def test_a_worker_that_does_not_match_expect_worker_stops_the_run(
+    vrun: VRun, settings: BenchSettings
+) -> None:
+    sc = scenario(expect_worker={"backend": "onnxruntime", "infer_batch": "1"})
+    ingest = FakeIngest()
+    prom = FakePrometheus(settings, HEALTHY.get, workers=[ORT])
+    with pytest.raises(WorkerMismatchError, match="infer_batch"):
+        vrun(make_runner(sc, settings, ingest, prom).run())
+    with pytest.raises(WorkerMismatchError, match="no worker"):
+        vrun(make_runner(sc, settings, ingest, FakePrometheus(settings, HEALTHY.get)).run())
+    ok = scenario(expect_worker={"backend": "onnxruntime"})
+    assert vrun(make_runner(ok, settings, ingest, prom).run()).workers == [ORT]

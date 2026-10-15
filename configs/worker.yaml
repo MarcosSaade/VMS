@@ -11,6 +11,7 @@ queue:                         # Postgres as the queue (D3), camera leases (D20)
   lease_ttl_s: 30
   renew_every_s: 5
   claim_batch: 4
+  infer_batch: 1               # frames per detect_batch call (5.5); <= claim_batch
   max_attempts: 3
   poll_min_s: 0.05
   poll_max_s: 1.0

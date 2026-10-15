@@ -35,6 +35,7 @@ from vms.storage.work import (
     PostgresWorkQueue,
     TrackUpdate,
 )
+from vms.worker.onnx_detector import StaleExportError, export_onnx, verified_export
 from vms.worker.weights import ensure_weights, load_models_config
 
 pytestmark = pytest.mark.integration
@@ -329,10 +330,30 @@ def bus_clip() -> LoadedClip:
     return LoadedClip("bus", 30.0, width, height, (bytes(buf),) * 4)
 
 
+@pytest.mark.parametrize(
+    ("backend", "infer_batch", "version"),
+    [
+        ("ultralytics", 1, "yolo11n@0ebbc80d4a76"),
+        # Task 5.5: ONNX Runtime with frames of both cameras in one forward pass.
+        ("onnxruntime", 4, "yolo11n@0ebbc80d4a76+onnx"),
+    ],
+)
 def test_loadgen_to_detections_with_yolo11n(
-    stack: StackSettings, fresh_db: str, ingest_url: str, prefix: str
+    stack: StackSettings,
+    fresh_db: str,
+    ingest_url: str,
+    prefix: str,
+    backend: str,
+    infer_batch: int,
+    version: str,
 ) -> None:
-    ensure_weights(load_models_config(), "yolo11n")  # fetched once, then cached
+    models = load_models_config()
+    weights = ensure_weights(models, "yolo11n")  # fetched once, then cached
+    if backend == "onnxruntime":
+        try:
+            verified_export(models.onnx_dir, "yolo11n", models.weights["yolo11n"].sha256)
+        except (FileNotFoundError, StaleExportError):
+            export_onnx(weights, models.weights["yolo11n"].sha256, "yolo11n", models.onnx_dir, 640)
     clip = bus_clip()
     plans = plan_cameras(2, ["bus"], {"bus": 4}, 5.0, seed=0, prefix=prefix)
     settings = LoadgenSettings(cameras=2, fps=5.0, duration_s=0.8, warmup_s=0.0)
@@ -359,7 +380,12 @@ def test_loadgen_to_detections_with_yolo11n(
             (f"{zoned}:all", zoned),
         )
 
-    worker_env = {"VMS_DETECTOR__WEIGHTS": "yolo11n", "VMS_QUEUE__POLL_MAX_S": "0.2"}
+    worker_env = {
+        "VMS_DETECTOR__WEIGHTS": "yolo11n",
+        "VMS_DETECTOR__BACKEND": backend,
+        "VMS_QUEUE__INFER_BATCH": str(infer_batch),
+        "VMS_QUEUE__POLL_MAX_S": "0.2",
+    }
     with service("vms.worker", stack, fresh_db, worker_env) as url:
         poll(
             lambda: fetch(
@@ -369,6 +395,7 @@ def test_loadgen_to_detections_with_yolo11n(
         )
         metrics = poll(lambda: _get(f"{url}/metrics"), timeout_s=5)
         assert 'vms_worker_frames_total{outcome="done"} 8.0' in metrics
+        assert f'model_version="{version}"' in metrics  # vms_worker_model_info
 
     frames = fetch(
         stack,
@@ -377,7 +404,7 @@ def test_loadgen_to_detections_with_yolo11n(
     )
     assert {f[:2] for f in frames} == {(clip.width, clip.height)}
     assert all(f[2] > 0 and f[3] > 0 and f[4] > 0 for f in frames)
-    assert {f[5] for f in frames} == {"yolo11n@0ebbc80d4a76"}
+    assert {f[5] for f in frames} == {version}
     assert {f[6] for f in frames} == {1}
 
     by_class = dict(

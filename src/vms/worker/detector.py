@@ -55,6 +55,10 @@ class Detector(Protocol):
         """Detect objects in one BGR image (H x W x 3, uint8)."""
         ...
 
+    def detect_batch(self, images: list[NDArray[np.uint8]]) -> list[list[Detection]]:
+        """`detect` for several images in one forward pass, results in input order."""
+        ...
+
 
 class DetectorSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -53,7 +53,9 @@ class FakePrometheus:
         settings: BenchSettings,
         values: Callable[[str], Any],
         backlog: list[float | None] | None = None,
+        workers: list[dict[str, str]] | None = None,
     ) -> None:
+        self.workers = workers if workers is not None else []
         self._templates = {name: q.query for name, q in settings.queries.items()}
         self._by = {name: q.by for name, q in settings.queries.items()}
         self._values = values
@@ -72,6 +74,9 @@ class FakePrometheus:
         if promql == "max(vms_worker_backlog_frames)":
             value = self.backlog.pop(0) if len(self.backlog) > 1 else self.backlog[0]
             return [] if value is None else [({}, value)]
+        if promql == "vms_worker_model_info":
+            labels = {"__name__": "vms_worker_model_info", "job": "worker", "instance": "w:8090"}
+            return [(labels | w, 1.0) for w in self.workers]
         name = self._name(promql)
         value = self._values(name)
         if value is None:

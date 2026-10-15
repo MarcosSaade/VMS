@@ -193,6 +193,7 @@ class FakeDetector:
     seen: list[tuple[int, ...]] = field(default_factory=list)
     on_detect: Callable[[], None] | None = None
     script: list[list[Detection]] = field(default_factory=list)  # per call, then `detections`
+    batches: list[int] = field(default_factory=list)  # images per detect_batch call
 
     @property
     def model_version(self) -> str:
@@ -207,6 +208,10 @@ class FakeDetector:
         if self.script:
             return list(self.script.pop(0))
         return list(self.detections)
+
+    def detect_batch(self, images: list[NDArray[np.uint8]]) -> list[list[Detection]]:
+        self.batches.append(len(images))
+        return [self.detect(image) for image in images]
 
 
 class InlineExecutor(Executor):
@@ -238,6 +243,10 @@ class Harness:
 
 @pytest.fixture
 def harness() -> Harness:
+    return make_harness(QueueSettings(max_cameras=2, claim_batch=2, max_attempts=2))
+
+
+def make_harness(settings: QueueSettings) -> Harness:
     clock = FakeClock(T0 + timedelta(seconds=60))
     queue, fetcher, detector = FakeQueue(clock=clock), FakeFetcher(), FakeDetector()
     metrics = Metrics("worker")
@@ -245,7 +254,6 @@ def harness() -> Harness:
     tracer = init_telemetry(
         "worker", TelemetrySettings(), exporter=spans, set_global=False
     ).get_tracer("test")
-    settings = QueueSettings(max_cameras=2, claim_batch=2, max_attempts=2)
     counter = iter(range(1, 1_000_000))
     ids = UlidGenerator(clock, randbytes=lambda n: next(counter).to_bytes(n, "big"))
     worker = Worker(

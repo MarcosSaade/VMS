@@ -31,7 +31,10 @@ class QueueSettings(_Section):
     max_cameras: int = Field(default=16, ge=1)  # cameras leased at once by one worker
     lease_ttl_s: float = Field(default=30.0, gt=0)  # a dead worker's cameras move after this
     renew_every_s: float = Field(default=5.0, gt=0)
-    claim_batch: int = Field(default=4, ge=1)  # frames per claim query (inference stays bs=1)
+    claim_batch: int = Field(default=4, ge=1)  # frames per claim query
+    # Frames per detect_batch call (task 5.5): claimed frames, of any leased cameras, are
+    # detected together up to this many; 1 is one frame at a time. At most claim_batch.
+    infer_batch: int = Field(default=1, ge=1)
     max_attempts: int = Field(default=3, ge=1)  # then the frame is marked failed
     # Idle polling backs off from min to max while no frames arrive.
     poll_min_s: float = Field(default=0.05, gt=0)
@@ -46,6 +49,8 @@ class QueueSettings(_Section):
             raise ValueError("poll_min_s must not exceed poll_max_s")
         if self.renew_every_s >= self.lease_ttl_s:
             raise ValueError("renew_every_s must be shorter than lease_ttl_s")
+        if self.infer_batch > self.claim_batch:
+            raise ValueError("infer_batch must not exceed claim_batch")
         return self
 
 
