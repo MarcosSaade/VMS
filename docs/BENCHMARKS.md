@@ -34,7 +34,7 @@ Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacit
 | Rated capacity, CPU (one yolo11n worker, PyTorch, batch 1) | **2 cameras at 5 FPS** (3/3 repetitions; freshness p95 0.24 s, 0 lost); the worker saturates at 14.2 frames/s | E-039, [`ramp-cpu`](../bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json) |
 | Structured-query latency under ingest, CPU, canned planner (LLM excluded) | p95 39 ms at 1 client, 98 ms at 8 (159 q/s, one core saturated) | E-040, [`query-load-cpu`](../bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json) |
 | Detection quality, yolo11s (PyTorch CPU) | COCO-500 mAP@50-95 45.8 [44.1, 49.6]; MOT17 person mAP@50-95 45.0 [43.1, 47.0] | E-034 (Evaluation, detection quality) |
-| Precision ladder, yolo11s CPU, model-only (`detect_batch`, batch 1) | ONNX Runtime FP32 **1.65x** PyTorch (21.3 vs 12.9 images/s), same mAP; INT8 3.0x (38.2 images/s) but COCO mAP@50-95 -1.07 [-1.84, +0.40] fails D32, so not kept | E-044, E-045 (Inference, precision ladder) |
+| Precision ladder, CPU, model-only (`detect_batch`, batch 1) | ONNX Runtime FP32 **1.84x** PyTorch for yolo11n (48.8 vs 26.5 images/s) and **1.65x** for yolo11s (21.3 vs 12.9), identical mAP; INT8 is faster still (65.8 and 38.2) but fails D32 for both models (COCO mAP@50-95 -1.30 and -1.07 points), so not kept | E-044 to E-046 (Inference, precision ladder) |
 
 ## Ingest and pipeline capacity
 
@@ -151,7 +151,7 @@ Evidence: [`yolo11n parity`](../bench/results/2026-10-14-onnx-parity-yolo11n-01M
 
 **Why these tolerances.** Two float32 runtimes run the same graph with different kernels (oneDNN in PyTorch, MLAS in ONNX Runtime) and summation orders, so exact equality is not expected; differences come from rounding that accumulates over about 300 layers. A tenth of a pixel moves no pixel of a crop and the IoU of a 20 px box by about 1%; 1e-4 in score is 1/1500 of the gap between the worker's 0.1 and 0.25 thresholds. The tolerances sit 5x to 50x above the observed maxima, so a real bug (a half-pixel letterbox shift, RGB/BGR swapped, a wrong NMS rule) fails them by orders of magnitude while rounding never does. Where outputs can legitimately differ, near a threshold, the check classifies the case instead of loosening the tolerance.
 
-### Precision ladder, CPU (task 5.2; E-043 to E-045)
+### Precision ladder, CPU (task 5.2; E-043 to E-046)
 
 Self-measured on `laptop` (clean commit 9b71ac7). **Model-only**: `detect_batch` (letterbox, forward pass, NMS) for yolo11s at imgsz 640 and threshold 0.1, on 300 decoded data-mini frames (1280x720, as loadgen sends them; JPEG decode excluded). `make bench SCENARIO=bench/scenarios/ladder-cpu.yaml`: each backend in its own process, 5 repetitions with the step order rotated, 15 s cooldown, 2 warmup batches per batch size, compose stack stopped. Thread defaults as the worker (one intra-op thread per physical core). Quality: the detection subset (D31) per backend, and the INT8 difference as a paired bootstrap against ORT FP32 (`make eval-detection-compare`).
 
@@ -161,13 +161,24 @@ Self-measured on `laptop` (clean commit 9b71ac7). **Model-only**: `detect_batch`
 | ONNX Runtime FP32 | 21.3 (1.5) | 44 / 53 / 53 | 22.3 (1.7) | 21.0 (1.5) | 10.0 | 1,531 | 45.8 (paired delta 0.00) | 45.0 (paired delta 0.00) |
 | ONNX Runtime INT8 (static QDQ, head decode FP32) | 38.2 (0.8) | 26 / 31 / 31 | 45.9 (0.2) | 46.1 (0.7) | 10.0 | 1,214 | 44.8, paired delta **-1.07 [-1.84, +0.40]** | 45.2, paired delta +0.13 [-0.27, +0.55] |
 
+**yolo11n** (the compose worker's model and the E-039 ramp's; `ladder-cpu-n`, otherwise identical, clean commit 5bd2499, E-046):
+
+| Backend | Batch 1 images/s (std) | Batch 1 latency p50 / p95 / p99 ms | Batch 4 images/s (std) | Batch 8 images/s (std) | Peak RSS MB | COCO mAP@50-95 | MOT17 mAP@50-95 |
+|---|---|---|---|---|---|---|---|
+| PyTorch FP32 (Ultralytics) | 26.5 (3.0) | 37 / 44 / 45 | 37.4 (2.8) | 39.5 (1.5) | 1,521 | 37.9 [36.1, 42.2] | 40.3 [38.6, 42.0] |
+| ONNX Runtime FP32 | 48.8 (2.9) | 20 / 23 / 24 | 56.5 (0.9) | 54.3 (0.5) | 1,258 | 37.9 (paired delta 0.00) | 40.3 (paired delta 0.00) |
+| ONNX Runtime INT8 | 65.8 (0.3) | 15 / 16 / 16 | 80.3 (0.2) | 82.2 (0.4) | 1,125 | 36.6, paired delta **-1.30 [-1.99, -0.52]** | 38.9, paired delta **-1.41 [-1.72, -1.03]** |
+
+Evidence: [`ladder-cpu-n`](../bench/results/2026-10-15-ladder-cpu-n-01M50TMX23YZAMTNEX1DRAC2S1.json), [`PyTorch mAP`](../eval/results/2026-10-15-detection-yolo11n-01M50TEJ1JBC9N557V68GB26S9.json), [`ORT FP32 mAP`](../eval/results/2026-10-15-detection-yolo11n-onnx-01M50TGJY2AAMBSEDNP12HA9GB.json), [`INT8 mAP`](../eval/results/2026-10-15-detection-yolo11n-int8-01M50TJ5J970KQ600WEG9X0NW2.json), [`INT8 vs ORT FP32`](../eval/results/2026-10-15-detection-compare-yolo11n-int8-vs-onnx-01M50V86Q8430P31RD2B1CQ8PZ.json), [`ORT FP32 vs PyTorch`](../eval/results/2026-10-15-detection-compare-yolo11n-onnx-vs-pytorch-01M50VA95ZMWE42WPE36JYN9K7.json).
+
 Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch latencies at batch 4 and 8 are in the results file. Evidence: [`ladder-cpu`](../bench/results/2026-10-15-ladder-cpu-01M50QBZK10K8HA5XBGGFJ5R3G.json), [`PyTorch mAP`](../eval/results/2026-10-15-detection-yolo11s-01M50Q4B0MS40CJ1DFBR0F3YVQ.json), [`ORT FP32 mAP`](../eval/results/2026-10-15-detection-yolo11s-onnx-01M50Q73K4R740EX5CW84K1BJB.json), [`INT8 mAP`](../eval/results/2026-10-15-detection-yolo11s-int8-01M50Q94H5G5N3H2Q1CRT5XVTM.json), [`INT8 vs ORT FP32`](../eval/results/2026-10-15-detection-compare-yolo11s-int8-vs-onnx-01M50R9S67XGGJFQ3SYKXE14JT.json), [`ORT FP32 vs PyTorch`](../eval/results/2026-10-15-detection-compare-yolo11s-onnx-vs-pytorch-01M50RBNWP219YDN57J11REJDW.json).
 
 - **ONNX Runtime FP32 is 1.65x PyTorch at batch 1 for no quality change** (identical mAP; 5.1 showed identical detections within rounding).
 - **INT8 is another 1.8x (2.1x at batch 4) but fails D32 on COCO by 0.07 points**: a 1.07-point drop against a 1.0 limit, set before the run. The upper end of the drop's interval (1.84) is within the 2.0 limit, and on MOT17 persons INT8 is no worse (mAP@50 +0.69 [+0.16, +1.49]). Quantizing the whole graph instead gives mAP 0 (E-043).
 - **Batching does not help ONNX Runtime on this CPU** (batch 4 is +5%, inside the repetition std): one image already uses all 10 cores. PyTorch gains 17% at batch 4.
 - Calibration: 64 COCO train2017 images and 64 frames of MOT17-05/10/11/13 (`configs/calibration.v1.lock.jsonl`, sha256 35018eeb...), disjoint from the eval subset (unit test). MinMax ranges, per-channel weights.
-- Not measured: the GPU rungs (TensorRT FP16 and INT8, waiting for the GPU quota), yolo11n (the model of the E-039 ramp), and anything end to end (5.5).
+- **yolo11n:** ONNX Runtime FP32 is 1.84x PyTorch at batch 1 with identical mAP; INT8 loses 1.3 to 1.4 points on both sources with intervals that exclude 0, so it fails D32 clearly. Here batch 4 adds 16% for ONNX Runtime (smaller convolutions leave cores idle at batch 1), which the batch sweep (5.3) will pin down.
+- Not measured: the GPU rungs (TensorRT FP16 and INT8, waiting for the GPU quota) and anything end to end (5.5).
 
 ## Evaluation
 
