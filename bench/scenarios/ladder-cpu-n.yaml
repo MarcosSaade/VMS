@@ -1,0 +1,27 @@
+name: ladder-cpu-n
+description: >
+  Precision ladder on CPU for YOLO11n, the model the containerized worker and the E-039 ramp run (task 5.2, CPU fallback; D5, D32; input to 5.5): YOLO11n with PyTorch (the Phase 1
+  baseline), ONNX Runtime FP32 and ONNX Runtime INT8 (static, QDQ, calibration set v1), each
+  in its own process. Model-only: detect_batch (letterbox, forward, NMS) on decoded data-mini
+  frames (1280x720, as loadgen sends them) at batch sizes 1, 4 and 8. Same thread defaults as
+  the worker (one intra-op thread per physical core). Quality for each step comes from
+  `make eval SUITE=detection` and `python -m vms.eval.detection compare`.
+kind: ladder
+repeats: 5
+bench:
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  frames_per_clip: 100
+  batch_sizes: [1, 4, 8]
+  warmup_batches: 2
+  cooldown_s: 15
+config:
+  detector:
+    weights: yolo11n
+    device: cpu
+steps:
+  - name: pytorch-fp32
+    detector: {backend: ultralytics}
+  - name: ort-fp32
+    detector: {backend: onnxruntime}
+  - name: ort-int8
+    detector: {backend: onnxruntime, precision: int8}
