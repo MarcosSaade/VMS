@@ -153,6 +153,14 @@ models: ## Fetch and verify the pinned detector weights into models/weights/
 onnx: ## Export the pinned weights to ONNX into models/onnx/ (needed by detector.backend=onnxruntime)
 	$(RUN) python -m vms.worker export-onnx
 
+.PHONY: calibration-data
+calibration-data: ## Fetch and verify the INT8 calibration images (64 COCO train2017 + 64 MOT17 frames, ~19 MB)
+	$(RUN) python -m vms.worker calibration fetch
+
+.PHONY: quantize
+quantize: ## Static INT8 quantization of the ONNX exports (needs make onnx and make calibration-data; WEIGHTS=yolo11s)
+	$(RUN) python -m vms.worker quantize $(WEIGHTS)
+
 .PHONY: onnx-parity
 onnx-parity: ## ONNX Runtime vs PyTorch parity on the eval subset and data-mini (WEIGHTS=yolo11n|yolo11s)
 	$(RUN) python -m vms.worker onnx-parity --weights $(or $(WEIGHTS),yolo11n)
@@ -257,8 +265,15 @@ eval-detection-data: ## Fetch and verify the detection eval images (500 COCO val
 	$(RUN) python -m vms.eval.detection fetch
 
 .PHONY: eval-detection
-eval-detection: ## Detection mAP@50 and mAP@50-95 with bootstrap CIs (WEIGHTS=yolo11s|yolo11n)
-	$(if $(WEIGHTS),VMS_DETECTOR__WEIGHTS=$(WEIGHTS)) $(RUN) python -m vms.eval.detection run
+eval-detection: ## Detection mAP@50 and mAP@50-95 with bootstrap CIs (WEIGHTS=yolo11s|yolo11n BACKEND=ultralytics|onnxruntime PRECISION=fp32|int8 NAME=...)
+	$(if $(WEIGHTS),VMS_DETECTOR__WEIGHTS=$(WEIGHTS)) $(if $(BACKEND),VMS_DETECTOR__BACKEND=$(BACKEND)) \
+	$(if $(PRECISION),VMS_DETECTOR__PRECISION=$(PRECISION)) \
+	$(RUN) python -m vms.eval.detection run $(if $(NAME),--name $(NAME))
+
+.PHONY: eval-detection-compare
+eval-detection-compare: ## Paired mAP difference between two detection runs, with the D32 verdict (BASE=a.json OTHER=b.json)
+	@test -n "$(BASE)" -a -n "$(OTHER)" || { echo "set BASE=<results JSON> OTHER=<results JSON>" >&2; exit 1; }
+	$(RUN) python -m vms.eval.detection compare $(BASE) $(OTHER) $(if $(NAME),--name $(NAME))
 
 .PHONY: eval-report
 eval-report: ## Markdown tables of eval results files (RESULTS="eval/results/a.json ...")

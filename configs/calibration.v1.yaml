@@ -1,0 +1,40 @@
+# INT8 calibration set, version 1 (task 5.2, vms.worker.calibration). Resolved once by
+# `python -m vms.worker calibration build` into the frozen list configs/calibration.v1.lock.jsonl
+# (archive member and sha256 per image, in git); `make calibration-data` fetches the listed
+# images into data/calibration/v1/ (gitignored). Never edit after the list is built: the INT8
+# model's sidecar records the list's sha256. A different selection is a new version.
+#
+# Disjoint from the detection eval subset (configs/eval/detection.v1.yaml, D31): COCO train2017
+# instead of val2017, and MOT17 sequences outside the eval's 02, 04 and 09.
+
+version: 1
+seed: 20261015
+
+licenses:
+  coco:
+    name: COCO images under their Flickr licenses
+    url: https://cocodataset.org/#termsofuse
+  mot17:
+    name: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+    url: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+coco:
+  # Path-style HTTPS, as the eval subset: images.cocodataset.org serves another certificate.
+  images_url: https://s3.amazonaws.com/images.cocodataset.org/zips/train2017.zip
+  images_bytes: 19336861798
+  member_prefix: train2017/
+  images: 64                    # sampled uniformly without replacement (seed above)
+
+mot17:
+  url: https://motchallenge.net/data/MOT17.zip
+  archive_bytes: 5860214001
+  # The train sequences not in the eval subset (05, 10, 11, 13 move with the camera; the
+  # static ones, 02, 04 and 09, are the eval's). The detector variant suffix does not matter:
+  # the frames are the same for every variant.
+  sequences: [MOT17-05-FRCNN, MOT17-10-FRCNN, MOT17-11-FRCNN, MOT17-13-FRCNN]
+  frames_per_sequence: 16       # evenly spaced from the first to the last frame
+
+mot_frame:                      # as loadgen sends camera frames (configs/loadgen.yaml)
+  width: 1280
+  height: 720
+  jpeg_quality: 85

@@ -254,15 +254,10 @@ def _interval(point: float, samples: NDArray[np.float64], confidence: float) -> 
     return Interval(point, float(lo), float(hi), std, float(samples.mean()))
 
 
-def evaluate(
-    matches: dict[str, ClassMatches],
-    n_images: int,
-    resamples: int,
-    seed: int,
-    confidence: float = 0.95,
-    chunk: int = 250,
-) -> MapResult:
-    """Point mAP (all images once) and percentile bootstrap intervals over images."""
+def _point(
+    matches: dict[str, ClassMatches], n_images: int
+) -> tuple[float, float, dict[str, dict[str, float]]]:
+    """mAP@50, mAP@50-95 and per-class AP with every image counted once."""
     classes = list(matches)
     ones = np.ones((1, n_images))
     point = (
@@ -282,7 +277,20 @@ def evaluate(
     valid = ~np.isnan(point[:, 0])
     map50 = float(point[valid, 0].mean()) if valid.any() else float("nan")
     map50_95 = float(point[valid].mean()) if valid.any() else float("nan")
+    return map50, map50_95, per_class
 
+
+def bootstrap_maps(
+    matches: dict[str, ClassMatches],
+    n_images: int,
+    resamples: int,
+    seed: int,
+    chunk: int = 250,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """mAP@50 and mAP@50-95 per bootstrap resample. The resamples depend only on `n_images`,
+    `resamples`, `seed` and `chunk`, so two prediction sets scored with the same arguments see
+    the same resampled images: their per-resample difference is a paired bootstrap."""
+    classes = list(matches)
     rng = np.random.default_rng(seed)
     if n_images == 0:
         resamples = 0
@@ -293,13 +301,78 @@ def evaluate(
         weights = rng.multinomial(n_images, np.full(n_images, 1 / n_images), size=size).astype(
             np.float64
         )
+        if not classes:
+            boot50[start : start + size] = np.nan
+            boot5095[start : start + size] = np.nan
+            continue
         aps = np.stack([class_ap(matches[c], weights) for c in classes], axis=1)  # (R, C, T)
         boot50[start : start + size] = _nanmean_rows(aps[:, :, 0])
         boot5095[start : start + size] = _nanmean_rows(aps.mean(axis=2))
+    return boot50, boot5095
+
+
+def evaluate(
+    matches: dict[str, ClassMatches],
+    n_images: int,
+    resamples: int,
+    seed: int,
+    confidence: float = 0.95,
+    chunk: int = 250,
+) -> MapResult:
+    """Point mAP (all images once) and percentile bootstrap intervals over images."""
+    map50, map50_95, per_class = _point(matches, n_images)
+    boot50, boot5095 = bootstrap_maps(matches, n_images, resamples, seed, chunk)
     return MapResult(
         map50=_interval(map50, boot50, confidence),
         map50_95=_interval(map50_95, boot5095, confidence),
         per_class=per_class,
-        resamples=resamples,
+        resamples=len(boot50),
         confidence=confidence,
+    )
+
+
+@dataclass
+class PairedResult:
+    """`other` minus `base`, both scored on the same images with the same resamples."""
+
+    base: MapResult
+    other: MapResult
+    delta50: Interval
+    delta50_95: Interval
+
+
+def paired_difference(
+    base: dict[str, ClassMatches],
+    other: dict[str, ClassMatches],
+    n_images: int,
+    resamples: int,
+    seed: int,
+    confidence: float = 0.95,
+    chunk: int = 250,
+) -> PairedResult:
+    """Paired percentile bootstrap of the mAP difference between two detectors on one dataset.
+
+    Each resample draws the same image counts for both, so image difficulty (the main source of
+    the unpaired interval's width) cancels and only the detectors' disagreement remains."""
+    b50, b5095 = bootstrap_maps(base, n_images, resamples, seed, chunk)
+    o50, o5095 = bootstrap_maps(other, n_images, resamples, seed, chunk)
+    p_b50, p_b5095, pc_b = _point(base, n_images)
+    p_o50, p_o5095, pc_o = _point(other, n_images)
+    return PairedResult(
+        base=MapResult(
+            _interval(p_b50, b50, confidence),
+            _interval(p_b5095, b5095, confidence),
+            pc_b,
+            len(b50),
+            confidence,
+        ),
+        other=MapResult(
+            _interval(p_o50, o50, confidence),
+            _interval(p_o5095, o5095, confidence),
+            pc_o,
+            len(o50),
+            confidence,
+        ),
+        delta50=_interval(p_o50 - p_b50, o50 - b50, confidence),
+        delta50_95=_interval(p_o5095 - p_b5095, o5095 - b5095, confidence),
     )

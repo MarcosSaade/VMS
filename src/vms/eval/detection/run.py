@@ -44,24 +44,29 @@ class SubsetNotReadyError(RuntimeError):
     pass
 
 
-def load_image(
-    image: GtImage, images_dir: Path, settings: DetectionEvalSettings
-) -> tuple[np.ndarray, ImageGt]:
-    """The image as the detector gets it, and its ground truth in that image's pixels."""
-    data = image.path(images_dir).read_bytes()
+def ground_truth(image: GtImage, settings: DetectionEvalSettings) -> ImageGt:
+    """The image's ground truth in the pixels the detector sees (MOT boxes scaled)."""
     boxes = np.asarray(image.boxes, dtype=np.float64).reshape(-1, 4)
     if image.source == "mot17":
         f = settings.mot_frame
-        data = prepare_frame(data, (f.width, f.height), f.jpeg_quality)
-        scale = np.array([f.width / image.width, f.height / image.height] * 2)
-        boxes = boxes * scale
-    gt = ImageGt(
+        boxes = boxes * np.array([f.width / image.width, f.height / image.height] * 2)
+    return ImageGt(
         boxes=boxes,
         classes=image.classes,
         ignore=np.asarray(image.ignore, dtype=bool),
         crowd=np.asarray(image.crowd, dtype=bool),
     )
-    return decode_jpeg(data), gt
+
+
+def load_image(
+    image: GtImage, images_dir: Path, settings: DetectionEvalSettings
+) -> tuple[np.ndarray, ImageGt]:
+    """The image as the detector gets it, and its ground truth in that image's pixels."""
+    data = image.path(images_dir).read_bytes()
+    if image.source == "mot17":
+        f = settings.mot_frame
+        data = prepare_frame(data, (f.width, f.height), f.jpeg_quality)
+    return decode_jpeg(data), ground_truth(image, settings)
 
 
 def predict(detector: Detector, pixels: np.ndarray) -> ImagePred:

@@ -19,6 +19,7 @@ from vms.eval.detection.metrics import (
     evaluate,
     match_dataset,
     match_image,
+    paired_difference,
 )
 
 CLASSES = ["cat", "dog", "person"]
@@ -246,3 +247,26 @@ def test_one_prediction_set_per_image_is_required() -> None:
     gts, preds = _one_image([[0, 0, 1, 1]], [])
     with pytest.raises(ValueError, match="one prediction set"):
         match_dataset(gts, preds * 2, ["person"], 100)
+
+
+def test_paired_difference_of_identical_detectors_is_exactly_zero() -> None:
+    gts, preds = random_dataset(5)
+    matches = match_dataset(gts, preds, CLASSES, max_dets=100)
+    res = paired_difference(matches, matches, len(gts), resamples=200, seed=3)
+    assert (res.delta50_95.value, res.delta50_95.lo, res.delta50_95.hi) == (0.0, 0.0, 0.0)
+    assert (res.delta50.lo, res.delta50.hi) == (0.0, 0.0)
+
+
+def test_paired_difference_uses_the_same_resamples_as_evaluate() -> None:
+    gts, preds = random_dataset(6)
+    _, worse = random_dataset(7)  # unrelated detections: much lower mAP
+    base = match_dataset(gts, preds, CLASSES, max_dets=100)
+    other = match_dataset(gts, worse, CLASSES, max_dets=100)
+    res = paired_difference(base, other, len(gts), resamples=300, seed=11)
+    alone_b = evaluate(base, len(gts), resamples=300, seed=11)
+    alone_o = evaluate(other, len(gts), resamples=300, seed=11)
+    assert res.base.map50_95.as_dict() == alone_b.map50_95.as_dict()
+    assert res.other.map50_95.as_dict() == alone_o.map50_95.as_dict()
+    assert res.delta50_95.value == pytest.approx(alone_o.map50_95.value - alone_b.map50_95.value)
+    assert res.delta50_95.mean == pytest.approx(alone_o.map50_95.mean - alone_b.map50_95.mean)
+    assert res.delta50_95.hi < 0  # clearly worse, and the paired interval says so

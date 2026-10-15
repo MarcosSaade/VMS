@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
@@ -25,7 +24,6 @@ from vms.worker.onnx_detector import (
     Letterbox,
     OnnxDetector,
     StaleExportError,
-    export_onnx,
     letterbox,
     nms,
     onnx_paths,
@@ -161,21 +159,6 @@ def test_compare_explains_an_nms_flip_and_reports_the_rest() -> None:
     assert [u["class"] for u in lost.unexplained] == ["dog"]
 
 
-@pytest.fixture(scope="module")
-def random_yolo(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, str]:
-    """A randomly initialized YOLO11n (seed 0) saved as weights and exported to ONNX."""
-    import importlib
-
-    torch.manual_seed(0)
-    yolo: Any = importlib.import_module("ultralytics").YOLO
-    root = tmp_path_factory.mktemp("yolo")
-    weights = root / "rand.pt"
-    yolo("yolo11n.yaml", task="detect").save(str(weights))
-    sha = hashlib.sha256(weights.read_bytes()).hexdigest()
-    model = export_onnx(weights, sha, "rand", root / "onnx", 640)
-    return weights, model, sha
-
-
 def test_export_writes_a_sidecar_that_verifies(random_yolo: tuple[Path, Path, str]) -> None:
     _, model, sha = random_yolo
     path, meta = verified_export(model.parent, "rand", sha)
@@ -270,3 +253,17 @@ def test_compare_handles_images_without_detections(
     diff = compare_detections(ref, got, conf=0.25, iou=0.7, tol=Tolerances())
     assert diff.matched == 0
     assert len(diff.unexplained) == len(ref) + len(got)
+
+
+def test_pytorch_batch_gives_the_same_detections_as_one_at_a_time(
+    random_yolo: tuple[Path, Path, str],
+) -> None:
+    weights, _, sha = random_yolo
+    detector = YoloDetector(weights, sha, DetectorSettings(weights="rand", conf=1e-4))
+    images = [noise((720, 1280), s) for s in range(3)]
+    batched = detector.detect_batch(images)
+    assert len(batched) == 3
+    for image, got in zip(images, batched, strict=True):
+        diff = compare_detections(detector.detect(image), got, 1e-4, 0.7, Tolerances())
+        assert diff.matched == len(got) > 0
+        assert not diff.unexplained

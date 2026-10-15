@@ -3,10 +3,12 @@ semantics, an object store, a detector, and an executor that runs inline."""
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from concurrent.futures import Executor, Future
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -267,3 +269,22 @@ def harness() -> Harness:
 def h(harness: Harness) -> Harness:
     """Short alias: tests read `h.queue`, `h.worker`, ..."""
     return harness
+
+
+@pytest.fixture(scope="session")
+def random_yolo(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, str]:
+    """A randomly initialized YOLO11n (seed 0) saved as weights and exported to ONNX."""
+    import importlib
+
+    import torch
+
+    from vms.worker.onnx_detector import export_onnx
+
+    torch.manual_seed(0)
+    yolo: Any = importlib.import_module("ultralytics").YOLO
+    root = tmp_path_factory.mktemp("yolo")
+    weights = root / "rand.pt"
+    yolo("yolo11n.yaml", task="detect").save(str(weights))
+    sha = hashlib.sha256(weights.read_bytes()).hexdigest()
+    model = export_onnx(weights, sha, "rand", root / "onnx", 640)
+    return weights, model, sha

@@ -1,10 +1,13 @@
 """Object detector behind a small interface, so the worker is tested with fakes.
 
-`YoloDetector` runs Ultralytics YOLO11 in-process with PyTorch at batch size 1 (the Phase 1
-baseline). `OnnxDetector` (vms.worker.onnx_detector, task 5.1) runs the same model exported to
-ONNX on ONNX Runtime; `detector.backend` chooses, and D5 decides the default. `detect` is CPU or
-GPU bound and blocking: the worker calls it from its own single-thread executor, never on the
-event loop. `build_detector` is the one place that turns settings into a detector.
+`YoloDetector` runs Ultralytics YOLO11 in-process with PyTorch (the worker calls it at batch
+size 1, the Phase 1 baseline). `OnnxDetector` (vms.worker.onnx_detector, task 5.1) runs the same
+model exported to ONNX on ONNX Runtime, in FP32 or statically quantized to INT8
+(vms.worker.quantize, task 5.2); `detector.backend` and `detector.precision` choose, and D5
+decides the default. Both have `detect_batch` for the precision ladder (vms.worker.ladder).
+`detect` is CPU or GPU bound and blocking: the worker calls it from its own single-thread
+executor, never on the event loop. `build_detector` is the one place that turns settings into
+a detector.
 
 Detections are ordered by confidence (descending, ties by position), so `det_idx`, part of the
 detections key, is stable for a given model output.
@@ -19,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 if TYPE_CHECKING:
     from vms.worker.onnx_detector import OnnxDetector
@@ -60,6 +63,9 @@ class DetectorSettings(BaseModel):
     # ultralytics: PyTorch through Ultralytics' predictor; onnxruntime: the ONNX export
     # (make onnx) with numpy pre/post-processing.
     backend: Literal["ultralytics", "onnxruntime"] = "ultralytics"
+    # fp32, or int8: the ONNX export statically quantized on the calibration set
+    # (vms.worker.quantize, make quantize; onnxruntime only).
+    precision: Literal["fp32", "int8"] = "fp32"
     device: Literal["cpu", "cuda"] = "cpu"
     imgsz: int = Field(default=640, ge=32, multiple_of=32)
     conf: float = Field(default=0.25, ge=0.0, le=1.0)  # minimum confidence kept
@@ -67,6 +73,12 @@ class DetectorSettings(BaseModel):
     max_det: int = Field(default=300, ge=1)
     # Intra-op threads of the backend; None: its default (one per physical core for both).
     threads: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _int8_needs_onnxruntime(self) -> DetectorSettings:
+        if self.precision == "int8" and self.backend != "onnxruntime":
+            raise ValueError("precision 'int8' needs backend 'onnxruntime'")
+        return self
 
 
 def to_detections(
@@ -108,20 +120,34 @@ class YoloDetector:
         return self._version
 
     def detect(self, image: NDArray[np.uint8]) -> list[Detection]:
+        return self.detect_batch([image])[0]
+
+    def detect_batch(self, images: list[NDArray[np.uint8]]) -> list[list[Detection]]:
+        """Several images in one forward pass: Ultralytics stacks a list source into one batch
+        (letterboxed to the stride rectangle when all images share a shape, as OnnxDetector)."""
         s = self._settings
-        result: Any = self._model.predict(
-            image,
+        results: Any = self._model.predict(
+            images,
             imgsz=s.imgsz,
             conf=s.conf,
             iou=s.iou,
             max_det=s.max_det,
             device=s.device,
+            batch=len(images),
             verbose=False,
-        )[0]
-        boxes = result.boxes
-        return to_detections(
-            boxes.xyxy.cpu().numpy(), boxes.conf.cpu().numpy(), boxes.cls.cpu().numpy(), self._names
         )
+        out = []
+        for result in results:
+            boxes = result.boxes
+            out.append(
+                to_detections(
+                    boxes.xyxy.cpu().numpy(),
+                    boxes.conf.cpu().numpy(),
+                    boxes.cls.cpu().numpy(),
+                    self._names,
+                )
+            )
+        return out
 
     def torch_module(self) -> Any:
         """The fused, eval-mode PyTorch module the predictor runs (built on the first predict;
@@ -151,5 +177,10 @@ def build_detector(settings: DetectorSettings, root: Path = Path()) -> YoloDetec
         return YoloDetector(path, sha, settings)
     from vms.worker.onnx_detector import OnnxDetector, verified_export
 
-    model_path, _ = verified_export(root / models.onnx_dir, name, sha)
+    model_path, meta = verified_export(root / models.onnx_dir, name, sha)
+    if settings.precision == "int8":
+        from vms.worker.quantize import verified_int8
+
+        int8_path, int8_meta = verified_int8(root / models.onnx_dir, name, sha, meta.onnx_sha256)
+        return OnnxDetector(int8_path, sha, settings, variant=f"int8@{int8_meta.int8_sha256[:8]}")
     return OnnxDetector(model_path, sha, settings)

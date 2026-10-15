@@ -262,7 +262,14 @@ def onnx_session_options(threads: int | None) -> Any:
 class OnnxDetector:
     """`Detector` on ONNX Runtime; `detect_batch` runs several images in one forward pass."""
 
-    def __init__(self, model_path: Path, weights_sha256: str, settings: DetectorSettings) -> None:
+    def __init__(
+        self,
+        model_path: Path,
+        weights_sha256: str,
+        settings: DetectorSettings,
+        variant: str | None = None,
+    ) -> None:
+        """`variant` tags a derived model in `model_version` (e.g. `int8@<sha256 prefix>`)."""
         ort = _ort()
         providers = ["CPUExecutionProvider"]
         if settings.device == "cuda":
@@ -279,7 +286,8 @@ class OnnxDetector:
         }
         self._stride = int(meta.get("stride", 32))
         self._input = self._session.get_inputs()[0].name
-        self._version = f"{settings.weights}@{weights_sha256[:12]}+onnx"
+        suffix = f"-{variant}" if variant else ""
+        self._version = f"{settings.weights}@{weights_sha256[:12]}+onnx{suffix}"
 
     @property
     def model_version(self) -> str:

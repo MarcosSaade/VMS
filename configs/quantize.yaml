@@ -1,0 +1,23 @@
+# Post-training static INT8 quantization of the ONNX export (task 5.2, vms.worker.quantize;
+# make quantize). Overrides configs/common.yaml; VMS_* environment variables override this file
+# (e.g. VMS_INT8__METHOD=percentile). Acceptance rule for the result: D32.
+
+calibration:
+  spec: configs/calibration.v1.yaml
+  lock: configs/calibration.v1.lock.jsonl     # frozen list, in git
+  images_dir: data/calibration/v1             # fetched images (gitignored)
+  fetch_workers: 8
+
+int8:
+  format: qdq                   # QuantizeLinear/DequantizeLinear pairs; ORT fuses them into
+                                # integer kernels (VNNI on this CPU)
+  per_channel: true             # one weight scale per output channel of each conv
+  activation_type: quint8       # u8 activations, s8 weights: ORT's x86 recommendation
+  weight_type: qint8
+  method: minmax                # activation range = min/max seen on the calibration set
+  # Nodes kept in FP32 (regular expressions on ONNX node names). The Detect head's decode part
+  # (distribution focal loss, anchor arithmetic, sigmoid, and the final concat that puts box
+  # coordinates in pixels next to class scores in [0, 1]) shares quantization ranges badly; its
+  # convs (cv2.*, cv3.*) stay quantized. An empty list quantizes everything.
+  exclude_nodes:
+    - '^/model\.23/(?!cv2\.|cv3\.)'

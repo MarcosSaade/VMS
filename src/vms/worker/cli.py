@@ -4,6 +4,11 @@ run                         (default; make worker) lease cameras, claim frames, 
 weights [NAME ...]          (make models) fetch and verify pinned weights
 export-onnx [NAME ...]      (make onnx) export pinned weights to ONNX (models/onnx/)
 onnx-parity [--weights N]   (make onnx-parity) ONNX Runtime vs PyTorch parity, results JSON
+calibration build|fetch     INT8 calibration list (once per version) / its images (make
+                            calibration-data)
+quantize [NAME ...]         (make quantize) static INT8 quantization of the ONNX exports
+ladder --scenario FILE      precision ladder: latency and throughput per backend and batch size
+                            (bench/scenarios/ladder-*.yaml; each step in its own process)
 bench --scenario FILE       model-only latency (bench/scenarios/worker-model-*.yaml)
 render CLIP:CAMERA ... --out FILE.mp4
                             review video: detections, tracks, zones and events on clips
@@ -33,6 +38,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parity = commands.add_parser("onnx-parity", help="ONNX Runtime vs PyTorch parity")
     parity.add_argument("--weights", default="yolo11n")
     parity.add_argument("--eval-images", type=int, help="first N subset images (smoke only)")
+    calib = commands.add_parser("calibration", help="INT8 calibration set")
+    calib.add_argument("action", choices=["build", "fetch"])
+    quant = commands.add_parser("quantize", help="static INT8 quantization of ONNX exports")
+    quant.add_argument("names", nargs="*", help="default: every configured model")
+    ladder = commands.add_parser("ladder", help="precision ladder speed benchmark")
+    ladder.add_argument("--scenario", type=Path, required=True)
+    step = commands.add_parser("ladder-step", help=argparse.SUPPRESS)  # one step, for `ladder`
+    step.add_argument("--scenario", type=Path, required=True)
+    step.add_argument("--step", required=True)
+    step.add_argument("--out", type=Path, required=True)
     bench = commands.add_parser("bench", help="model-only latency benchmark")
     bench.add_argument("--scenario", type=Path, required=True)
     render = commands.add_parser("render", help="draw detections, tracks and zones on clips")
@@ -90,10 +105,89 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "render":
         return _render(args)
 
+    if args.command == "calibration":
+        return _calibration(args.action)
+
+    if args.command == "quantize":
+        return _quantize(args.names)
+
+    if args.command == "ladder":
+        from vms.worker.ladder import run_ladder
+
+        run_ladder(args.scenario)
+        return 0
+
+    if args.command == "ladder-step":
+        from vms.worker.ladder import run_step_main
+
+        return run_step_main(args.scenario, args.step, args.out)
+
     from vms.worker import bench as bench_module
 
     raw = yaml.safe_load(args.scenario.read_text(encoding="utf-8"))
     bench_module.run(bench_module.Scenario.model_validate(raw), raw)
+    return 0
+
+
+def _calibration(action: str) -> int:
+    import sys
+
+    from vms.common.settings import load_settings
+    from vms.datasets.http import RetryPolicy, UrllibTransport
+    from vms.worker import calibration as cal
+    from vms.worker.quantize import QuantizeSettings
+
+    p = load_settings(QuantizeSettings, "quantize").calibration
+    spec = cal.load_spec(p.spec)
+    if action == "build":
+        images = cal.build(spec, UrllibTransport(), RetryPolicy(), p.images_dir, p.fetch_workers)
+        if p.lock.exists():
+            if cal.read_lock(p.lock) != images:
+                sys.stdout.write(f"rebuilt calibration list differs from {p.lock}; it is frozen\n")
+                return 1
+            sys.stdout.write(f"rebuilt calibration list identical to {p.lock}\n")
+            return 0
+        digest = cal.write_lock(p.lock, images)
+        sys.stdout.write(f"wrote {p.lock} ({len(images)} images, sha256 {digest})\n")
+        return 0
+    images = cal.read_lock(p.lock)
+    n = cal.fetch(spec, images, UrllibTransport(), RetryPolicy(), p.images_dir, p.fetch_workers)
+    sys.stdout.write(f"{len(images)} calibration images verified under {p.images_dir} ")
+    sys.stdout.write(f"({n} downloaded)\n")
+    return 0
+
+
+def _quantize(names: list[str]) -> int:
+    from vms.common.settings import load_settings
+    from vms.worker import calibration as cal
+    from vms.worker.detector import DetectorSettings
+    from vms.worker.onnx_detector import verified_export
+    from vms.worker.quantize import QuantizeSettings, quantize_int8
+    from vms.worker.weights import load_models_config
+
+    settings = load_settings(QuantizeSettings, "quantize")
+    p = settings.calibration
+    spec = cal.load_spec(p.spec)
+    images = cal.read_lock(p.lock)
+    missing = [i.id for i in images if not cal.image_ok(p.images_dir, i)]
+    if missing:
+        raise SystemExit(f"{len(missing)} calibration images missing; run `make calibration-data`")
+    models = load_models_config()
+    for name in names or sorted(models.weights):
+        sha = models.weights[name].sha256
+        source, meta = verified_export(models.onnx_dir, name, sha)
+        path = quantize_int8(
+            source,
+            meta.onnx_sha256,
+            name,
+            sha,
+            cal.load_pixels(images, p.images_dir, spec),
+            cal.lock_sha256(p.lock),
+            settings.int8,
+            models.onnx_dir,
+            DetectorSettings().imgsz,
+        )
+        log.info("int8 model written", extra={"weights": name, "path": str(path)})
     return 0
 
 

@@ -344,7 +344,7 @@ def _build_coco(
     return out, ann_hash
 
 
-def _mot_root(index: dict[str, zipfile.ZipInfo], sequence: str) -> str:
+def mot_root(index: dict[str, zipfile.ZipInfo], sequence: str) -> str:
     for split in ("train", "test"):
         root = f"MOT17/{split}/{sequence}/"
         if root + "seqinfo.ini" in index:
@@ -359,7 +359,7 @@ def _build_mot17(
     index = remote_zip_index(transport, retry, url, spec.archive_bytes)
     out = []
     for sequence in spec.sequences:
-        root = _mot_root(index, sequence)
+        root = mot_root(index, sequence)
         meta = fetch_members(
             transport,
             retry,

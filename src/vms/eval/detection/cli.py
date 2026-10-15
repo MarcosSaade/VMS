@@ -6,6 +6,9 @@ Commands:
   fetch   download the listed images that are missing or corrupt (fresh clones)
   check   offline: the spec and subset files match the manifest
   run     score a detector on the subset; writes a results JSON under eval/results/
+  compare BASE OTHER
+          paired bootstrap of the mAP difference between two runs, from their saved
+          detections (no inference); writes a results JSON with the D32 verdict
 """
 
 from __future__ import annotations
@@ -104,8 +107,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands.add_parser("check", help="offline: spec and subset match the manifest")
     run = commands.add_parser("run", help="score a detector on the subset")
     run.add_argument("--name", default=None, help="results name (default: detection-<weights>)")
+    comp = commands.add_parser("compare", help="paired mAP difference between two runs")
+    comp.add_argument("base", type=Path, help="results JSON of the reference run")
+    comp.add_argument("other", type=Path, help="results JSON of the run compared with it")
+    comp.add_argument("--name", default=None, help="results name (default: detection-compare)")
     args = parser.parse_args(argv)
     configure_logging("eval-detection", args.log_level)
+    if args.command == "compare":
+        from vms.eval.detection.compare import run_compare
+
+        path = run_compare(args.base, args.other, Path(), args.name)
+        sys.stdout.write(f"results: {path}\n")
+        return 0
     settings = load_settings(DetectionEvalSettings, "eval-detection")
 
     if args.command == "build":
