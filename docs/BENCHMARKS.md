@@ -34,6 +34,7 @@ Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacit
 | Rated capacity, CPU (one yolo11n worker, PyTorch, batch 1) | **2 cameras at 5 FPS** (3/3 repetitions; freshness p95 0.24 s, 0 lost); the worker saturates at 14.2 frames/s | E-039, [`ramp-cpu`](../bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json) |
 | Structured-query latency under ingest, CPU, canned planner (LLM excluded) | p95 39 ms at 1 client, 98 ms at 8 (159 q/s, one core saturated) | E-040, [`query-load-cpu`](../bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json) |
 | Detection quality, yolo11s (PyTorch CPU) | COCO-500 mAP@50-95 45.8 [44.1, 49.6]; MOT17 person mAP@50-95 45.0 [43.1, 47.0] | E-034 (Evaluation, detection quality) |
+| Precision ladder, yolo11s CPU, model-only (`detect_batch`, batch 1) | ONNX Runtime FP32 **1.65x** PyTorch (21.3 vs 12.9 images/s), same mAP; INT8 3.0x (38.2 images/s) but COCO mAP@50-95 -1.07 [-1.84, +0.40] fails D32, so not kept | E-044, E-045 (Inference, precision ladder) |
 
 ## Ingest and pipeline capacity
 
@@ -118,7 +119,7 @@ _Placeholder (tasks 4.3, 4.4)._
 
 ## Inference
 
-_Precision ladder and batch sweep: placeholder (tasks 5.2, 5.3)._ Model-only and end-to-end numbers are reported separately, with mAP and recall@k next to speed.
+_Batch sweep (5.3), the GPU rungs of the ladder (TensorRT FP16 and INT8) and the optimized worker end to end (5.5) are still to come._ Model-only and end-to-end numbers are reported separately, with mAP next to speed.
 
 ### Worker model-only latency, CPU baseline
 
@@ -149,6 +150,24 @@ At 5 FPS per camera, one CPU worker keeps up with about 2 cameras on yolo11s and
 Evidence: [`yolo11n parity`](../bench/results/2026-10-14-onnx-parity-yolo11n-01M4XQQGJWF596G49X0GQ06AZY.json), [`yolo11s parity`](../bench/results/2026-10-14-onnx-parity-yolo11s-01M4XSHPCKT13PEV7NGAW18RX5.json), [`yolo11n ONNX mAP`](../eval/results/2026-10-14-detection-yolo11n-onnx-01M4XSHQVKYXR93NSRME7F6SRC.json), [`yolo11s ONNX mAP`](../eval/results/2026-10-14-detection-yolo11s-onnx-01M4XSKH477FFM21CWP6P58Z66.json).
 
 **Why these tolerances.** Two float32 runtimes run the same graph with different kernels (oneDNN in PyTorch, MLAS in ONNX Runtime) and summation orders, so exact equality is not expected; differences come from rounding that accumulates over about 300 layers. A tenth of a pixel moves no pixel of a crop and the IoU of a 20 px box by about 1%; 1e-4 in score is 1/1500 of the gap between the worker's 0.1 and 0.25 thresholds. The tolerances sit 5x to 50x above the observed maxima, so a real bug (a half-pixel letterbox shift, RGB/BGR swapped, a wrong NMS rule) fails them by orders of magnitude while rounding never does. Where outputs can legitimately differ, near a threshold, the check classifies the case instead of loosening the tolerance.
+
+### Precision ladder, CPU (task 5.2; E-043 to E-045)
+
+Self-measured on `laptop` (clean commit 9b71ac7). **Model-only**: `detect_batch` (letterbox, forward pass, NMS) for yolo11s at imgsz 640 and threshold 0.1, on 300 decoded data-mini frames (1280x720, as loadgen sends them; JPEG decode excluded). `make bench SCENARIO=bench/scenarios/ladder-cpu.yaml`: each backend in its own process, 5 repetitions with the step order rotated, 15 s cooldown, 2 warmup batches per batch size, compose stack stopped. Thread defaults as the worker (one intra-op thread per physical core). Quality: the detection subset (D31) per backend, and the INT8 difference as a paired bootstrap against ORT FP32 (`make eval-detection-compare`).
+
+| Backend | Batch 1 images/s (std) | Batch 1 latency p50 / p95 / p99 ms | Batch 4 images/s (std) | Batch 8 images/s (std) | CPU cores | Peak RSS MB | COCO mAP@50-95 | MOT17 mAP@50-95 |
+|---|---|---|---|---|---|---|---|---|
+| PyTorch FP32 (Ultralytics) | 12.9 (0.5) | 78 / 87 / 88 | 15.0 (0.7) | 14.9 (0.2) | 8.0 | 1,820 | 45.8 [44.1, 49.6] | 45.0 [43.1, 47.0] |
+| ONNX Runtime FP32 | 21.3 (1.5) | 44 / 53 / 53 | 22.3 (1.7) | 21.0 (1.5) | 10.0 | 1,531 | 45.8 (paired delta 0.00) | 45.0 (paired delta 0.00) |
+| ONNX Runtime INT8 (static QDQ, head decode FP32) | 38.2 (0.8) | 26 / 31 / 31 | 45.9 (0.2) | 46.1 (0.7) | 10.0 | 1,214 | 44.8, paired delta **-1.07 [-1.84, +0.40]** | 45.2, paired delta +0.13 [-0.27, +0.55] |
+
+Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch latencies at batch 4 and 8 are in the results file. Evidence: [`ladder-cpu`](../bench/results/2026-10-15-ladder-cpu-01M50QBZK10K8HA5XBGGFJ5R3G.json), [`PyTorch mAP`](../eval/results/2026-10-15-detection-yolo11s-01M50Q4B0MS40CJ1DFBR0F3YVQ.json), [`ORT FP32 mAP`](../eval/results/2026-10-15-detection-yolo11s-onnx-01M50Q73K4R740EX5CW84K1BJB.json), [`INT8 mAP`](../eval/results/2026-10-15-detection-yolo11s-int8-01M50Q94H5G5N3H2Q1CRT5XVTM.json), [`INT8 vs ORT FP32`](../eval/results/2026-10-15-detection-compare-yolo11s-int8-vs-onnx-01M50R9S67XGGJFQ3SYKXE14JT.json), [`ORT FP32 vs PyTorch`](../eval/results/2026-10-15-detection-compare-yolo11s-onnx-vs-pytorch-01M50RBNWP219YDN57J11REJDW.json).
+
+- **ONNX Runtime FP32 is 1.65x PyTorch at batch 1 for no quality change** (identical mAP; 5.1 showed identical detections within rounding).
+- **INT8 is another 1.8x (2.1x at batch 4) but fails D32 on COCO by 0.07 points**: a 1.07-point drop against a 1.0 limit, set before the run. The upper end of the drop's interval (1.84) is within the 2.0 limit, and on MOT17 persons INT8 is no worse (mAP@50 +0.69 [+0.16, +1.49]). Quantizing the whole graph instead gives mAP 0 (E-043).
+- **Batching does not help ONNX Runtime on this CPU** (batch 4 is +5%, inside the repetition std): one image already uses all 10 cores. PyTorch gains 17% at batch 4.
+- Calibration: 64 COCO train2017 images and 64 frames of MOT17-05/10/11/13 (`configs/calibration.v1.lock.jsonl`, sha256 35018eeb...), disjoint from the eval subset (unit test). MinMax ranges, per-channel weights.
+- Not measured: the GPU rungs (TensorRT FP16 and INT8, waiting for the GPU quota), yolo11n (the model of the E-039 ramp), and anything end to end (5.5).
 
 ## Evaluation
 
@@ -270,5 +289,6 @@ One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/s
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
 - CPU baseline: `make up`, `make data-mini`, `make models`, then start the app containers with the canned planner (`LLM_MODEL= docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile app up -d --wait ingest worker query` after `make app`), stop other CPU-heavy work, and run `make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` (~45 min), `query-load-cpu.yaml` (~20 min), `profile-worker-cpu.yaml` and `profile-query-cpu.yaml` (~2 min each).
 - ONNX parity: `make models`, `make eval-detection-data`, `make data-mini`, `make onnx`, then `make onnx-parity` and `make onnx-parity WEIGHTS=yolo11s` (~25 min each); ONNX mAP: `VMS_DETECTOR__BACKEND=onnxruntime make eval SUITE=detection` (and `WEIGHTS=yolo11n`).
+- Precision ladder, CPU: `make models`, `make data-mini`, `make eval-detection-data`, `make onnx`, `make calibration-data`, `make quantize WEIGHTS=yolo11s`; then `make eval SUITE=detection NAME=detection-yolo11s`, `... BACKEND=onnxruntime NAME=detection-yolo11s-onnx`, `... BACKEND=onnxruntime PRECISION=int8 NAME=detection-yolo11s-int8` (~1.5 min each), `make eval-detection-compare BASE=<onnx run> OTHER=<int8 run>` (~2 min), and with the compose stack stopped `make bench SCENARIO=bench/scenarios/ladder-cpu.yaml` (~15 min). The whole-graph INT8 of E-043: `VMS_INT8__EXCLUDE_NODES='[]' make quantize WEIGHTS=yolo11s`.
 - Structured eval set: `make up`, `make eval-db` (pulls or regenerates the snapshot and checks its hashes), `make eval-build` (re-runs every gold; the split files must come out unchanged), `make eval-check`.
 - Load generator ceiling: `make data-mini`, then `make loadgen-selftest`; `make loadgen-stub STUB_WORKERS=6` in one shell and `make loadgen SCENARIO=bench/scenarios/loadgen-stub-max.yaml` in another; restart the stub with `STUB_WORKERS=1` and run `make loadgen SCENARIO=bench/scenarios/loadgen-stub-20x5.yaml`. Check that port 8080 is free before starting each stub.

@@ -75,7 +75,7 @@
 ## Phase 5: Model internals
 - [x] 5.1 Export YOLO11 to ONNX with parity tests (SHRINK: no Triton, no CLIP)
   - Understand it: what tolerance did parity use and why, and where do ONNX and PyTorch outputs differ?
-- [ ] 5.2 Precision ladder: PyTorch, ORT, TensorRT FP16, TensorRT INT8, each with mAP (CI) and latency (CPU ladder as fallback)
+- [ ] 5.2 Precision ladder: PyTorch, ORT, TensorRT FP16, TensorRT INT8, each with mAP (CI) and latency (CPU ladder as fallback). CPU part done 2026-10-15 (E-043 to E-045: ORT FP32 1.65x PyTorch at equal mAP; ORT INT8 3.0x but fails D32 on COCO by 0.07 points); the TensorRT rungs wait for the quota
   - Understand it: why does INT8 need calibration, what did it cost in mAP, and is that drop inside the CI?
 - [ ] 5.3 Batch-size sweep in-process: throughput against latency (SHRINK: no Triton dynamic batching)
   - Understand it: why do throughput and latency both rise with batch size, and which point meets the freshness SLO?

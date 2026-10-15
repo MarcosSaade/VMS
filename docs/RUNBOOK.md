@@ -295,6 +295,7 @@ make eval SPLIT=dev LIMIT=5                     # smoke run; marked partial, not
 make eval-detection-data                    # fetch and verify the 573 listed images (~95 MB, about a minute)
 make eval SUITE=detection                   # yolo11s (configs/eval-detection.yaml), ~1.5 min on the laptop
 make eval SUITE=detection WEIGHTS=yolo11n   # any key of configs/models.yaml (make models first)
+make eval SUITE=detection BACKEND=onnxruntime PRECISION=int8   # another backend (precision ladder below)
 uv run python -m vms.eval.detection check   # offline: spec and list match the manifest (also a unit test)
 ```
 
@@ -302,6 +303,23 @@ uv run python -m vms.eval.detection check   # offline: spec and list match the m
 - Each run writes `eval/results/<date>-detection-<weights>-<run_id>.json` (mAP@50 and mAP@50-95 per source with interval, bootstrap std and mean, per-class AP) and the raw detections to `data/eval/detection/predictions/<run_id>.jsonl.gz`. A smoke run on a few images (`VMS_MAX_IMAGES=20`) is marked `partial` and is never a reported number.
 - Licenses: COCO annotations are CC BY 4.0 and its images keep their Flickr licenses; MOT17 is CC BY-NC-SA 3.0. Neither is redistributed; never commit or publish the images.
 - The subset is frozen. Changing `configs/eval/detection.v1.yaml` or the list fails a unit test; a new selection is v2 (`detection.v2.yaml`, then `uv run python -m vms.eval.detection build` with the v2 paths, which writes the list and manifest once and on later runs only checks that a rebuild is identical). Images used to calibrate INT8 (5.2) or fine-tune (9.5) must not be in the list.
+
+### Precision ladder (task 5.2)
+
+```bash
+make onnx                                   # FP32 export (once per weights)
+make calibration-data                       # 128 calibration images into data/calibration/v1/ (~19 MB)
+make quantize WEIGHTS=yolo11s               # models/onnx/yolo11s.int8.onnx + sidecar (~20 s)
+make eval SUITE=detection BACKEND=onnxruntime PRECISION=int8 NAME=detection-yolo11s-int8
+make eval-detection-compare BASE=eval/results/<fp32>.json OTHER=eval/results/<int8>.json
+make bench SCENARIO=bench/scenarios/ladder-cpu.yaml   # speed per backend and batch size (~25 min)
+VMS_DETECTOR__BACKEND=onnxruntime VMS_DETECTOR__PRECISION=int8 make worker
+```
+
+- Calibration set: `configs/calibration.v1.yaml` (64 COCO train2017 images, 16 frames each of MOT17-05/10/11/13), frozen into `configs/calibration.v1.lock.jsonl`; a unit test fails if the list changes or overlaps the detection eval subset. A new selection is v2 (`uv run python -m vms.worker calibration build` with the v2 paths; on an existing list it only checks the rebuild is identical).
+- Quantization settings are in `configs/quantize.yaml` (`VMS_INT8__*` overrides, e.g. `VMS_INT8__EXCLUDE_NODES='[]'` quantizes the whole graph). The sidecar `yolo11s.int8.onnx.json` records the settings, the excluded nodes, the op types that run in INT8, and the hashes of the weights, the FP32 export and the calibration list; the worker refuses an INT8 model whose inputs changed ("run `make quantize`"). `model_version` ends in `+onnx-int8@<sha256 prefix>`, so eval results name the exact model.
+- `compare` re-scores two eval runs from their saved detections with the same bootstrap resamples (no inference) and writes `eval/results/<date>-<name>-<run_id>.json` with the paired difference per source and the D32 verdict (`d32_pass`). It refuses runs scored on different terms (subset, sources, bootstrap, max detections) and partial runs.
+- The ladder runs each step in its own process and rotates the step order per repetition. For numbers worth reporting: AC power, nothing else heavy running, and the compose stack stopped (`docker stop` the `vms-*` containers; `docker start` them after). The laptop's CPU is a hybrid (2 performance + 8 efficiency cores), so expect a few percent between repetitions.
 
 ## GPU sessions
 
