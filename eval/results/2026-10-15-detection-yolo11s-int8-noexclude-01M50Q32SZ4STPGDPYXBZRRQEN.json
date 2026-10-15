@@ -1,0 +1,546 @@
+{
+  "schema_version": 1,
+  "run_id": "01M50Q32SZ4STPGDPYXBZRRQEN",
+  "name": "detection-yolo11s-int8-noexclude",
+  "kind": "eval.detection",
+  "started_at": "2026-10-15T21:22:02.687121Z",
+  "ended_at": "2026-10-15T21:22:22.251250Z",
+  "seed": 20261014,
+  "git": {
+    "sha": "9b71ac79444df8f9c988075efc50db9f5b91d813",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0",
+    "torch": "2.14.1+cpu",
+    "torchvision": "0.29.1+cpu",
+    "ultralytics": "8.4.175",
+    "onnxruntime": "1.31.0"
+  },
+  "config": {
+    "service": "eval-detection",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 1.0
+    },
+    "paths": {
+      "spec": "configs/eval/detection.v1.yaml",
+      "subset": "eval/detection/subset.v1.jsonl",
+      "manifest": "eval/detection/subset.v1.json",
+      "images_dir": "data/eval/detection/v1",
+      "fetch_workers": 8
+    },
+    "results_dir": "eval/results",
+    "predictions_dir": "data/eval/detection/predictions",
+    "sources": [
+      "coco",
+      "mot17"
+    ],
+    "detector": {
+      "weights": "yolo11s",
+      "backend": "onnxruntime",
+      "precision": "int8",
+      "device": "cpu",
+      "imgsz": 640,
+      "conf": 0.001,
+      "iou": 0.7,
+      "max_det": 300,
+      "threads": null
+    },
+    "max_dets_per_class": 100,
+    "mot_frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "bootstrap": {
+      "seed": 20261014,
+      "resamples": 2000,
+      "confidence": 0.95
+    },
+    "max_images": null
+  },
+  "scenario": null,
+  "metrics": {
+    "model_version": "yolo11s@85a76fe86dd8+onnx-int8@d5b9b4d9",
+    "subset": {
+      "version": 1,
+      "subset_sha256": "1661781dd3045ca39c1baba92807b0815f5c09e5f7a161fc42a061a3183f87dc",
+      "spec_sha256": "f6030d96dbf01a67b2e101f646ec9d87bb94dccff4e2baa936154cada32f7b16",
+      "partial": false
+    },
+    "predictions_file": "data/eval/detection/predictions/01M50Q32SZ4STPGDPYXBZRRQEN.jsonl.gz",
+    "infer_s_total": 16.851315565000505,
+    "images_per_s": 34.00327990949844,
+    "sources": {
+      "coco": {
+        "images": 500,
+        "gt_boxes": 3833,
+        "ignore_regions": 49,
+        "predictions": 0,
+        "classes_scored": 79,
+        "map50": {
+          "value": 0.0,
+          "ci_lo": 0.0,
+          "ci_hi": 0.0,
+          "boot_std": 0.0,
+          "boot_mean": 0.0
+        },
+        "map50_95": {
+          "value": 0.0,
+          "ci_lo": 0.0,
+          "ci_hi": 0.0,
+          "boot_std": 0.0,
+          "boot_mean": 0.0
+        },
+        "per_class": {
+          "airplane": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 13
+          },
+          "apple": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 17
+          },
+          "backpack": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 38
+          },
+          "banana": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 37
+          },
+          "baseball bat": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 17
+          },
+          "baseball glove": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 14
+          },
+          "bear": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 5
+          },
+          "bed": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 18
+          },
+          "bench": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 53
+          },
+          "bicycle": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 33
+          },
+          "bird": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 45
+          },
+          "boat": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 25
+          },
+          "book": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 131
+          },
+          "bottle": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 100
+          },
+          "bowl": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 77
+          },
+          "broccoli": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 12
+          },
+          "bus": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 26
+          },
+          "cake": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 46
+          },
+          "car": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 214
+          },
+          "carrot": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 35
+          },
+          "cat": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 20
+          },
+          "cell phone": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 23
+          },
+          "chair": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 192
+          },
+          "clock": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 27
+          },
+          "couch": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 24
+          },
+          "cow": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 40
+          },
+          "cup": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 90
+          },
+          "dining table": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 82
+          },
+          "dog": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 23
+          },
+          "donut": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 20
+          },
+          "elephant": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 33
+          },
+          "fire hydrant": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 9
+          },
+          "fork": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 26
+          },
+          "frisbee": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 9
+          },
+          "giraffe": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 23
+          },
+          "hair drier": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 1
+          },
+          "handbag": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 54
+          },
+          "horse": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 29
+          },
+          "hot dog": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 11
+          },
+          "keyboard": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 10
+          },
+          "kite": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 25
+          },
+          "knife": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 39
+          },
+          "laptop": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 20
+          },
+          "microwave": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 2
+          },
+          "motorcycle": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 15
+          },
+          "mouse": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 4
+          },
+          "orange": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 29
+          },
+          "oven": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 9
+          },
+          "parking meter": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 3
+          },
+          "person": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 1167
+          },
+          "pizza": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 45
+          },
+          "potted plant": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 32
+          },
+          "refrigerator": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 2
+          },
+          "remote": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 31
+          },
+          "sandwich": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 28
+          },
+          "scissors": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 2
+          },
+          "sheep": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 25
+          },
+          "sink": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 22
+          },
+          "skateboard": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 23
+          },
+          "skis": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 23
+          },
+          "snowboard": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 10
+          },
+          "spoon": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 34
+          },
+          "sports ball": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 17
+          },
+          "stop sign": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 10
+          },
+          "suitcase": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 23
+          },
+          "surfboard": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 36
+          },
+          "teddy bear": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 14
+          },
+          "tennis racket": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 19
+          },
+          "tie": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 17
+          },
+          "toilet": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 19
+          },
+          "toothbrush": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 8
+          },
+          "traffic light": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 104
+          },
+          "train": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 21
+          },
+          "truck": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 40
+          },
+          "tv": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 25
+          },
+          "umbrella": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 77
+          },
+          "vase": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 40
+          },
+          "wine glass": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 31
+          },
+          "zebra": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 40
+          }
+        }
+      },
+      "mot17": {
+        "images": 73,
+        "gt_boxes": 1961,
+        "ignore_regions": 980,
+        "predictions": 0,
+        "classes_scored": 1,
+        "map50": {
+          "value": 0.0,
+          "ci_lo": 0.0,
+          "ci_hi": 0.0,
+          "boot_std": 0.0,
+          "boot_mean": 0.0
+        },
+        "map50_95": {
+          "value": 0.0,
+          "ci_lo": 0.0,
+          "ci_hi": 0.0,
+          "boot_std": 0.0,
+          "boot_mean": 0.0
+        },
+        "per_class": {
+          "person": {
+            "ap50": 0.0,
+            "ap50_95": 0.0,
+            "n_pos": 1961
+          }
+        }
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": "mAP point estimates follow pycocotools (area all); intervals are percentile bootstrap over images. MOT17 frames are one per second of three sequences and still correlated within a sequence, so its interval is optimistic."
+}
