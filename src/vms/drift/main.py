@@ -29,7 +29,13 @@ def build_app(settings: DriftSettings, obs: Observability) -> FastAPI:
         settings.db,
     )
     monitor = DriftMonitor(
-        store, settings.monitor, settings.signals, obs.metrics, clock=SystemClock()
+        store,
+        settings.monitor,
+        settings.signals,
+        obs.metrics,
+        clock=SystemClock(),
+        detector=settings.detector,
+        calibration=settings.calibration,
     )
     stop = asyncio.Event()
     task: asyncio.Task[None] | None = None

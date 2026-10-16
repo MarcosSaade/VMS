@@ -1,0 +1,37 @@
+# Drift alerts (task 9.3). The drift monitor runs the detector (configs/drift.yaml: detector,
+# calibration; operating point chosen by `make drift-score`, BENCHMARKS "Drift detection") and
+# exports vms_drift_alarm_value per camera and channel; these rules only surface it. What each
+# alert means and how to respond: docs/RUNBOOK.md, "Drift alerts".
+groups:
+  - name: vms-drift
+    rules:
+      - alert: VmsCameraDrift
+        expr: max by (camera_id, channel) (vms_drift_alarm_value) == 1
+        labels:
+          severity: warning
+        annotations:
+          summary: "Camera {{ $labels.camera_id }} drifted ({{ $labels.channel }})"
+          description: >-
+            The drift detector on {{ $labels.channel }} crossed its decision interval for
+            camera {{ $labels.camera_id }}: its recent window differs from its reference more
+            than clean runs ever did. See RUNBOOK "Drift alerts".
+
+      - alert: VmsDriftNoData
+        expr: max by (camera_id) (vms_drift_reference_frames) > 0 and max by (camera_id) (vms_drift_window_frames) < 20
+        for: 2m
+        labels:
+          severity: info
+        annotations:
+          summary: "No drift statistics for camera {{ $labels.camera_id }}"
+          description: >-
+            Fewer than 20 processed frames per 30 s window for 2 minutes: the camera stopped
+            sending, or the worker is behind. Drift cannot be detected meanwhile.
+
+      - alert: VmsDriftMonitorDown
+        expr: up{job="drift"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Drift monitor is down"
+          description: "Prometheus cannot scrape the drift monitor; no drift alerts can fire."

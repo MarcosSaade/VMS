@@ -208,3 +208,43 @@ def test_run_counts_failed_updates() -> None:
 def test_update_every_must_fit_in_the_window() -> None:
     with pytest.raises(ValueError, match="update_every_s"):
         MonitorSettings(window_s=5, update_every_s=10)
+
+
+def test_detector_alarms_on_the_drift_and_counts_one_onset() -> None:
+    from vms.drift.detect import Calibration, ChannelCalibration, DetectorSettings
+
+    store = clean_then_dark()
+    clock = FakeClock(T0)
+    metrics = Metrics("drift")
+    cal = Calibration(channels={"shift:brightness": ChannelCalibration(mean=0.0, std=0.5)})
+    monitor = DriftMonitor(
+        store,
+        SETTINGS,
+        SignalSettings(),
+        metrics,
+        clock=clock,
+        detector=DetectorSettings(kind="cusum", k=1, h=10),
+        calibration=cal,
+    )
+
+    def at(seconds: float) -> None:
+        clock.set(T0 + timedelta(seconds=seconds))
+        asyncio.run(monitor.update())
+
+    def sample(name: str) -> float | None:
+        return metrics.registry.get_sample_value(
+            f"vms_drift_{name}", {"camera_id": "cam-1", "channel": "shift:brightness"}
+        )
+
+    at(20)
+    for t in range(100, 125, 5):  # clean windows
+        at(t)
+    assert sample("alarm_value") == 0
+    assert sample("cusum_value") == 0
+    for t in range(155, 180, 5):  # dark from 120 s: z about -40 per update
+        at(t)
+    assert sample("alarm_value") == 1
+    assert sample("alarms_total") == 1  # one onset, however many updates alarm
+    z = sample("z_value")
+    assert z is not None
+    assert z < -20

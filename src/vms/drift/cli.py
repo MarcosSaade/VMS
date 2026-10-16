@@ -6,6 +6,8 @@ recalibrate CAMERA ... | --all    start a new calibration period now (the next r
                                   capture time), or set one with --start and --end (ISO 8601,
                                   a period known to be clean); the monitor picks it up on its
                                   next update
+score --scenario FILE             (make drift-score) replay stored drift runs, sweep threshold
+                                  and CUSUM detectors, results JSON and a plot (task 9.3)
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import asyncio
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from vms.common.clock import Clock, SystemClock
 from vms.common.logs import configure_logging, get_logger
@@ -40,6 +43,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     recal.add_argument("--all", action="store_true", help="every camera with a reference")
     recal.add_argument("--start", type=datetime.fromisoformat)
     recal.add_argument("--end", type=datetime.fromisoformat)
+    score = commands.add_parser("score", help="score drift detectors on stored runs")
+    score.add_argument("--scenario", type=Path, required=True)
     args = parser.parse_args(argv)
 
     if args.command in (None, "run"):
@@ -70,6 +75,14 @@ async def _with_store(settings: DriftSettings, args: argparse.Namespace) -> int:
     )
     await store.open()
     try:
+        if args.command == "score":
+            from vms.drift.score import load_scenario, run_score
+
+            path = await run_score(
+                load_scenario(args.scenario), store, Path(), Path("bench/results")
+            )
+            sys.stdout.write(f"results: {path}\n")
+            return 0
         if args.command == "references":
             for ref in sorted((await store.references()).values(), key=lambda r: r.camera_id):
                 sys.stdout.write(

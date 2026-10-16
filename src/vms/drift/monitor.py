@@ -12,6 +12,11 @@ Every `update_every_s`, `update`:
    its range changes (`python -m vms.drift recalibrate`) or the process restarts; the range
    lives in Postgres, so a restart recomputes the same reference.
 5. Compares window and reference (vms.drift.signals) and sets the gauges.
+6. If a detector and its clean-run calibration are configured (task 9.3), standardizes each
+   channel, updates the camera's detector (vms.drift.detect) and exports each channel's z,
+   its CUSUM statistic and whether it alarms; Prometheus alert rules fire on the alarm gauge
+   (deploy/compose/prometheus/rules/drift.yml). A camera's detector restarts when its
+   reference changes.
 
 Gauges carry `camera_id` (and `signal`); an undefined statistic (too few frames or
 detections) is exported as NaN, which Prometheus stores and Grafana draws as a gap, so "no
@@ -33,8 +38,17 @@ from datetime import datetime, timedelta
 from vms.common.clock import Clock
 from vms.common.logs import get_logger
 from vms.common.metrics import Metrics
+from vms.drift.detect import Calibration, CameraDetector, DetectorSettings, channel_values
 from vms.drift.settings import MonitorSettings
-from vms.drift.signals import SIGNALS, DetectionRow, FrameRow, Sample, SignalSettings, compare
+from vms.drift.signals import (
+    SIGNALS,
+    DetectionRow,
+    DriftStatistics,
+    FrameRow,
+    Sample,
+    SignalSettings,
+    compare,
+)
 from vms.drift.store import DriftStore, ReferenceRange
 from vms.storage.frames import FrameStoreError
 
@@ -52,8 +66,14 @@ class DriftMonitor:
         metrics: Metrics,
         *,
         clock: Clock,
+        detector: DetectorSettings | None = None,
+        calibration: Calibration | None = None,
     ) -> None:
         self._store = store
+        self._detector = detector if calibration is not None else None
+        self._calibration = calibration
+        self._detectors: dict[str, CameraDetector] = {}
+        self._alarming: set[tuple[str, str]] = set()
         self._settings = settings
         self._signals = signals
         self._clock = clock
@@ -107,6 +127,22 @@ class DriftMonitor:
             "frames",
             "Frames in the camera's reference; 0 while the calibration period runs",
             ["camera_id"],
+        )
+        channel = ["camera_id", "channel"]
+        self._z = metrics.gauge(
+            "z", "value", "Channel statistic standardized by its clean-run calibration", channel
+        )
+        self._cusum = metrics.gauge(
+            "cusum",
+            "value",
+            "Detector statistic (CUSUM S, larger side); 0 for a threshold",
+            channel,
+        )
+        self._alarm = metrics.gauge(
+            "alarm", "value", "1 while the channel's detector alarms, else 0", channel
+        )
+        self._alarms = metrics.counter(
+            "alarms", "total", "Alarm onsets (0 to 1 transitions) per camera and channel", channel
         )
         self._updates = metrics.counter(
             "updates", "total", "Monitor updates by outcome", ["outcome"]
@@ -216,6 +252,7 @@ class DriftMonitor:
                 extra={"camera_id": ref.camera_id, "frames": sample.frames},
             )
         self._references[ref.camera_id] = (ref, sample)
+        self._detectors.pop(ref.camera_id, None)  # a new reference: detection starts over
         log.info(
             "drift reference loaded",
             extra={
@@ -242,3 +279,30 @@ class DriftMonitor:
         self._ks.labels(camera_id=camera_id).set(stats.confidence_ks)
         self._w1.labels(camera_id=camera_id).set(stats.confidence_wasserstein)
         self._psi.labels(camera_id=camera_id).set(stats.class_psi)
+        self._detect(camera_id, stats)
+
+    def _detect(self, camera_id: str, stats: DriftStatistics) -> None:
+        if self._detector is None or self._calibration is None:
+            return
+        det = self._detectors.get(camera_id)
+        if det is None:
+            det = self._detectors[camera_id] = CameraDetector(self._detector, self._calibration)
+        values = channel_values(stats)
+        firing = set(det.update(values))
+        for channel, cd in det.channels.items():
+            labels = {"camera_id": camera_id, "channel": channel}
+            self._z.labels(**labels).set(self._calibration.z(channel, values[channel]))
+            self._cusum.labels(**labels).set(cd.statistic)
+            self._alarm.labels(**labels).set(1 if channel in firing else 0)
+            key = (camera_id, channel)
+            was = key in self._alarming
+            if channel in firing:
+                self._alarming.add(key)
+            else:
+                self._alarming.discard(key)
+            if channel in firing and not was:
+                self._alarms.labels(**labels).inc()
+                log.warning(
+                    "drift alarm",
+                    extra={"camera_id": camera_id, "channel": channel, "z": values[channel]},
+                )

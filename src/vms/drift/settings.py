@@ -8,6 +8,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from vms.common.settings import ServiceSettings
+from vms.drift.detect import Calibration, DetectorSettings
 from vms.drift.signals import SignalSettings
 from vms.storage.frames import PoolTuning
 
@@ -44,3 +45,7 @@ class DriftSettings(ServiceSettings):
     monitor: MonitorSettings = Field(default_factory=MonitorSettings)
     signals: SignalSettings = Field(default_factory=SignalSettings)
     db: PoolTuning = Field(default_factory=PoolTuning)
+    # Alerting (task 9.3): the chosen operating point and the clean-run calibration it was
+    # chosen with (from `python -m vms.drift score`). Without a calibration, no detection.
+    detector: DetectorSettings = Field(default_factory=DetectorSettings)
+    calibration: Calibration | None = None

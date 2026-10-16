@@ -95,3 +95,12 @@ def test_span_reaches_tempo_through_collector(stack: StackSettings) -> None:
 
     # The collector batches spans, then Tempo makes them queryable from its live store.
     poll(trace_with_span, timeout_s=30)
+
+
+def test_prometheus_loads_the_drift_alert_rules(stack: StackSettings) -> None:
+    rules = get_json(stack.url(stack.prometheus_port, "/api/v1/rules"))
+    groups = {g["name"]: g for g in rules["data"]["groups"]}
+    assert "vms-drift" in groups, "rules not mounted: recreate prometheus (make up)"
+    alerts = {r["name"] for r in groups["vms-drift"]["rules"]}
+    assert alerts == {"VmsCameraDrift", "VmsDriftNoData", "VmsDriftMonitorDown"}
+    assert all(r["health"] in ("ok", "unknown") for r in groups["vms-drift"]["rules"])

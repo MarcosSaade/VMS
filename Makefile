@@ -129,6 +129,10 @@ worker: ## Run the inference worker on the host (needs make up; fetches weights 
 drift: ## Run the drift monitor on the host (needs make up; per-camera drift gauges on :8095)
 	$(RUN) python -m vms.drift run
 
+.PHONY: drift-score
+drift-score: ## Score drift detectors (threshold vs CUSUM) on stored drift runs (SCENARIO=bench/scenarios/drift-detect-cpu.yaml)
+	$(RUN) python -m vms.drift score --scenario $(or $(SCENARIO),bench/scenarios/drift-detect-cpu.yaml)
+
 .PHONY: query
 query: ## Run the query service on the host (needs make up; LLM from LLM_* in .env, else canned)
 	$(RUN) python -m vms.query serve
