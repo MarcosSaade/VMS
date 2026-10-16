@@ -1,0 +1,1867 @@
+{
+  "schema_version": 1,
+  "run_id": "01M511Z4V0FE0MA4TK3YDAY1SD",
+  "name": "ramp-cpu-ort-b4-ext",
+  "kind": "bench.e2e",
+  "started_at": "2026-10-16T00:32:08.032674Z",
+  "ended_at": "2026-10-16T01:00:36.438519Z",
+  "seed": 1234,
+  "git": {
+    "sha": "be6d03925d8279ba734e9bd25c0e34358b7f9665",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0"
+  },
+  "config": {
+    "service": "bench",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 1.0
+    },
+    "ingest_url": "http://127.0.0.1:8080",
+    "query_url": "http://127.0.0.1:8070",
+    "prometheus_url": "http://127.0.0.1:9090",
+    "results_dir": "bench/results",
+    "http_timeout_s": 10.0,
+    "query_timeout_s": 30.0,
+    "loadgen_timeout_margin_s": 120.0,
+    "min_window_s": 15.0,
+    "scrape_settle_s": 7.0,
+    "drain": {
+      "enabled": true,
+      "timeout_s": 900.0,
+      "interval_s": 2.0
+    },
+    "max_client_cpu_cores": 0.8,
+    "slo": {
+      "freshness_p95_s": 2.0,
+      "max_lost_frames": 0,
+      "max_backlog_slope_fps": 0.5,
+      "query_p95_s": 1.5
+    },
+    "queries": {
+      "ingest_created_fps": {
+        "query": "sum(rate(vms_ingest_frames_total{outcome=\"created\"}[$window]))",
+        "by": null
+      },
+      "ingest_rejected_fps": {
+        "query": "sum(rate(vms_ingest_frames_total{outcome=~\"invalid|error\"}[$window]))",
+        "by": null
+      },
+      "worker_done_fps": {
+        "query": "sum(rate(vms_worker_frames_total{outcome=\"done\"}[$window]))",
+        "by": null
+      },
+      "worker_lost_frames": {
+        "query": "sum(increase(vms_worker_frames_total{outcome=~\"lost|failed\"}[$window]))",
+        "by": null
+      },
+      "freshness_p50_s": {
+        "query": "histogram_quantile(0.50, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+        "by": null
+      },
+      "freshness_p95_s": {
+        "query": "histogram_quantile(0.95, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+        "by": null
+      },
+      "freshness_p99_s": {
+        "query": "histogram_quantile(0.99, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[$window])))",
+        "by": null
+      },
+      "queue_wait_p95_s": {
+        "query": "histogram_quantile(0.95, sum by (le) (rate(vms_worker_queue_wait_seconds_bucket[$window])))",
+        "by": null
+      },
+      "worker_stage_p95_s": {
+        "query": "histogram_quantile(0.95, sum by (le, stage) (rate(vms_worker_stage_duration_seconds_bucket[$window])))",
+        "by": "stage"
+      },
+      "backlog_end_frames": {
+        "query": "max(vms_worker_backlog_frames)",
+        "by": null
+      },
+      "backlog_max_frames": {
+        "query": "max_over_time(max(vms_worker_backlog_frames)[$window:5s])",
+        "by": null
+      },
+      "backlog_slope_fps": {
+        "query": "deriv(max(vms_worker_backlog_frames)[$window:5s])",
+        "by": null
+      },
+      "backlog_age_max_s": {
+        "query": "max_over_time(max(vms_worker_backlog_age_seconds)[$window:5s])",
+        "by": null
+      },
+      "query_stage_p95_s": {
+        "query": "histogram_quantile(0.95, sum by (le, stage) (rate(vms_query_stage_duration_seconds_bucket[$window])))",
+        "by": "stage"
+      },
+      "cpu_cores": {
+        "query": "sum by (job) (rate(process_cpu_seconds_total{job=~\"ingest|worker|query\"}[$window]))",
+        "by": "job"
+      },
+      "rss_max_bytes": {
+        "query": "max by (job) (max_over_time(process_resident_memory_bytes{job=~\"ingest|worker|query\"}[$window]))",
+        "by": "job"
+      }
+    }
+  },
+  "scenario": {
+    "name": "ramp-cpu-ort-b4-ext",
+    "description": "Task 5.5, ramp-cpu-ort-b4 continued past its top step: ramp-cpu-ort-b4 passed all of 1 to 5 cameras (rated capacity only a lower bound), so this finds the knee. Same stack, worker and settings (yolo11n, ONNX Runtime FP32, infer_batch 4, data-mini at 5 FPS per camera, 1280x720 q85), steps of 5 to 8 cameras (5 repeated as the link to the first run), warmup 20 s, hold 90 s, 3 repetitions, no query load. Start the worker with WORKER_BACKEND=onnxruntime WORKER_INFER_BATCH=4. Quiet host: nothing else CPU-heavy.\n",
+    "kind": "e2e",
+    "repeats": 3,
+    "warmup_s": 20,
+    "hold_s": 90,
+    "expect_worker": {
+      "backend": "onnxruntime",
+      "precision": "fp32",
+      "infer_batch": "4"
+    },
+    "ingest": {
+      "cameras": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "fps": 5
+    }
+  },
+  "metrics": {
+    "steps": [
+      {
+        "rep": 0,
+        "step": 0,
+        "cameras": 5,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 1234,
+        "window": {
+          "start": "2026-10-16T00:32:29.402336Z",
+          "end": "2026-10-16T00:33:59.402336Z",
+          "seconds": 90.0
+        },
+        "drain_s": 0.003,
+        "loadgen": {
+          "run_id": "01M511Z65SWSS7ZN9R9GQW6BTM",
+          "steady_s": 89.984,
+          "offered_fps": 25.0,
+          "sent_fps": 25.0,
+          "accepted_fps": 25.0,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 2250,
+            "accepted": 2250,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 11.019,
+            "p95": 16.45,
+            "p99": 20.448,
+            "mean": 11.601,
+            "max": 226.145
+          },
+          "schedule_lag_ms": {
+            "p50": 0.789,
+            "p95": 1.883,
+            "p99": 2.442,
+            "mean": 0.862,
+            "max": 4.317
+          },
+          "seed": 1234,
+          "started_at": "2026-10-16T00:32:09.402336+00:00",
+          "elapsed_s": 109.984,
+          "drain_s": 0.009,
+          "cpu": {
+            "seconds": 3.579,
+            "utilization_cores": 0.033,
+            "us_per_frame": 1301.5
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 25.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 25.0,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 0.1174,
+          "freshness_p95_s": 0.2459,
+          "freshness_p99_s": 0.4325,
+          "queue_wait_p95_s": 0.096,
+          "worker_stage_p95_s": {
+            "claim": 0.0024,
+            "decode": 0.0049,
+            "fetch": 0.0096,
+            "infer": 0.075,
+            "stats": 0.0068,
+            "track": 0.0041,
+            "write": 0.0076
+          },
+          "backlog_end_frames": 3.0,
+          "backlog_max_frames": 4.0,
+          "backlog_slope_fps": 0.0089,
+          "backlog_age_max_s": 0.0992,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1221,
+            "query": 0.002,
+            "worker": 9.8362
+          },
+          "rss_max_bytes": {
+            "ingest": 103018496.0,
+            "query": 129572864.0,
+            "worker": 546369536.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": true,
+          "loss_ok": true,
+          "backlog_ok": true,
+          "ingest_ok": true,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 0,
+        "step": 1,
+        "cameras": 6,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 1235,
+        "window": {
+          "start": "2026-10-16T00:34:27.919747Z",
+          "end": "2026-10-16T00:35:57.919747Z",
+          "seconds": 90.0
+        },
+        "drain_s": 0.001,
+        "loadgen": {
+          "run_id": "01M5122SXF1W6G3DA4NTNVFSC4",
+          "steady_s": 89.945,
+          "offered_fps": 30.0,
+          "sent_fps": 30.02,
+          "accepted_fps": 30.02,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 2700,
+            "accepted": 2700,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 12.605,
+            "p95": 21.299,
+            "p99": 25.681,
+            "mean": 13.661,
+            "max": 51.827
+          },
+          "schedule_lag_ms": {
+            "p50": 0.776,
+            "p95": 1.896,
+            "p99": 2.375,
+            "mean": 0.853,
+            "max": 21.635
+          },
+          "seed": 1235,
+          "started_at": "2026-10-16T00:34:07.919747+00:00",
+          "elapsed_s": 109.945,
+          "drain_s": 0.01,
+          "cpu": {
+            "seconds": 4.603,
+            "utilization_cores": 0.042,
+            "us_per_frame": 1395.0
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 30.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 26.2235,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 7.5121,
+          "freshness_p95_s": 18.1425,
+          "freshness_p99_s": 19.6285,
+          "queue_wait_p95_s": 18.0213,
+          "worker_stage_p95_s": {
+            "claim": 0.0025,
+            "decode": 0.0049,
+            "fetch": 0.0142,
+            "infer": 0.1084,
+            "stats": 0.0095,
+            "track": 0.0025,
+            "write": 0.0056
+          },
+          "backlog_end_frames": 376.0,
+          "backlog_max_frames": 357.0,
+          "backlog_slope_fps": 3.4045,
+          "backlog_age_max_s": 11.9036,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1584,
+            "query": 0.0021,
+            "worker": 9.8953
+          },
+          "rss_max_bytes": {
+            "ingest": 103411712.0,
+            "query": 129572864.0,
+            "worker": 553394176.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 0,
+        "step": 2,
+        "cameras": 7,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 1236,
+        "window": {
+          "start": "2026-10-16T00:36:40.454126Z",
+          "end": "2026-10-16T00:38:10.454126Z",
+          "seconds": 90.0
+        },
+        "drain_s": 14.034,
+        "loadgen": {
+          "run_id": "01M5126VB5PGE5SWB1VAHTFCR9",
+          "steady_s": 89.963,
+          "offered_fps": 35.0,
+          "sent_fps": 35.01,
+          "accepted_fps": 35.01,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 3150,
+            "accepted": 3150,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 12.588,
+            "p95": 19.124,
+            "p99": 23.155,
+            "mean": 13.134,
+            "max": 211.787
+          },
+          "schedule_lag_ms": {
+            "p50": 0.732,
+            "p95": 1.704,
+            "p99": 2.202,
+            "mean": 0.781,
+            "max": 3.729
+          },
+          "seed": 1236,
+          "started_at": "2026-10-16T00:36:20.454126+00:00",
+          "elapsed_s": 109.963,
+          "drain_s": 0.012,
+          "cpu": {
+            "seconds": 5.204,
+            "utilization_cores": 0.047,
+            "us_per_frame": 1351.8
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 35.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 25.6941,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 16.8534,
+          "freshness_p95_s": 28.6054,
+          "freshness_p99_s": 29.7211,
+          "queue_wait_p95_s": 28.5818,
+          "worker_stage_p95_s": {
+            "claim": 0.004,
+            "decode": 0.005,
+            "fetch": 0.0141,
+            "infer": 0.1086,
+            "stats": 0.0095,
+            "track": 0.0025,
+            "write": 0.0055
+          },
+          "backlog_end_frames": 970.0,
+          "backlog_max_frames": 970.0,
+          "backlog_slope_fps": 9.4326,
+          "backlog_age_max_s": 27.7226,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1825,
+            "query": 0.0022,
+            "worker": 9.8914
+          },
+          "rss_max_bytes": {
+            "ingest": 103542784.0,
+            "query": 129572864.0,
+            "worker": 554692608.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 0,
+        "step": 3,
+        "cameras": 8,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 1237,
+        "window": {
+          "start": "2026-10-16T00:39:15.014096Z",
+          "end": "2026-10-16T00:40:45.014096Z",
+          "seconds": 90.0
+        },
+        "drain_s": 36.067,
+        "loadgen": {
+          "run_id": "01M512BJ95XATQRPTP50XWV0BZ",
+          "steady_s": 90.0,
+          "offered_fps": 40.0,
+          "sent_fps": 40.0,
+          "accepted_fps": 40.0,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 3600,
+            "accepted": 3600,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 12.234,
+            "p95": 18.679,
+            "p99": 23.248,
+            "mean": 13.158,
+            "max": 1018.154
+          },
+          "schedule_lag_ms": {
+            "p50": 0.761,
+            "p95": 1.837,
+            "p99": 2.472,
+            "mean": 0.835,
+            "max": 5.322
+          },
+          "seed": 1237,
+          "started_at": "2026-10-16T00:38:55.014096+00:00",
+          "elapsed_s": 110.0,
+          "drain_s": 0.011,
+          "cpu": {
+            "seconds": 5.949,
+            "utilization_cores": 0.054,
+            "us_per_frame": 1351.9
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 40.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 25.1765,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 23.4894,
+          "freshness_p95_s": 42.4883,
+          "freshness_p99_s": 44.4977,
+          "queue_wait_p95_s": 42.4645,
+          "worker_stage_p95_s": {
+            "claim": 0.0034,
+            "decode": 0.005,
+            "fetch": 0.0157,
+            "infer": 0.1137,
+            "stats": 0.0095,
+            "track": 0.003,
+            "write": 0.0068
+          },
+          "backlog_end_frames": 1512.0,
+          "backlog_max_frames": 1512.0,
+          "backlog_slope_fps": 14.6768,
+          "backlog_age_max_s": 37.755,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.2075,
+            "query": 0.0021,
+            "worker": 9.8788
+          },
+          "rss_max_bytes": {
+            "ingest": 103538688.0,
+            "query": 129572864.0,
+            "worker": 558407680.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 1,
+        "step": 0,
+        "cameras": 5,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 2234,
+        "window": {
+          "start": "2026-10-16T00:42:13.614513Z",
+          "end": "2026-10-16T00:43:43.614513Z",
+          "seconds": 90.0
+        },
+        "drain_s": 60.117,
+        "loadgen": {
+          "run_id": "01M512H0PEE5E7W5AAEW13JEG9",
+          "steady_s": 89.963,
+          "offered_fps": 25.0,
+          "sent_fps": 25.01,
+          "accepted_fps": 25.01,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 2250,
+            "accepted": 2250,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 10.675,
+            "p95": 13.844,
+            "p99": 16.453,
+            "mean": 10.739,
+            "max": 27.171
+          },
+          "schedule_lag_ms": {
+            "p50": 0.747,
+            "p95": 1.901,
+            "p99": 2.355,
+            "mean": 0.816,
+            "max": 4.31
+          },
+          "seed": 2234,
+          "started_at": "2026-10-16T00:41:53.614513+00:00",
+          "elapsed_s": 109.963,
+          "drain_s": 0.01,
+          "cpu": {
+            "seconds": 3.823,
+            "utilization_cores": 0.035,
+            "us_per_frame": 1390.3
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 25.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 25.0006,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 0.0913,
+          "freshness_p95_s": 0.231,
+          "freshness_p99_s": 0.2462,
+          "queue_wait_p95_s": 0.0778,
+          "worker_stage_p95_s": {
+            "claim": 0.0024,
+            "decode": 0.0049,
+            "fetch": 0.0077,
+            "infer": 0.0493,
+            "stats": 0.005,
+            "track": 0.0043,
+            "write": 0.0078
+          },
+          "backlog_end_frames": 2.0,
+          "backlog_max_frames": 3.0,
+          "backlog_slope_fps": -0.001,
+          "backlog_age_max_s": 0.0681,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1287,
+            "query": 0.0022,
+            "worker": 9.8871
+          },
+          "rss_max_bytes": {
+            "ingest": 103538688.0,
+            "query": 129572864.0,
+            "worker": 549888000.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": true,
+          "loss_ok": true,
+          "backlog_ok": true,
+          "ingest_ok": true,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 1,
+        "step": 1,
+        "cameras": 6,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 2235,
+        "window": {
+          "start": "2026-10-16T00:44:12.086171Z",
+          "end": "2026-10-16T00:45:42.086171Z",
+          "seconds": 90.0
+        },
+        "drain_s": 0.001,
+        "loadgen": {
+          "run_id": "01M512MMCNNZQ2XDKZFRWRETPW",
+          "steady_s": 89.973,
+          "offered_fps": 30.0,
+          "sent_fps": 30.01,
+          "accepted_fps": 30.01,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 2700,
+            "accepted": 2700,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 14.071,
+            "p95": 25.922,
+            "p99": 30.864,
+            "mean": 15.637,
+            "max": 77.17
+          },
+          "schedule_lag_ms": {
+            "p50": 0.726,
+            "p95": 1.779,
+            "p99": 2.641,
+            "mean": 0.794,
+            "max": 4.387
+          },
+          "seed": 2235,
+          "started_at": "2026-10-16T00:43:52.086171+00:00",
+          "elapsed_s": 109.973,
+          "drain_s": 0.009,
+          "cpu": {
+            "seconds": 4.359,
+            "utilization_cores": 0.04,
+            "us_per_frame": 1320.8
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 30.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 25.6471,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 9.6198,
+          "freshness_p95_s": 18.9345,
+          "freshness_p99_s": 19.7869,
+          "queue_wait_p95_s": 18.9067,
+          "worker_stage_p95_s": {
+            "claim": 0.0025,
+            "decode": 0.0066,
+            "fetch": 0.0166,
+            "infer": 0.1025,
+            "stats": 0.0096,
+            "track": 0.0025,
+            "write": 0.005
+          },
+          "backlog_end_frames": 449.0,
+          "backlog_max_frames": 429.0,
+          "backlog_slope_fps": 4.2423,
+          "backlog_age_max_s": 14.204,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1556,
+            "query": 0.0021,
+            "worker": 9.9058
+          },
+          "rss_max_bytes": {
+            "ingest": 103669760.0,
+            "query": 129572864.0,
+            "worker": 559878144.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 1,
+        "step": 2,
+        "cameras": 7,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 2236,
+        "window": {
+          "start": "2026-10-16T00:46:28.579541Z",
+          "end": "2026-10-16T00:47:58.579541Z",
+          "seconds": 90.0
+        },
+        "drain_s": 18.044,
+        "loadgen": {
+          "run_id": "01M512RSP2R01HVPN6C16EWX89",
+          "steady_s": 89.991,
+          "offered_fps": 35.0,
+          "sent_fps": 35.0,
+          "accepted_fps": 35.0,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 3150,
+            "accepted": 3150,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 11.736,
+            "p95": 18.378,
+            "p99": 24.841,
+            "mean": 12.308,
+            "max": 44.598
+          },
+          "schedule_lag_ms": {
+            "p50": 0.748,
+            "p95": 1.7,
+            "p99": 2.219,
+            "mean": 0.795,
+            "max": 15.271
+          },
+          "seed": 2236,
+          "started_at": "2026-10-16T00:46:08.579541+00:00",
+          "elapsed_s": 109.991,
+          "drain_s": 0.013,
+          "cpu": {
+            "seconds": 5.384,
+            "utilization_cores": 0.049,
+            "us_per_frame": 1398.6
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 35.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 25.2706,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 17.8676,
+          "freshness_p95_s": 28.8585,
+          "freshness_p99_s": 29.8552,
+          "queue_wait_p95_s": 28.7599,
+          "worker_stage_p95_s": {
+            "claim": 0.0026,
+            "decode": 0.0067,
+            "fetch": 0.0163,
+            "infer": 0.1111,
+            "stats": 0.0096,
+            "track": 0.0025,
+            "write": 0.0056
+          },
+          "backlog_end_frames": 1033.0,
+          "backlog_max_frames": 984.0,
+          "backlog_slope_fps": 9.7344,
+          "backlog_age_max_s": 28.0508,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1858,
+            "query": 0.0022,
+            "worker": 9.8887
+          },
+          "rss_max_bytes": {
+            "ingest": 103190528.0,
+            "query": 129703936.0,
+            "worker": 560652288.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 1,
+        "step": 3,
+        "cameras": 8,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 2237,
+        "window": {
+          "start": "2026-10-16T00:49:05.137169Z",
+          "end": "2026-10-16T00:50:35.137169Z",
+          "seconds": 90.0
+        },
+        "drain_s": 38.078,
+        "loadgen": {
+          "run_id": "01M512XJJGV56ZE8P2VPWT08N6",
+          "steady_s": 90.0,
+          "offered_fps": 40.0,
+          "sent_fps": 40.0,
+          "accepted_fps": 40.0,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 3600,
+            "accepted": 3600,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 11.919,
+            "p95": 17.798,
+            "p99": 22.43,
+            "mean": 12.731,
+            "max": 1016.573
+          },
+          "schedule_lag_ms": {
+            "p50": 0.704,
+            "p95": 1.746,
+            "p99": 2.48,
+            "mean": 0.788,
+            "max": 13.921
+          },
+          "seed": 2237,
+          "started_at": "2026-10-16T00:48:45.137169+00:00",
+          "elapsed_s": 110.001,
+          "drain_s": 0.014,
+          "cpu": {
+            "seconds": 6.076,
+            "utilization_cores": 0.055,
+            "us_per_frame": 1380.8
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 40.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 24.9412,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 23.7348,
+          "freshness_p95_s": 42.5501,
+          "freshness_p99_s": 44.51,
+          "queue_wait_p95_s": 42.5234,
+          "worker_stage_p95_s": {
+            "claim": 0.0034,
+            "decode": 0.0073,
+            "fetch": 0.0155,
+            "infer": 0.1125,
+            "stats": 0.0096,
+            "track": 0.0025,
+            "write": 0.0067
+          },
+          "backlog_end_frames": 1537.0,
+          "backlog_max_frames": 1537.0,
+          "backlog_slope_fps": 14.1647,
+          "backlog_age_max_s": 38.5033,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.2109,
+            "query": 0.0021,
+            "worker": 9.8818
+          },
+          "rss_max_bytes": {
+            "ingest": 103190528.0,
+            "query": 129703936.0,
+            "worker": 561164288.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 2,
+        "step": 0,
+        "cameras": 5,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 3234,
+        "window": {
+          "start": "2026-10-16T00:52:03.784409Z",
+          "end": "2026-10-16T00:53:33.784409Z",
+          "seconds": 90.0
+        },
+        "drain_s": 60.119,
+        "loadgen": {
+          "run_id": "01M5133117HH2K78QXGS5DXNR5",
+          "steady_s": 89.949,
+          "offered_fps": 25.0,
+          "sent_fps": 25.01,
+          "accepted_fps": 25.01,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 2250,
+            "accepted": 2250,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 11.159,
+            "p95": 17.672,
+            "p99": 22.983,
+            "mean": 11.733,
+            "max": 35.357
+          },
+          "schedule_lag_ms": {
+            "p50": 0.765,
+            "p95": 1.897,
+            "p99": 2.299,
+            "mean": 0.843,
+            "max": 4.302
+          },
+          "seed": 3234,
+          "started_at": "2026-10-16T00:51:43.784409+00:00",
+          "elapsed_s": 109.949,
+          "drain_s": 0.011,
+          "cpu": {
+            "seconds": 3.788,
+            "utilization_cores": 0.034,
+            "us_per_frame": 1377.5
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 25.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 24.9647,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 0.1803,
+          "freshness_p95_s": 0.3772,
+          "freshness_p99_s": 0.4754,
+          "queue_wait_p95_s": 0.2109,
+          "worker_stage_p95_s": {
+            "claim": 0.0025,
+            "decode": 0.0052,
+            "fetch": 0.01,
+            "infer": 0.0971,
+            "stats": 0.0094,
+            "track": 0.0037,
+            "write": 0.0062
+          },
+          "backlog_end_frames": 4.0,
+          "backlog_max_frames": 5.0,
+          "backlog_slope_fps": -0.0064,
+          "backlog_age_max_s": 0.1858,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1275,
+            "query": 0.0022,
+            "worker": 9.8866
+          },
+          "rss_max_bytes": {
+            "ingest": 103190528.0,
+            "query": 129703936.0,
+            "worker": 561123328.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": true,
+          "loss_ok": true,
+          "backlog_ok": true,
+          "ingest_ok": true,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 2,
+        "step": 1,
+        "cameras": 6,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 3235,
+        "window": {
+          "start": "2026-10-16T00:54:02.326058Z",
+          "end": "2026-10-16T00:55:32.326058Z",
+          "seconds": 90.0
+        },
+        "drain_s": 0.001,
+        "loadgen": {
+          "run_id": "01M5136MSN4HD94REJGC4XT1YA",
+          "steady_s": 89.995,
+          "offered_fps": 30.0,
+          "sent_fps": 30.0,
+          "accepted_fps": 30.0,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 2700,
+            "accepted": 2700,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 13.078,
+            "p95": 24.063,
+            "p99": 31.503,
+            "mean": 15.463,
+            "max": 1027.269
+          },
+          "schedule_lag_ms": {
+            "p50": 0.752,
+            "p95": 1.834,
+            "p99": 2.601,
+            "mean": 0.822,
+            "max": 12.463
+          },
+          "seed": 3235,
+          "started_at": "2026-10-16T00:53:42.326058+00:00",
+          "elapsed_s": 109.995,
+          "drain_s": 0.013,
+          "cpu": {
+            "seconds": 4.516,
+            "utilization_cores": 0.041,
+            "us_per_frame": 1368.6
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 30.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 24.9412,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 9.7343,
+          "freshness_p95_s": 18.9567,
+          "freshness_p99_s": 19.7913,
+          "queue_wait_p95_s": 18.9325,
+          "worker_stage_p95_s": {
+            "claim": 0.0025,
+            "decode": 0.0074,
+            "fetch": 0.0164,
+            "infer": 0.1175,
+            "stats": 0.0097,
+            "track": 0.0025,
+            "write": 0.0064
+          },
+          "backlog_end_frames": 514.0,
+          "backlog_max_frames": 468.0,
+          "backlog_slope_fps": 4.7548,
+          "backlog_age_max_s": 15.5667,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.158,
+            "query": 0.0022,
+            "worker": 9.8673
+          },
+          "rss_max_bytes": {
+            "ingest": 104005632.0,
+            "query": 129703936.0,
+            "worker": 561086464.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 2,
+        "step": 2,
+        "cameras": 7,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 3236,
+        "window": {
+          "start": "2026-10-16T00:56:18.852426Z",
+          "end": "2026-10-16T00:57:48.852426Z",
+          "seconds": 90.0
+        },
+        "drain_s": 18.047,
+        "loadgen": {
+          "run_id": "01M513AT4389XJB9MXXKFHX5H9",
+          "steady_s": 89.995,
+          "offered_fps": 35.0,
+          "sent_fps": 35.0,
+          "accepted_fps": 35.0,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 3150,
+            "accepted": 3150,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 12.171,
+            "p95": 18.553,
+            "p99": 21.881,
+            "mean": 12.62,
+            "max": 55.659
+          },
+          "schedule_lag_ms": {
+            "p50": 0.751,
+            "p95": 1.963,
+            "p99": 2.403,
+            "mean": 0.844,
+            "max": 4.264
+          },
+          "seed": 3236,
+          "started_at": "2026-10-16T00:55:58.852426+00:00",
+          "elapsed_s": 109.995,
+          "drain_s": 0.011,
+          "cpu": {
+            "seconds": 5.371,
+            "utilization_cores": 0.049,
+            "us_per_frame": 1395.1
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 35.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 25.0824,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 18.6164,
+          "freshness_p95_s": 29.4402,
+          "freshness_p99_s": 39.3895,
+          "queue_wait_p95_s": 29.3296,
+          "worker_stage_p95_s": {
+            "claim": 0.0033,
+            "decode": 0.0066,
+            "fetch": 0.0149,
+            "infer": 0.1106,
+            "stats": 0.0096,
+            "track": 0.0025,
+            "write": 0.0056
+          },
+          "backlog_end_frames": 1067.0,
+          "backlog_max_frames": 1019.0,
+          "backlog_slope_fps": 10.0854,
+          "backlog_age_max_s": 29.0531,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.1859,
+            "query": 0.0022,
+            "worker": 9.8895
+          },
+          "rss_max_bytes": {
+            "ingest": 104005632.0,
+            "query": 129703936.0,
+            "worker": 561139712.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      },
+      {
+        "rep": 2,
+        "step": 3,
+        "cameras": 8,
+        "fps": 5.0,
+        "concurrency": 0,
+        "seed": 3237,
+        "window": {
+          "start": "2026-10-16T00:58:59.408471Z",
+          "end": "2026-10-16T01:00:29.408471Z",
+          "seconds": 90.0
+        },
+        "drain_s": 42.087,
+        "loadgen": {
+          "run_id": "01M513FPXF8DED8P1ABKYDRKA6",
+          "steady_s": 89.995,
+          "offered_fps": 40.0,
+          "sent_fps": 40.0,
+          "accepted_fps": 40.0,
+          "sent_fps_per_second_std": 0.0,
+          "frames": {
+            "sent": 3600,
+            "accepted": 3600,
+            "rejected": 0,
+            "failed": 0,
+            "dropped": 0,
+            "incomplete": 0,
+            "retries": 0
+          },
+          "failure_reasons": {},
+          "error_rate": 0.0,
+          "send_latency_ms": {
+            "p50": 11.837,
+            "p95": 17.94,
+            "p99": 21.636,
+            "mean": 12.319,
+            "max": 210.724
+          },
+          "schedule_lag_ms": {
+            "p50": 0.758,
+            "p95": 1.709,
+            "p99": 2.173,
+            "mean": 0.807,
+            "max": 5.664
+          },
+          "seed": 3237,
+          "started_at": "2026-10-16T00:58:39.408471+00:00",
+          "elapsed_s": 109.995,
+          "drain_s": 0.009,
+          "cpu": {
+            "seconds": 6.147,
+            "utilization_cores": 0.056,
+            "us_per_frame": 1397.0
+          },
+          "generator_ok": true
+        },
+        "query": null,
+        "prometheus": {
+          "ingest_created_fps": 40.0,
+          "ingest_rejected_fps": null,
+          "worker_done_fps": 24.6597,
+          "worker_lost_frames": null,
+          "freshness_p50_s": 24.1732,
+          "freshness_p95_s": 42.6814,
+          "freshness_p99_s": 44.5363,
+          "queue_wait_p95_s": 42.6607,
+          "worker_stage_p95_s": {
+            "claim": 0.0042,
+            "decode": 0.0077,
+            "fetch": 0.0161,
+            "infer": 0.1177,
+            "stats": 0.0096,
+            "track": 0.0025,
+            "write": 0.0059
+          },
+          "backlog_end_frames": 1604.0,
+          "backlog_max_frames": 1527.0,
+          "backlog_slope_fps": 15.5001,
+          "backlog_age_max_s": 38.1579,
+          "query_stage_p95_s": {},
+          "cpu_cores": {
+            "ingest": 0.2119,
+            "query": 0.0021,
+            "worker": 9.8692
+          },
+          "rss_max_bytes": {
+            "ingest": 104005632.0,
+            "query": 129703936.0,
+            "worker": 561119232.0
+          }
+        },
+        "lost_frames": 0,
+        "slo": {
+          "freshness_ok": false,
+          "loss_ok": true,
+          "backlog_ok": false,
+          "ingest_ok": false,
+          "query_ok": null,
+          "harness_ok": true
+        }
+      }
+    ],
+    "aggregate": [
+      {
+        "step": 0,
+        "cameras": 5,
+        "concurrency": 0,
+        "reps": 3,
+        "ingest_ok_reps": 3,
+        "harness_ok_reps": 3,
+        "stats": {
+          "loadgen.offered_fps": {
+            "mean": 25.0,
+            "std": 0.0,
+            "min": 25.0,
+            "max": 25.0
+          },
+          "loadgen.accepted_fps": {
+            "mean": 25.007,
+            "std": 0.006,
+            "min": 25.0,
+            "max": 25.01
+          },
+          "loadgen.send_latency_ms.p95": {
+            "mean": 15.989,
+            "std": 1.955,
+            "min": 13.844,
+            "max": 17.672
+          },
+          "loadgen.schedule_lag_ms.p99": {
+            "mean": 2.365,
+            "std": 0.072,
+            "min": 2.299,
+            "max": 2.442
+          },
+          "loadgen.cpu.utilization_cores": {
+            "mean": 0.034,
+            "std": 0.001,
+            "min": 0.033,
+            "max": 0.035
+          },
+          "lost_frames": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0
+          },
+          "prometheus.worker_done_fps": {
+            "mean": 24.988,
+            "std": 0.021,
+            "min": 24.965,
+            "max": 25.001
+          },
+          "prometheus.freshness_p50_s": {
+            "mean": 0.13,
+            "std": 0.046,
+            "min": 0.091,
+            "max": 0.18
+          },
+          "prometheus.freshness_p95_s": {
+            "mean": 0.285,
+            "std": 0.08,
+            "min": 0.231,
+            "max": 0.377
+          },
+          "prometheus.freshness_p99_s": {
+            "mean": 0.385,
+            "std": 0.122,
+            "min": 0.246,
+            "max": 0.475
+          },
+          "prometheus.queue_wait_p95_s": {
+            "mean": 0.128,
+            "std": 0.072,
+            "min": 0.078,
+            "max": 0.211
+          },
+          "prometheus.backlog_slope_fps": {
+            "mean": 0.0,
+            "std": 0.008,
+            "min": -0.006,
+            "max": 0.009
+          },
+          "prometheus.backlog_max_frames": {
+            "mean": 4.0,
+            "std": 1.0,
+            "min": 3.0,
+            "max": 5.0
+          },
+          "prometheus.cpu_cores.ingest": {
+            "mean": 0.126,
+            "std": 0.004,
+            "min": 0.122,
+            "max": 0.129
+          },
+          "prometheus.cpu_cores.worker": {
+            "mean": 9.87,
+            "std": 0.029,
+            "min": 9.836,
+            "max": 9.887
+          },
+          "prometheus.cpu_cores.query": {
+            "mean": 0.002,
+            "std": 0.0,
+            "min": 0.002,
+            "max": 0.002
+          }
+        }
+      },
+      {
+        "step": 1,
+        "cameras": 6,
+        "concurrency": 0,
+        "reps": 3,
+        "ingest_ok_reps": 0,
+        "harness_ok_reps": 3,
+        "stats": {
+          "loadgen.offered_fps": {
+            "mean": 30.0,
+            "std": 0.0,
+            "min": 30.0,
+            "max": 30.0
+          },
+          "loadgen.accepted_fps": {
+            "mean": 30.01,
+            "std": 0.01,
+            "min": 30.0,
+            "max": 30.02
+          },
+          "loadgen.send_latency_ms.p95": {
+            "mean": 23.761,
+            "std": 2.326,
+            "min": 21.299,
+            "max": 25.922
+          },
+          "loadgen.schedule_lag_ms.p99": {
+            "mean": 2.539,
+            "std": 0.143,
+            "min": 2.375,
+            "max": 2.641
+          },
+          "loadgen.cpu.utilization_cores": {
+            "mean": 0.041,
+            "std": 0.001,
+            "min": 0.04,
+            "max": 0.042
+          },
+          "lost_frames": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0
+          },
+          "prometheus.worker_done_fps": {
+            "mean": 25.604,
+            "std": 0.642,
+            "min": 24.941,
+            "max": 26.224
+          },
+          "prometheus.freshness_p50_s": {
+            "mean": 8.955,
+            "std": 1.251,
+            "min": 7.512,
+            "max": 9.734
+          },
+          "prometheus.freshness_p95_s": {
+            "mean": 18.678,
+            "std": 0.464,
+            "min": 18.142,
+            "max": 18.957
+          },
+          "prometheus.freshness_p99_s": {
+            "mean": 19.736,
+            "std": 0.093,
+            "min": 19.628,
+            "max": 19.791
+          },
+          "prometheus.queue_wait_p95_s": {
+            "mean": 18.62,
+            "std": 0.519,
+            "min": 18.021,
+            "max": 18.933
+          },
+          "prometheus.backlog_slope_fps": {
+            "mean": 4.134,
+            "std": 0.682,
+            "min": 3.405,
+            "max": 4.755
+          },
+          "prometheus.backlog_max_frames": {
+            "mean": 418.0,
+            "std": 56.312,
+            "min": 357.0,
+            "max": 468.0
+          },
+          "prometheus.cpu_cores.ingest": {
+            "mean": 0.157,
+            "std": 0.002,
+            "min": 0.156,
+            "max": 0.158
+          },
+          "prometheus.cpu_cores.worker": {
+            "mean": 9.889,
+            "std": 0.02,
+            "min": 9.867,
+            "max": 9.906
+          },
+          "prometheus.cpu_cores.query": {
+            "mean": 0.002,
+            "std": 0.0,
+            "min": 0.002,
+            "max": 0.002
+          }
+        }
+      },
+      {
+        "step": 2,
+        "cameras": 7,
+        "concurrency": 0,
+        "reps": 3,
+        "ingest_ok_reps": 0,
+        "harness_ok_reps": 3,
+        "stats": {
+          "loadgen.offered_fps": {
+            "mean": 35.0,
+            "std": 0.0,
+            "min": 35.0,
+            "max": 35.0
+          },
+          "loadgen.accepted_fps": {
+            "mean": 35.003,
+            "std": 0.006,
+            "min": 35.0,
+            "max": 35.01
+          },
+          "loadgen.send_latency_ms.p95": {
+            "mean": 18.685,
+            "std": 0.39,
+            "min": 18.378,
+            "max": 19.124
+          },
+          "loadgen.schedule_lag_ms.p99": {
+            "mean": 2.275,
+            "std": 0.111,
+            "min": 2.202,
+            "max": 2.403
+          },
+          "loadgen.cpu.utilization_cores": {
+            "mean": 0.048,
+            "std": 0.001,
+            "min": 0.047,
+            "max": 0.049
+          },
+          "lost_frames": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0
+          },
+          "prometheus.worker_done_fps": {
+            "mean": 25.349,
+            "std": 0.313,
+            "min": 25.082,
+            "max": 25.694
+          },
+          "prometheus.freshness_p50_s": {
+            "mean": 17.779,
+            "std": 0.885,
+            "min": 16.853,
+            "max": 18.616
+          },
+          "prometheus.freshness_p95_s": {
+            "mean": 28.968,
+            "std": 0.428,
+            "min": 28.605,
+            "max": 29.44
+          },
+          "prometheus.freshness_p99_s": {
+            "mean": 32.989,
+            "std": 5.544,
+            "min": 29.721,
+            "max": 39.389
+          },
+          "prometheus.queue_wait_p95_s": {
+            "mean": 28.89,
+            "std": 0.391,
+            "min": 28.582,
+            "max": 29.33
+          },
+          "prometheus.backlog_slope_fps": {
+            "mean": 9.751,
+            "std": 0.327,
+            "min": 9.433,
+            "max": 10.085
+          },
+          "prometheus.backlog_max_frames": {
+            "mean": 991.0,
+            "std": 25.239,
+            "min": 970.0,
+            "max": 1019.0
+          },
+          "prometheus.cpu_cores.ingest": {
+            "mean": 0.185,
+            "std": 0.002,
+            "min": 0.182,
+            "max": 0.186
+          },
+          "prometheus.cpu_cores.worker": {
+            "mean": 9.89,
+            "std": 0.001,
+            "min": 9.889,
+            "max": 9.891
+          },
+          "prometheus.cpu_cores.query": {
+            "mean": 0.002,
+            "std": 0.0,
+            "min": 0.002,
+            "max": 0.002
+          }
+        }
+      },
+      {
+        "step": 3,
+        "cameras": 8,
+        "concurrency": 0,
+        "reps": 3,
+        "ingest_ok_reps": 0,
+        "harness_ok_reps": 3,
+        "stats": {
+          "loadgen.offered_fps": {
+            "mean": 40.0,
+            "std": 0.0,
+            "min": 40.0,
+            "max": 40.0
+          },
+          "loadgen.accepted_fps": {
+            "mean": 40.0,
+            "std": 0.0,
+            "min": 40.0,
+            "max": 40.0
+          },
+          "loadgen.send_latency_ms.p95": {
+            "mean": 18.139,
+            "std": 0.473,
+            "min": 17.798,
+            "max": 18.679
+          },
+          "loadgen.schedule_lag_ms.p99": {
+            "mean": 2.375,
+            "std": 0.175,
+            "min": 2.173,
+            "max": 2.48
+          },
+          "loadgen.cpu.utilization_cores": {
+            "mean": 0.055,
+            "std": 0.001,
+            "min": 0.054,
+            "max": 0.056
+          },
+          "lost_frames": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0
+          },
+          "prometheus.worker_done_fps": {
+            "mean": 24.926,
+            "std": 0.259,
+            "min": 24.66,
+            "max": 25.177
+          },
+          "prometheus.freshness_p50_s": {
+            "mean": 23.799,
+            "std": 0.346,
+            "min": 23.489,
+            "max": 24.173
+          },
+          "prometheus.freshness_p95_s": {
+            "mean": 42.573,
+            "std": 0.099,
+            "min": 42.488,
+            "max": 42.681
+          },
+          "prometheus.freshness_p99_s": {
+            "mean": 44.515,
+            "std": 0.02,
+            "min": 44.498,
+            "max": 44.536
+          },
+          "prometheus.queue_wait_p95_s": {
+            "mean": 42.55,
+            "std": 0.101,
+            "min": 42.465,
+            "max": 42.661
+          },
+          "prometheus.backlog_slope_fps": {
+            "mean": 14.781,
+            "std": 0.674,
+            "min": 14.165,
+            "max": 15.5
+          },
+          "prometheus.backlog_max_frames": {
+            "mean": 1525.333,
+            "std": 12.583,
+            "min": 1512.0,
+            "max": 1537.0
+          },
+          "prometheus.cpu_cores.ingest": {
+            "mean": 0.21,
+            "std": 0.002,
+            "min": 0.207,
+            "max": 0.212
+          },
+          "prometheus.cpu_cores.worker": {
+            "mean": 9.877,
+            "std": 0.007,
+            "min": 9.869,
+            "max": 9.882
+          },
+          "prometheus.cpu_cores.query": {
+            "mean": 0.002,
+            "std": 0.0,
+            "min": 0.002,
+            "max": 0.002
+          }
+        }
+      }
+    ],
+    "rated_capacity": {
+      "fps": 5.0,
+      "cameras": 5,
+      "lower_bound": false,
+      "first_failure": 6
+    },
+    "loadgen_config": {
+      "service": "loadgen",
+      "env": "local",
+      "seed": 1234,
+      "log": {
+        "level": "INFO"
+      },
+      "telemetry": {
+        "enabled": true,
+        "otlp_endpoint": null,
+        "otlp_insecure": true,
+        "export_timeout_s": 10.0,
+        "sample_ratio": 0.01
+      },
+      "target_url": "http://127.0.0.1:8080",
+      "mode": "paced",
+      "cameras": 5,
+      "fps": 5.0,
+      "duration_s": 110.0,
+      "warmup_s": 20.0,
+      "camera_prefix": "cam-",
+      "max_schedule_lag_p99_ms": 10.0,
+      "frame": {
+        "width": 1280,
+        "height": 720,
+        "jpeg_quality": 85
+      },
+      "clips": {
+        "data_dir": "data",
+        "ids": [
+          "mot17-09-mini",
+          "mot17-04-mini",
+          "commons-roncesvalles"
+        ],
+        "assignment": "round_robin",
+        "max_frames": null
+      },
+      "http": {
+        "request_timeout_s": 5.0,
+        "connect_timeout_s": 2.0,
+        "max_in_flight_per_camera": 4,
+        "max_retries": 0,
+        "retry_base_s": 0.05,
+        "retry_max_s": 1.0
+      },
+      "stub": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "latency_ms": 0.0,
+        "reject_ratio": 0.0,
+        "workers": 1
+      },
+      "metrics_port": null,
+      "results_dir": "/tmp/vms-bench-5chvk4ba"
+    },
+    "interrupted": false,
+    "workers": [
+      {
+        "backend": "onnxruntime",
+        "device": "cpu",
+        "infer_batch": "4",
+        "model_version": "yolo11n@0ebbc80d4a76+onnx",
+        "precision": "fp32"
+      }
+    ]
+  },
+  "cost_usd": 0.0,
+  "notes": ""
+}
