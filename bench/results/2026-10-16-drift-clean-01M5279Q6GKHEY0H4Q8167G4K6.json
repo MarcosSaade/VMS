@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5279Q6GKHEY0H4Q8167G4K6",
+  "name": "drift-clean",
+  "kind": "loadgen.run",
+  "started_at": "2026-10-16T11:24:31.824088Z",
+  "ended_at": "2026-10-16T11:42:31.781309Z",
+  "seed": 1234,
+  "git": {
+    "sha": "ebcdf9f727addd0f6839559887d5e7b1a7705dd8",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0"
+  },
+  "config": {
+    "service": "loadgen",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 0.01
+    },
+    "target_url": "http://127.0.0.1:8080",
+    "mode": "paced",
+    "cameras": 4,
+    "fps": 5.0,
+    "duration_s": 360.0,
+    "warmup_s": 10.0,
+    "camera_prefix": "drift-clean-",
+    "max_schedule_lag_p99_ms": 10.0,
+    "frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "clips": {
+      "data_dir": "data",
+      "ids": [
+        "mot17-09",
+        "mot17-04",
+        "mot17-02",
+        "mot17-08"
+      ],
+      "assignment": "round_robin",
+      "max_frames": null
+    },
+    "http": {
+      "request_timeout_s": 5.0,
+      "connect_timeout_s": 2.0,
+      "max_in_flight_per_camera": 4,
+      "max_retries": 0,
+      "retry_base_s": 0.05,
+      "retry_max_s": 1.0
+    },
+    "stub": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "latency_ms": 0.0,
+      "reject_ratio": 0.0,
+      "workers": 1
+    },
+    "drift": {
+      "events": [],
+      "render_workers": 2
+    },
+    "metrics_port": 9105,
+    "results_dir": "bench/results"
+  },
+  "scenario": {
+    "name": "drift-clean",
+    "description": "Task 9.2/9.3 control: the drift scenarios' cameras, clips and length without any drift, for false alarms per camera-hour (`python -m vms.loadgen run --scenario bench/scenarios/drift-clean.yaml`). 4 cameras x 5 FPS for 360 s on four full-length clips (make data).\n",
+    "kind": "run",
+    "repeats": 3,
+    "config": {
+      "cameras": 4,
+      "fps": 5,
+      "duration_s": 360,
+      "warmup_s": 10,
+      "camera_prefix": "drift-clean-",
+      "clips": {
+        "ids": [
+          "mot17-09",
+          "mot17-04",
+          "mot17-02",
+          "mot17-08"
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "transport": "http",
+    "repetitions": [
+      {
+        "steady_s": 349.984,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 12.083,
+          "p95": 22.596,
+          "p99": 28.664,
+          "mean": 13.627,
+          "max": 211.319
+        },
+        "schedule_lag_ms": {
+          "p50": 0.779,
+          "p95": 1.876,
+          "p99": 2.23,
+          "mean": 0.851,
+          "max": 7.151
+        },
+        "seed": 1234,
+        "started_at": "2026-10-16T11:24:31.824585+00:00",
+        "elapsed_s": 359.984,
+        "drain_s": 0.01,
+        "cpu": {
+          "seconds": 11.79,
+          "utilization_cores": 0.033,
+          "us_per_frame": 1637.4
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.947,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 11.993,
+          "p95": 19.695,
+          "p99": 24.717,
+          "mean": 12.857,
+          "max": 212.99
+        },
+        "schedule_lag_ms": {
+          "p50": 0.835,
+          "p95": 1.981,
+          "p99": 2.254,
+          "mean": 0.918,
+          "max": 9.408
+        },
+        "seed": 1235,
+        "started_at": "2026-10-16T11:30:31.834790+00:00",
+        "elapsed_s": 359.947,
+        "drain_s": 0.012,
+        "cpu": {
+          "seconds": 13.005,
+          "utilization_cores": 0.036,
+          "us_per_frame": 1806.3
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.966,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 11.985,
+          "p95": 20.506,
+          "p99": 26.069,
+          "mean": 13.057,
+          "max": 214.313
+        },
+        "schedule_lag_ms": {
+          "p50": 0.739,
+          "p95": 1.463,
+          "p99": 2.12,
+          "mean": 0.778,
+          "max": 36.998
+        },
+        "seed": 1236,
+        "started_at": "2026-10-16T11:36:31.796393+00:00",
+        "elapsed_s": 359.966,
+        "drain_s": 0.016,
+        "cpu": {
+          "seconds": 13.017,
+          "utilization_cores": 0.036,
+          "us_per_frame": 1807.9
+        },
+        "generator_ok": true
+      }
+    ],
+    "aggregate": {
+      "sent_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "accepted_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "send_latency_ms.p50": {
+        "mean": 12.02,
+        "std": 0.054,
+        "min": 11.985,
+        "max": 12.083
+      },
+      "send_latency_ms.p95": {
+        "mean": 20.932,
+        "std": 1.497,
+        "min": 19.695,
+        "max": 22.596
+      },
+      "send_latency_ms.p99": {
+        "mean": 26.483,
+        "std": 2.006,
+        "min": 24.717,
+        "max": 28.664
+      },
+      "schedule_lag_ms.p99": {
+        "mean": 2.201,
+        "std": 0.071,
+        "min": 2.12,
+        "max": 2.254
+      },
+      "cpu.utilization_cores": {
+        "mean": 0.035,
+        "std": 0.002,
+        "min": 0.033,
+        "max": 0.036
+      },
+      "cpu.us_per_frame": {
+        "mean": 1750.533,
+        "std": 97.98,
+        "min": 1637.4,
+        "max": 1807.9
+      }
+    },
+    "clips": {
+      "mot17-09": {
+        "frames": 525,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-04": {
+        "frames": 1050,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-02": {
+        "frames": 600,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-08": {
+        "frames": 625,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": ""
+}

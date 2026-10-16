@@ -1,0 +1,469 @@
+{
+  "schema_version": 1,
+  "run_id": "01M52DG5JAN3033X03G1HP6JGW",
+  "name": "drift-classmix",
+  "kind": "loadgen.run",
+  "started_at": "2026-10-16T13:12:54.602659Z",
+  "ended_at": "2026-10-16T13:30:54.565273Z",
+  "seed": 1234,
+  "git": {
+    "sha": "ebcdf9f727addd0f6839559887d5e7b1a7705dd8",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0"
+  },
+  "config": {
+    "service": "loadgen",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 0.01
+    },
+    "target_url": "http://127.0.0.1:8080",
+    "mode": "paced",
+    "cameras": 4,
+    "fps": 5.0,
+    "duration_s": 360.0,
+    "warmup_s": 10.0,
+    "camera_prefix": "drift-classmix-",
+    "max_schedule_lag_p99_ms": 10.0,
+    "frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "clips": {
+      "data_dir": "data",
+      "ids": [
+        "mot17-09",
+        "mot17-04",
+        "mot17-02",
+        "mot17-08"
+      ],
+      "assignment": "round_robin",
+      "max_frames": null
+    },
+    "http": {
+      "request_timeout_s": 5.0,
+      "connect_timeout_s": 2.0,
+      "max_in_flight_per_camera": 4,
+      "max_retries": 0,
+      "retry_base_s": 0.05,
+      "retry_max_s": 1.0
+    },
+    "stub": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "latency_ms": 0.0,
+      "reject_ratio": 0.0,
+      "workers": 1
+    },
+    "drift": {
+      "events": [
+        {
+          "kind": "switch_clip",
+          "cameras": [
+            0,
+            2
+          ],
+          "onset_s": 120.0,
+          "onset_jitter_s": 60.0,
+          "ramp_s": 0.0,
+          "strength": null,
+          "clip": "commons-roncesvalles"
+        }
+      ],
+      "render_workers": 2
+    },
+    "metrics_port": 9105,
+    "results_dir": "bench/results"
+  },
+  "scenario": {
+    "name": "drift-classmix",
+    "description": "Task 9.2 drift scenario (vms.loadgen.drift), run against the containerized pipeline with the drift monitor (make demo stack): `python -m vms.loadgen run --scenario bench/scenarios/drift-classmix.yaml`. 4 cameras x 5 FPS for 360 s on four full-length clips (make data; the data-mini clips loop every 10 s, E-050). The monitor's reference is each camera's first 60 s; onsets are at 120 s plus a seeded jitter in [0, 60) s per camera and repetition, recorded in the results (repetitions[].drift.events). Class-mix change: cameras 0 and 2 switch to commons-roncesvalles (a street with cars and cyclists) from their pedestrian scenes; abrupt only (a camera re-pointed, or a feed swapped). Cameras 1 and 3 stay clean. The switch changes the input statistics too: it is a scene change, not a pure class-mix change.\n",
+    "kind": "run",
+    "repeats": 3,
+    "config": {
+      "cameras": 4,
+      "fps": 5,
+      "duration_s": 360,
+      "warmup_s": 10,
+      "camera_prefix": "drift-classmix-",
+      "clips": {
+        "ids": [
+          "mot17-09",
+          "mot17-04",
+          "mot17-02",
+          "mot17-08"
+        ]
+      },
+      "drift": {
+        "events": [
+          {
+            "kind": "switch_clip",
+            "clip": "commons-roncesvalles",
+            "cameras": [
+              0,
+              2
+            ],
+            "onset_s": 120,
+            "onset_jitter_s": 60
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "transport": "http",
+    "repetitions": [
+      {
+        "steady_s": 349.987,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 16.726,
+          "p95": 21.152,
+          "p99": 22.95,
+          "mean": 16.496,
+          "max": 216.004
+        },
+        "schedule_lag_ms": {
+          "p50": 0.847,
+          "p95": 2.057,
+          "p99": 2.388,
+          "mean": 0.936,
+          "max": 2.767
+        },
+        "seed": 1234,
+        "started_at": "2026-10-16T13:12:54.603218+00:00",
+        "elapsed_s": 359.987,
+        "drain_s": 0.015,
+        "cpu": {
+          "seconds": 15.621,
+          "utilization_cores": 0.043,
+          "us_per_frame": 2169.5
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-classmix-001",
+              "kind": "switch_clip",
+              "onset_s": 161.018,
+              "onset_at": "2026-10-16T13:15:35.620775+00:00",
+              "ramp_s": 0.0,
+              "strength": null,
+              "clip": "commons-roncesvalles"
+            },
+            {
+              "camera_id": "drift-classmix-003",
+              "kind": "switch_clip",
+              "onset_s": 178.436,
+              "onset_at": "2026-10-16T13:15:53.039479+00:00",
+              "ramp_s": 0.0,
+              "strength": null,
+              "clip": "commons-roncesvalles"
+            }
+          ],
+          "rendered_frames": 0,
+          "render_ms": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "mean": null,
+            "max": null
+          }
+        },
+        "cameras": {
+          "drift-classmix-001": "mot17-09",
+          "drift-classmix-002": "mot17-04",
+          "drift-classmix-003": "mot17-02",
+          "drift-classmix-004": "mot17-08"
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.948,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 15.918,
+          "p95": 18.337,
+          "p99": 19.017,
+          "mean": 15.774,
+          "max": 216.588
+        },
+        "schedule_lag_ms": {
+          "p50": 0.91,
+          "p95": 2.042,
+          "p99": 2.272,
+          "mean": 1.004,
+          "max": 2.638
+        },
+        "seed": 1235,
+        "started_at": "2026-10-16T13:18:54.620081+00:00",
+        "elapsed_s": 359.948,
+        "drain_s": 0.013,
+        "cpu": {
+          "seconds": 20.881,
+          "utilization_cores": 0.058,
+          "us_per_frame": 2900.2
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-classmix-001",
+              "kind": "switch_clip",
+              "onset_s": 145.328,
+              "onset_at": "2026-10-16T13:21:19.947871+00:00",
+              "ramp_s": 0.0,
+              "strength": null,
+              "clip": "commons-roncesvalles"
+            },
+            {
+              "camera_id": "drift-classmix-003",
+              "kind": "switch_clip",
+              "onset_s": 134.035,
+              "onset_at": "2026-10-16T13:21:08.655175+00:00",
+              "ramp_s": 0.0,
+              "strength": null,
+              "clip": "commons-roncesvalles"
+            }
+          ],
+          "rendered_frames": 0,
+          "render_ms": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "mean": null,
+            "max": null
+          }
+        },
+        "cameras": {
+          "drift-classmix-001": "mot17-09",
+          "drift-classmix-002": "mot17-04",
+          "drift-classmix-003": "mot17-02",
+          "drift-classmix-004": "mot17-08"
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.964,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 16.013,
+          "p95": 19.279,
+          "p99": 20.548,
+          "mean": 15.691,
+          "max": 217.182
+        },
+        "schedule_lag_ms": {
+          "p50": 0.826,
+          "p95": 1.332,
+          "p99": 1.917,
+          "mean": 0.829,
+          "max": 3.573
+        },
+        "seed": 1236,
+        "started_at": "2026-10-16T13:24:54.584977+00:00",
+        "elapsed_s": 359.964,
+        "drain_s": 0.013,
+        "cpu": {
+          "seconds": 18.944,
+          "utilization_cores": 0.053,
+          "us_per_frame": 2631.1
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-classmix-001",
+              "kind": "switch_clip",
+              "onset_s": 134.568,
+              "onset_at": "2026-10-16T13:27:09.152484+00:00",
+              "ramp_s": 0.0,
+              "strength": null,
+              "clip": "commons-roncesvalles"
+            },
+            {
+              "camera_id": "drift-classmix-003",
+              "kind": "switch_clip",
+              "onset_s": 136.969,
+              "onset_at": "2026-10-16T13:27:11.553870+00:00",
+              "ramp_s": 0.0,
+              "strength": null,
+              "clip": "commons-roncesvalles"
+            }
+          ],
+          "rendered_frames": 0,
+          "render_ms": {
+            "p50": null,
+            "p95": null,
+            "p99": null,
+            "mean": null,
+            "max": null
+          }
+        },
+        "cameras": {
+          "drift-classmix-001": "mot17-09",
+          "drift-classmix-002": "mot17-04",
+          "drift-classmix-003": "mot17-02",
+          "drift-classmix-004": "mot17-08"
+        },
+        "generator_ok": true
+      }
+    ],
+    "aggregate": {
+      "sent_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "accepted_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "send_latency_ms.p50": {
+        "mean": 16.219,
+        "std": 0.442,
+        "min": 15.918,
+        "max": 16.726
+      },
+      "send_latency_ms.p95": {
+        "mean": 19.589,
+        "std": 1.433,
+        "min": 18.337,
+        "max": 21.152
+      },
+      "send_latency_ms.p99": {
+        "mean": 20.838,
+        "std": 1.983,
+        "min": 19.017,
+        "max": 22.95
+      },
+      "schedule_lag_ms.p99": {
+        "mean": 2.192,
+        "std": 0.245,
+        "min": 1.917,
+        "max": 2.388
+      },
+      "cpu.utilization_cores": {
+        "mean": 0.051,
+        "std": 0.008,
+        "min": 0.043,
+        "max": 0.058
+      },
+      "cpu.us_per_frame": {
+        "mean": 2566.933,
+        "std": 369.552,
+        "min": 2169.5,
+        "max": 2900.2
+      }
+    },
+    "clips": {
+      "mot17-09": {
+        "frames": 525,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-04": {
+        "frames": 1050,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-02": {
+        "frames": 600,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-08": {
+        "frames": 625,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "commons-roncesvalles": {
+        "frames": 298,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 29.833
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": ""
+}

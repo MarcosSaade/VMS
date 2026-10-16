@@ -1,0 +1,480 @@
+{
+  "schema_version": 1,
+  "run_id": "01M52BE1GWQAMK34RCY29NPQJK",
+  "name": "drift-shift",
+  "kind": "loadgen.run",
+  "started_at": "2026-10-16T12:36:47.772329Z",
+  "ended_at": "2026-10-16T12:54:47.748085Z",
+  "seed": 1234,
+  "git": {
+    "sha": "ebcdf9f727addd0f6839559887d5e7b1a7705dd8",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0"
+  },
+  "config": {
+    "service": "loadgen",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 0.01
+    },
+    "target_url": "http://127.0.0.1:8080",
+    "mode": "paced",
+    "cameras": 4,
+    "fps": 5.0,
+    "duration_s": 360.0,
+    "warmup_s": 10.0,
+    "camera_prefix": "drift-shift-",
+    "max_schedule_lag_p99_ms": 10.0,
+    "frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "clips": {
+      "data_dir": "data",
+      "ids": [
+        "mot17-09",
+        "mot17-04",
+        "mot17-02",
+        "mot17-08"
+      ],
+      "assignment": "round_robin",
+      "max_frames": null
+    },
+    "http": {
+      "request_timeout_s": 5.0,
+      "connect_timeout_s": 2.0,
+      "max_in_flight_per_camera": 4,
+      "max_retries": 0,
+      "retry_base_s": 0.05,
+      "retry_max_s": 1.0
+    },
+    "stub": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "latency_ms": 0.0,
+      "reject_ratio": 0.0,
+      "workers": 1
+    },
+    "drift": {
+      "events": [
+        {
+          "kind": "shift",
+          "cameras": [
+            0
+          ],
+          "onset_s": 120.0,
+          "onset_jitter_s": 60.0,
+          "ramp_s": 0.0,
+          "strength": 0.15,
+          "clip": null
+        },
+        {
+          "kind": "shift",
+          "cameras": [
+            2
+          ],
+          "onset_s": 120.0,
+          "onset_jitter_s": 60.0,
+          "ramp_s": 120.0,
+          "strength": 0.15,
+          "clip": null
+        }
+      ],
+      "render_workers": 2
+    },
+    "metrics_port": 9105,
+    "results_dir": "bench/results"
+  },
+  "scenario": {
+    "name": "drift-shift",
+    "description": "Task 9.2 drift scenario (vms.loadgen.drift), run against the containerized pipeline with the drift monitor (make demo stack): `python -m vms.loadgen run --scenario bench/scenarios/drift-shift.yaml`. 4 cameras x 5 FPS for 360 s on four full-length clips (make data; the data-mini clips loop every 10 s, E-050). The monitor's reference is each camera's first 60 s; onsets are at 120 s plus a seeded jitter in [0, 60) s per camera and repetition, recorded in the results (repetitions[].drift.events). Camera shift (view cropped by 15% per side toward the bottom right and rescaled): camera 0 abrupt (bumped), camera 2 gradual over 120 s (a loose mount); cameras 1 and 3 stay clean.\n",
+    "kind": "run",
+    "repeats": 3,
+    "config": {
+      "cameras": 4,
+      "fps": 5,
+      "duration_s": 360,
+      "warmup_s": 10,
+      "camera_prefix": "drift-shift-",
+      "clips": {
+        "ids": [
+          "mot17-09",
+          "mot17-04",
+          "mot17-02",
+          "mot17-08"
+        ]
+      },
+      "drift": {
+        "events": [
+          {
+            "kind": "shift",
+            "strength": 0.15,
+            "cameras": [
+              0
+            ],
+            "onset_s": 120,
+            "onset_jitter_s": 60
+          },
+          {
+            "kind": "shift",
+            "strength": 0.15,
+            "cameras": [
+              2
+            ],
+            "onset_s": 120,
+            "onset_jitter_s": 60,
+            "ramp_s": 120
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "transport": "http",
+    "repetitions": [
+      {
+        "steady_s": 349.986,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 15.956,
+          "p95": 20.557,
+          "p99": 23.114,
+          "mean": 15.696,
+          "max": 215.454
+        },
+        "schedule_lag_ms": {
+          "p50": 0.815,
+          "p95": 2.005,
+          "p99": 2.299,
+          "mean": 0.896,
+          "max": 3.599
+        },
+        "seed": 1234,
+        "started_at": "2026-10-16T12:36:47.773083+00:00",
+        "elapsed_s": 359.986,
+        "drain_s": 0.015,
+        "cpu": {
+          "seconds": 62.398,
+          "utilization_cores": 0.173,
+          "us_per_frame": 8666.4
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-shift-001",
+              "kind": "shift",
+              "onset_s": 161.018,
+              "onset_at": "2026-10-16T12:39:28.790640+00:00",
+              "ramp_s": 0.0,
+              "strength": 0.15,
+              "clip": null
+            },
+            {
+              "camera_id": "drift-shift-003",
+              "kind": "shift",
+              "onset_s": 178.436,
+              "onset_at": "2026-10-16T12:39:46.209344+00:00",
+              "ramp_s": 120.0,
+              "strength": 0.15,
+              "clip": null
+            }
+          ],
+          "rendered_frames": 1902,
+          "render_ms": {
+            "p50": 14.487,
+            "p95": 19.277,
+            "p99": 21.179,
+            "mean": 14.34,
+            "max": 31.991
+          }
+        },
+        "cameras": {
+          "drift-shift-001": "mot17-09",
+          "drift-shift-002": "mot17-04",
+          "drift-shift-003": "mot17-02",
+          "drift-shift-004": "mot17-08"
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.946,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 15.182,
+          "p95": 18.052,
+          "p99": 18.79,
+          "mean": 14.615,
+          "max": 212.75
+        },
+        "schedule_lag_ms": {
+          "p50": 0.934,
+          "p95": 2.148,
+          "p99": 2.322,
+          "mean": 1.021,
+          "max": 2.508
+        },
+        "seed": 1235,
+        "started_at": "2026-10-16T12:42:47.791558+00:00",
+        "elapsed_s": 359.946,
+        "drain_s": 0.026,
+        "cpu": {
+          "seconds": 74.48,
+          "utilization_cores": 0.207,
+          "us_per_frame": 10344.5
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-shift-001",
+              "kind": "shift",
+              "onset_s": 145.328,
+              "onset_at": "2026-10-16T12:45:13.119348+00:00",
+              "ramp_s": 0.0,
+              "strength": 0.15,
+              "clip": null
+            },
+            {
+              "camera_id": "drift-shift-003",
+              "kind": "shift",
+              "onset_s": 134.035,
+              "onset_at": "2026-10-16T12:45:01.826652+00:00",
+              "ramp_s": 120.0,
+              "strength": 0.15,
+              "clip": null
+            }
+          ],
+          "rendered_frames": 2203,
+          "render_ms": {
+            "p50": 15.778,
+            "p95": 19.025,
+            "p99": 20.393,
+            "mean": 15.315,
+            "max": 22.38
+          }
+        },
+        "cameras": {
+          "drift-shift-001": "mot17-09",
+          "drift-shift-002": "mot17-04",
+          "drift-shift-003": "mot17-02",
+          "drift-shift-004": "mot17-08"
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.965,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 15.824,
+          "p95": 18.586,
+          "p99": 20.16,
+          "mean": 15.287,
+          "max": 218.552
+        },
+        "schedule_lag_ms": {
+          "p50": 0.97,
+          "p95": 2.109,
+          "p99": 2.466,
+          "mean": 1.04,
+          "max": 3.284
+        },
+        "seed": 1236,
+        "started_at": "2026-10-16T12:48:47.766576+00:00",
+        "elapsed_s": 359.965,
+        "drain_s": 0.014,
+        "cpu": {
+          "seconds": 69.158,
+          "utilization_cores": 0.192,
+          "us_per_frame": 9605.2
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-shift-001",
+              "kind": "shift",
+              "onset_s": 134.568,
+              "onset_at": "2026-10-16T12:51:02.334083+00:00",
+              "ramp_s": 0.0,
+              "strength": 0.15,
+              "clip": null
+            },
+            {
+              "camera_id": "drift-shift-003",
+              "kind": "shift",
+              "onset_s": 136.969,
+              "onset_at": "2026-10-16T12:51:04.735469+00:00",
+              "ramp_s": 120.0,
+              "strength": 0.15,
+              "clip": null
+            }
+          ],
+          "rendered_frames": 2242,
+          "render_ms": {
+            "p50": 14.302,
+            "p95": 17.431,
+            "p99": 19.273,
+            "mean": 13.67,
+            "max": 20.761
+          }
+        },
+        "cameras": {
+          "drift-shift-001": "mot17-09",
+          "drift-shift-002": "mot17-04",
+          "drift-shift-003": "mot17-02",
+          "drift-shift-004": "mot17-08"
+        },
+        "generator_ok": true
+      }
+    ],
+    "aggregate": {
+      "sent_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "accepted_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "send_latency_ms.p50": {
+        "mean": 15.654,
+        "std": 0.414,
+        "min": 15.182,
+        "max": 15.956
+      },
+      "send_latency_ms.p95": {
+        "mean": 19.065,
+        "std": 1.319,
+        "min": 18.052,
+        "max": 20.557
+      },
+      "send_latency_ms.p99": {
+        "mean": 20.688,
+        "std": 2.21,
+        "min": 18.79,
+        "max": 23.114
+      },
+      "schedule_lag_ms.p99": {
+        "mean": 2.362,
+        "std": 0.091,
+        "min": 2.299,
+        "max": 2.466
+      },
+      "cpu.utilization_cores": {
+        "mean": 0.191,
+        "std": 0.017,
+        "min": 0.173,
+        "max": 0.207
+      },
+      "cpu.us_per_frame": {
+        "mean": 9538.7,
+        "std": 841.024,
+        "min": 8666.4,
+        "max": 10344.5
+      }
+    },
+    "clips": {
+      "mot17-09": {
+        "frames": 525,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-04": {
+        "frames": 1050,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-02": {
+        "frames": 600,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-08": {
+        "frames": 625,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": ""
+}

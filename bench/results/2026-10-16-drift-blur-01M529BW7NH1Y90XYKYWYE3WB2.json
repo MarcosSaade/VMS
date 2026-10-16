@@ -1,0 +1,480 @@
+{
+  "schema_version": 1,
+  "run_id": "01M529BW7NH1Y90XYKYWYE3WB2",
+  "name": "drift-blur",
+  "kind": "loadgen.run",
+  "started_at": "2026-10-16T12:00:39.669387Z",
+  "ended_at": "2026-10-16T12:18:39.626019Z",
+  "seed": 1234,
+  "git": {
+    "sha": "ebcdf9f727addd0f6839559887d5e7b1a7705dd8",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0"
+  },
+  "config": {
+    "service": "loadgen",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 0.01
+    },
+    "target_url": "http://127.0.0.1:8080",
+    "mode": "paced",
+    "cameras": 4,
+    "fps": 5.0,
+    "duration_s": 360.0,
+    "warmup_s": 10.0,
+    "camera_prefix": "drift-blur-",
+    "max_schedule_lag_p99_ms": 10.0,
+    "frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "clips": {
+      "data_dir": "data",
+      "ids": [
+        "mot17-09",
+        "mot17-04",
+        "mot17-02",
+        "mot17-08"
+      ],
+      "assignment": "round_robin",
+      "max_frames": null
+    },
+    "http": {
+      "request_timeout_s": 5.0,
+      "connect_timeout_s": 2.0,
+      "max_in_flight_per_camera": 4,
+      "max_retries": 0,
+      "retry_base_s": 0.05,
+      "retry_max_s": 1.0
+    },
+    "stub": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "latency_ms": 0.0,
+      "reject_ratio": 0.0,
+      "workers": 1
+    },
+    "drift": {
+      "events": [
+        {
+          "kind": "blur",
+          "cameras": [
+            0
+          ],
+          "onset_s": 120.0,
+          "onset_jitter_s": 60.0,
+          "ramp_s": 0.0,
+          "strength": 4.0,
+          "clip": null
+        },
+        {
+          "kind": "blur",
+          "cameras": [
+            2
+          ],
+          "onset_s": 120.0,
+          "onset_jitter_s": 60.0,
+          "ramp_s": 120.0,
+          "strength": 4.0,
+          "clip": null
+        }
+      ],
+      "render_workers": 2
+    },
+    "metrics_port": 9105,
+    "results_dir": "bench/results"
+  },
+  "scenario": {
+    "name": "drift-blur",
+    "description": "Task 9.2 drift scenario (vms.loadgen.drift), run against the containerized pipeline with the drift monitor (make demo stack): `python -m vms.loadgen run --scenario bench/scenarios/drift-blur.yaml`. 4 cameras x 5 FPS for 360 s on four full-length clips (make data; the data-mini clips loop every 10 s, E-050). The monitor's reference is each camera's first 60 s; onsets are at 120 s plus a seeded jitter in [0, 60) s per camera and repetition, recorded in the results (repetitions[].drift.events). Gaussian blur to sigma 4 px: camera 0 abrupt, camera 2 gradual over 120 s; cameras 1 and 3 stay clean.\n",
+    "kind": "run",
+    "repeats": 3,
+    "config": {
+      "cameras": 4,
+      "fps": 5,
+      "duration_s": 360,
+      "warmup_s": 10,
+      "camera_prefix": "drift-blur-",
+      "clips": {
+        "ids": [
+          "mot17-09",
+          "mot17-04",
+          "mot17-02",
+          "mot17-08"
+        ]
+      },
+      "drift": {
+        "events": [
+          {
+            "kind": "blur",
+            "strength": 4.0,
+            "cameras": [
+              0
+            ],
+            "onset_s": 120,
+            "onset_jitter_s": 60
+          },
+          {
+            "kind": "blur",
+            "strength": 4.0,
+            "cameras": [
+              2
+            ],
+            "onset_s": 120,
+            "onset_jitter_s": 60,
+            "ramp_s": 120
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "transport": "http",
+    "repetitions": [
+      {
+        "steady_s": 349.983,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 11.81,
+          "p95": 20.583,
+          "p99": 26.532,
+          "mean": 12.98,
+          "max": 66.65
+        },
+        "schedule_lag_ms": {
+          "p50": 0.759,
+          "p95": 1.889,
+          "p99": 2.26,
+          "mean": 0.846,
+          "max": 7.609
+        },
+        "seed": 1234,
+        "started_at": "2026-10-16T12:00:39.669896+00:00",
+        "elapsed_s": 359.983,
+        "drain_s": 0.011,
+        "cpu": {
+          "seconds": 98.728,
+          "utilization_cores": 0.274,
+          "us_per_frame": 13712.2
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-blur-001",
+              "kind": "blur",
+              "onset_s": 161.018,
+              "onset_at": "2026-10-16T12:03:20.687453+00:00",
+              "ramp_s": 0.0,
+              "strength": 4.0,
+              "clip": null
+            },
+            {
+              "camera_id": "drift-blur-003",
+              "kind": "blur",
+              "onset_s": 178.436,
+              "onset_at": "2026-10-16T12:03:38.106157+00:00",
+              "ramp_s": 120.0,
+              "strength": 4.0,
+              "clip": null
+            }
+          ],
+          "rendered_frames": 1902,
+          "render_ms": {
+            "p50": 14.691,
+            "p95": 25.15,
+            "p99": 32.054,
+            "mean": 15.296,
+            "max": 47.196
+          }
+        },
+        "cameras": {
+          "drift-blur-001": "mot17-09",
+          "drift-blur-002": "mot17-04",
+          "drift-blur-003": "mot17-02",
+          "drift-blur-004": "mot17-08"
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.945,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 10.755,
+          "p95": 17.348,
+          "p99": 22.078,
+          "mean": 11.501,
+          "max": 212.737
+        },
+        "schedule_lag_ms": {
+          "p50": 0.828,
+          "p95": 1.965,
+          "p99": 2.181,
+          "mean": 0.911,
+          "max": 3.744
+        },
+        "seed": 1235,
+        "started_at": "2026-10-16T12:06:39.672112+00:00",
+        "elapsed_s": 359.945,
+        "drain_s": 0.024,
+        "cpu": {
+          "seconds": 115.768,
+          "utilization_cores": 0.322,
+          "us_per_frame": 16078.8
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-blur-001",
+              "kind": "blur",
+              "onset_s": 145.328,
+              "onset_at": "2026-10-16T12:09:04.999902+00:00",
+              "ramp_s": 0.0,
+              "strength": 4.0,
+              "clip": null
+            },
+            {
+              "camera_id": "drift-blur-003",
+              "kind": "blur",
+              "onset_s": 134.035,
+              "onset_at": "2026-10-16T12:08:53.707206+00:00",
+              "ramp_s": 120.0,
+              "strength": 4.0,
+              "clip": null
+            }
+          ],
+          "rendered_frames": 2203,
+          "render_ms": {
+            "p50": 14.048,
+            "p95": 24.596,
+            "p99": 31.422,
+            "mean": 14.839,
+            "max": 47.316
+          }
+        },
+        "cameras": {
+          "drift-blur-001": "mot17-09",
+          "drift-blur-002": "mot17-04",
+          "drift-blur-003": "mot17-02",
+          "drift-blur-004": "mot17-08"
+        },
+        "generator_ok": true
+      },
+      {
+        "steady_s": 349.964,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 11.108,
+          "p95": 18.438,
+          "p99": 23.604,
+          "mean": 11.949,
+          "max": 210.797
+        },
+        "schedule_lag_ms": {
+          "p50": 0.76,
+          "p95": 1.647,
+          "p99": 2.149,
+          "mean": 0.804,
+          "max": 4.833
+        },
+        "seed": 1236,
+        "started_at": "2026-10-16T12:12:39.644941+00:00",
+        "elapsed_s": 359.964,
+        "drain_s": 0.014,
+        "cpu": {
+          "seconds": 113.767,
+          "utilization_cores": 0.316,
+          "us_per_frame": 15800.9
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-blur-001",
+              "kind": "blur",
+              "onset_s": 134.568,
+              "onset_at": "2026-10-16T12:14:54.212448+00:00",
+              "ramp_s": 0.0,
+              "strength": 4.0,
+              "clip": null
+            },
+            {
+              "camera_id": "drift-blur-003",
+              "kind": "blur",
+              "onset_s": 136.969,
+              "onset_at": "2026-10-16T12:14:56.613834+00:00",
+              "ramp_s": 120.0,
+              "strength": 4.0,
+              "clip": null
+            }
+          ],
+          "rendered_frames": 2242,
+          "render_ms": {
+            "p50": 13.111,
+            "p95": 24.217,
+            "p99": 32.849,
+            "mean": 14.197,
+            "max": 47.05
+          }
+        },
+        "cameras": {
+          "drift-blur-001": "mot17-09",
+          "drift-blur-002": "mot17-04",
+          "drift-blur-003": "mot17-02",
+          "drift-blur-004": "mot17-08"
+        },
+        "generator_ok": true
+      }
+    ],
+    "aggregate": {
+      "sent_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "accepted_fps": {
+        "mean": 20.0,
+        "std": 0.0,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "send_latency_ms.p50": {
+        "mean": 11.224,
+        "std": 0.537,
+        "min": 10.755,
+        "max": 11.81
+      },
+      "send_latency_ms.p95": {
+        "mean": 18.79,
+        "std": 1.646,
+        "min": 17.348,
+        "max": 20.583
+      },
+      "send_latency_ms.p99": {
+        "mean": 24.071,
+        "std": 2.263,
+        "min": 22.078,
+        "max": 26.532
+      },
+      "schedule_lag_ms.p99": {
+        "mean": 2.197,
+        "std": 0.057,
+        "min": 2.149,
+        "max": 2.26
+      },
+      "cpu.utilization_cores": {
+        "mean": 0.304,
+        "std": 0.026,
+        "min": 0.274,
+        "max": 0.322
+      },
+      "cpu.us_per_frame": {
+        "mean": 15197.3,
+        "std": 1293.618,
+        "min": 13712.2,
+        "max": 16078.8
+      }
+    },
+    "clips": {
+      "mot17-09": {
+        "frames": 525,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-04": {
+        "frames": 1050,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-02": {
+        "frames": 600,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-08": {
+        "frames": 625,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": ""
+}

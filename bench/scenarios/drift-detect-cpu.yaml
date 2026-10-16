@@ -1,0 +1,16 @@
+# Task 9.3: score threshold vs CUSUM drift detectors on the seven live drift runs (laptop, CPU
+# stack, full-length MOT17 clips that loop every 17-35 s; synthetic drift injected by loadgen).
+# Streams are replayed from Postgres with the monitor's own window and statistics; the clean run
+# calibrates each channel and supplies most of the false-alarm exposure (cameras 1 and 3 of
+# every run are clean controls too). Operating points are chosen leave-one-repetition-out.
+name: drift-detect-cpu
+description: Threshold vs CUSUM drift detection delay and false alarms on 7 drift scenarios x 3 reps
+kind: drift-score
+runs:
+  - bench/results/2026-10-16-drift-clean-01M5279Q6GKHEY0H4Q8167G4K6.json
+  - bench/results/2026-10-16-drift-darken-01M528ASQ1FHEFP6RQX61XA5S1.json
+  - bench/results/2026-10-16-drift-blur-01M529BW7NH1Y90XYKYWYE3WB2.json
+  - bench/results/2026-10-16-drift-noise-01M52ACYGQJAQKGBD349YVPJJ7.json
+  - bench/results/2026-10-16-drift-shift-01M52BE1GWQAMK34RCY29NPQJK.json
+  - bench/results/2026-10-16-drift-occlusion-01M52CF3CEE5RNSFBS7H7VC655.json
+  - bench/results/2026-10-16-drift-classmix-01M52DG5JAN3033X03G1HP6JGW.json
