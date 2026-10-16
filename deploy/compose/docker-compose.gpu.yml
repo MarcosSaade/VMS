@@ -14,6 +14,11 @@ services:
     image: vms/app:gpu
     environment:
       VMS_DETECTOR__DEVICE: cuda
+      # The GPU baseline (2.5): PyTorch CUDA at batch 1. The CPU defaults (ONNX Runtime, batch 4,
+      # D5) do not apply: the image's onnxruntime wheel has no CUDA provider, and the GPU
+      # backend and batch size are still open in D5 (5.2 and 5.3 GPU rungs).
+      VMS_DETECTOR__BACKEND: ultralytics
+      VMS_QUEUE__INFER_BATCH: "1"
     deploy:
       resources:
         reservations:

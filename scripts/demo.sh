@@ -42,7 +42,7 @@ step "2/6 clips and weights"
 make --no-print-directory data-mini
 uv run python -m vms.worker weights "$weights"
 mkdir -p models/onnx  # mounted into the worker; created here so Docker does not create it as root
-backend="${WORKER_BACKEND:-$(setting WORKER_BACKEND ultralytics)}"
+backend="${WORKER_BACKEND:-$(setting WORKER_BACKEND onnxruntime)}"
 if [[ "$backend" == "onnxruntime" && ! -f "models/onnx/$weights.onnx" ]]; then
   uv run python -m vms.worker export-onnx "$weights"
 fi
