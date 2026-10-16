@@ -2,8 +2,10 @@
 
 One iteration (`step`):
 
-1. Leases: renew this worker's camera leases every `renew_every_s`, and lease more cameras
-   (up to `max_cameras`) on the same cadence or whenever there was nothing to claim.
+1. Leases: renew this worker's camera leases every `renew_every_s`, hand back cameras with
+   nothing claimed for `idle_release_s` and no pending frames (a camera that stopped sending
+   must not hold a slot forever), and lease more cameras (up to `max_cameras`) on the same
+   cadence or whenever there was nothing to claim.
 2. Claim up to `claim_batch` pending frames of leased cameras, oldest first.
 3. In batches of up to `infer_batch` frames (task 5.5; 1 is one frame at a time): fetch the
    JPEGs concurrently, then in the inference thread (CPU bound, so off the event loop) decode
@@ -168,6 +170,7 @@ class Worker:
         self._tracer = tracer or trace.get_tracer(__name__)
 
         self._held: set[str] = set()
+        self._active: dict[str, float] = {}  # camera -> monotonic time leased or last claimed
         self._last_leases = float("-inf")
         self._last_backlog = float("-inf")
         self._requeue_pending = False
@@ -269,6 +272,8 @@ class Worker:
             # Nothing to do with the cameras held: look for new ones right away.
             await self._acquire()
             return 0
+        for frame in frames:
+            self._active[frame.camera_id] = now
         size = self._settings.infer_batch
         for i in range(0, len(frames), size):
             if stop is not None and stop.is_set():
@@ -284,6 +289,19 @@ class Worker:
             del self._cameras[camera_id]
         if lost:
             log.warning("lost camera leases", extra={"cameras": sorted(lost)})
+        now = self._clock.monotonic()
+        idle = sorted(
+            c for c in self._held if now - self._active.get(c, now) >= self._settings.idle_release_s
+        )
+        if idle:
+            released = set(await self._queue.release_idle(self.worker_id, idle))
+            if released:
+                log.info("released idle cameras", extra={"cameras": sorted(released)})
+            self._held -= released
+        for camera_id in set(self._cameras) - self._held:
+            del self._cameras[camera_id]
+        for camera_id in set(self._active) - self._held:
+            del self._active[camera_id]
         await self._acquire()
 
     async def _acquire(self) -> None:
@@ -295,6 +313,9 @@ class Worker:
             if new:
                 log.info("leased cameras", extra={"cameras": new})
             self._held.update(new)
+            now = self._clock.monotonic()
+            for camera_id in new:
+                self._active[camera_id] = now
         self._leased.set(len(self._held))
 
     async def release(self) -> None:
@@ -306,6 +327,7 @@ class Worker:
             log.warning("release failed", extra={"error": str(exc)})
         self._held.clear()
         self._cameras.clear()
+        self._active.clear()
         self._leased.set(0)
         if self._owns_executor:
             self._executor.shutdown(wait=True)

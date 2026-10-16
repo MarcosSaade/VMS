@@ -3,6 +3,7 @@ counted against known onsets, and operating points are chosen out of sample."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import replace
 from datetime import timedelta
@@ -11,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tests.unit.drift.conftest import T0, Scene, stream
+from tests.unit.drift.conftest import T0, FakeDriftStore, Scene, stream
 from vms.drift.detect import Calibration, ChannelCalibration, DetectorSettings
 from vms.drift.score import (
     ScoreScenario,
@@ -19,6 +20,7 @@ from vms.drift.score import (
     SweepSettings,
     camera_series,
     choose,
+    extract,
     plot,
     score,
     score_stream,
@@ -135,3 +137,27 @@ def test_plot_writes_a_png(tmp_path: Path) -> None:
     out = tmp_path / "p.png"
     plot(score(streams, scenario), out)
     assert out.read_bytes()[:4] == b"\x89PNG"
+
+
+def test_extract_refuses_a_camera_without_processed_frames(tmp_path: Path) -> None:
+    rng = np.random.default_rng(5)
+    store = FakeDriftStore()
+    store.add(stream("cam-1", T0, 120, Scene(), rng))
+    rep = {
+        "started_at": T0.isoformat(),
+        "elapsed_s": 120.0,
+        "seed": 1,
+        "cameras": {"cam-1": "clip", "cam-2": "clip"},
+    }
+    run = {"name": "r", "run_id": "R", "metrics": {"repetitions": [rep]}}
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(run))
+    scenario = ScoreScenario(name="t", runs=[path], cache_dir=tmp_path / "cache")
+    with pytest.raises(ValueError, match="no processed frames of cam-2"):
+        asyncio.run(extract([path], store, scenario))
+    assert not (tmp_path / "cache").exists()  # nothing cached from a broken run
+
+    rep["cameras"] = {"cam-1": "clip"}
+    path.write_text(json.dumps(run))
+    streams = asyncio.run(extract([path], store, scenario))
+    assert [len(s.times_s) for s in streams] == [6]  # window ends 90..115 s

@@ -31,6 +31,9 @@ class QueueSettings(_Section):
     max_cameras: int = Field(default=16, ge=1)  # cameras leased at once by one worker
     lease_ttl_s: float = Field(default=30.0, gt=0)  # a dead worker's cameras move after this
     renew_every_s: float = Field(default=5.0, gt=0)
+    # A leased camera with nothing claimed for this long and no pending frames is handed back
+    # at the next renewal, so a worker at max_cameras makes room for cameras that start later.
+    idle_release_s: float = Field(default=60.0, gt=0)
     claim_batch: int = Field(default=4, ge=1)  # frames per claim query
     # Frames per detect_batch call (task 5.5): claimed frames, of any leased cameras, are
     # detected together up to this many; 1 is one frame at a time. At most claim_batch.

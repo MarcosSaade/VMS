@@ -187,6 +187,31 @@ def test_concurrent_lease_attempts_have_one_winner(stack: StackSettings, fresh_d
     with_queues(stack, fresh_db, 8, body)
 
 
+def test_release_idle_hands_back_only_own_cameras_without_pending_frames(
+    stack: StackSettings, fresh_db: str
+) -> None:
+    insert_frames(stack, fresh_db, ["cam-a", "cam-b", "cam-c"], 1)
+
+    async def body(q1: PostgresWorkQueue, q2: PostgresWorkQueue) -> None:
+        assert sorted(await q1.acquire_cameras("w1", 2, TTL_S, 3)) == ["cam-a", "cam-b"]
+        assert await q2.acquire_cameras("w2", 1, TTL_S, 3) == ["cam-c"]
+        for f in await q1.claim("w1", 10):
+            assert await q1.complete("w1", result(f.frame_id, f.camera_id))
+        with psycopg.connect(dsn(stack, fresh_db), autocommit=True) as conn:
+            conn.execute(
+                "INSERT INTO frames (frame_id, camera_id, run_id, seq, ts, object_key, "
+                "size_bytes) VALUES ('cam-b-9', 'cam-b', 'run', 9, %s, 'k', 1)",
+                (T0 + timedelta(seconds=9),),
+            )
+        # cam-b has a pending frame again; cam-c is w2's.
+        assert await q1.release_idle("w1", ["cam-a", "cam-b", "cam-c"]) == ["cam-a"]
+        assert sorted(await q1.renew("w1", TTL_S)) == ["cam-b"]
+        assert await q2.renew("w2", TTL_S) == ["cam-c"]
+        assert await q1.release_idle("w1", []) == []
+
+    with_queues(stack, fresh_db, 2, body)
+
+
 def test_takeover_after_lease_expiry_resets_frames_and_fences_the_old_worker(
     stack: StackSettings, fresh_db: str
 ) -> None:

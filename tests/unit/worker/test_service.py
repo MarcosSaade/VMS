@@ -321,6 +321,30 @@ def test_losing_a_lease_drops_the_camera_state(h: Harness) -> None:
     assert second.split(":")[1] != first.split(":")[1]  # a new tracker session
 
 
+def test_idle_cameras_are_handed_back_so_new_cameras_get_a_slot(h: Harness) -> None:
+    # A worker at max_cameras used to keep the leases of cameras that had stopped sending
+    # forever, so cameras that started later were never processed (seen in task 9.3).
+    for cam in ["cam-a", "cam-b"]:
+        h.queue.add(cam, 0, 0.0)
+    process_all(h)
+    assert h.worker.leased_cameras == {"cam-a", "cam-b"}  # max_cameras=2
+    h.queue.add("cam-c", 0, 0.0)
+    h.clock.advance(5.0)
+    process_all(h)
+    assert h.queue.status("cam-c-0") == "pending"  # no room yet: idle for less than 60 s
+
+    h.queue.add("cam-a", 1, 0.2)  # cam-a is still sending
+    process_all(h)
+    h.clock.advance(60.0)
+    h.queue.add("cam-a", 2, 0.4)  # pending at renew time: never released with work left
+    process_all(h)
+    assert h.worker.leased_cameras == {"cam-a", "cam-c"}
+    assert h.queue.status("cam-c-0") == "done"
+    assert h.queue.status("cam-a-2") == "done"
+    assert "cam-b" not in h.queue.leases
+    assert h.sample("vms_worker_leased_cameras") == 2
+
+
 def test_zones_are_reloaded_on_cadence_and_a_failed_load_is_not_fatal(h: Harness) -> None:
     h.queue.add("cam-a", 0, 0.0)
     h.queue.fail_ops = {"zones"}

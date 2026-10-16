@@ -215,6 +215,12 @@ async def extract(
                     stream.times_s, stream.values = camera_series(
                         frames, dets, start, scenario.monitor, scenario.signals
                     )
+                    if not stream.times_s:
+                        # Not "no drift": its frames were never processed (or were deleted).
+                        raise ValueError(
+                            f"{name} rep {rep_index}: no processed frames of {camera_id} "
+                            f"between {start.isoformat()} and {end.isoformat()}"
+                        )
                 streams.append(stream)
             if cached is None:
                 cache.parent.mkdir(parents=True, exist_ok=True)

@@ -103,6 +103,14 @@ class FakeQueue:
         self._op("renew")
         return sorted(c for c, w in self.leases.items() if w == worker_id)
 
+    async def release_idle(self, worker_id: str, cameras: list[str]) -> list[str]:
+        self._op("release_idle")
+        busy = {r.frame.camera_id for r in self.rows.values() if r.status == "pending"}
+        released = [c for c in cameras if self.leases.get(c) == worker_id and c not in busy]
+        for camera in released:
+            del self.leases[camera]
+        return released
+
     async def claim(self, worker_id: str, limit: int) -> list[ClaimedFrame]:
         self._op("claim")
         mine = {c for c, w in self.leases.items() if w == worker_id}

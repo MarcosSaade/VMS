@@ -129,6 +129,11 @@ class WorkQueue(Protocol):
         """Extend this worker's live leases; return the cameras it still holds."""
         ...
 
+    async def release_idle(self, worker_id: str, cameras: list[str]) -> list[str]:
+        """Give back this worker's leases of `cameras` that have no pending frames; return
+        the cameras released."""
+        ...
+
     async def claim(self, worker_id: str, limit: int) -> list[ClaimedFrame]:
         """Claim up to `limit` pending frames of leased cameras, in capture order."""
         ...
@@ -201,6 +206,17 @@ RENEW_SQL = """
 UPDATE camera_leases SET expires_at = now() + make_interval(secs => %(ttl_s)s)
 WHERE worker_id = %(worker_id)s AND expires_at >= now()
 RETURNING camera_id
+"""
+
+# A frame arriving right after the check finds the camera unleased, and the next acquire
+# (of any worker) leases it again.
+RELEASE_IDLE_SQL = """
+DELETE FROM camera_leases l
+WHERE l.worker_id = %(worker_id)s AND l.camera_id = ANY(%(cameras)s)
+  AND NOT EXISTS (
+      SELECT 1 FROM frames f WHERE f.camera_id = l.camera_id AND f.status = 'pending'
+  )
+RETURNING l.camera_id
 """
 
 CLAIM_SQL = """
@@ -343,6 +359,12 @@ class PostgresWorkQueue:
 
     async def renew(self, worker_id: str, ttl_s: float) -> list[str]:
         rows = await self._rows(RENEW_SQL, {"worker_id": worker_id, "ttl_s": ttl_s})
+        return [r[0] for r in rows]
+
+    async def release_idle(self, worker_id: str, cameras: list[str]) -> list[str]:
+        if not cameras:
+            return []
+        rows = await self._rows(RELEASE_IDLE_SQL, {"worker_id": worker_id, "cameras": cameras})
         return [r[0] for r in rows]
 
     async def claim(self, worker_id: str, limit: int) -> list[ClaimedFrame]:
