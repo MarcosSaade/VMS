@@ -79,7 +79,7 @@
   - Understand it: why does INT8 need calibration, what did it cost in mAP, and is that drop inside the CI?
 - [ ] 5.3 Batch-size sweep in-process: throughput against latency (SHRINK: no Triton dynamic batching)
   - Understand it: why do throughput and latency both rise with batch size, and which point meets the freshness SLO?
-- [ ] 5.5 Worker on the best backend in-process; re-run ramp; decide D5 (SHRINK: no Triton)
+- [ ] 5.5 Worker on the best backend in-process; re-run ramp; decide D5 (SHRINK: no Triton). CPU part done 2026-10-16 (E-047 to E-049: ONNX Runtime FP32, cross-camera batch 4, no thread spinning: rated 2 -> 5 cameras, ceiling 1.8x; D5 accepted for CPU); the GPU ramp and D5's GPU part wait for the quota
   - Understand it: how much of the model-only speedup survived end to end, and why not all of it?
 
 ## Phase 9: Drift detection

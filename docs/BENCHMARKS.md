@@ -26,12 +26,12 @@ One entry per environment used (CPU, RAM, GPU model, driver, CUDA, instance type
 
 ## Headline results
 
-Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity on a GPU, the optimized worker (5.5), cost per camera-hour, drift detection delay.
+Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity on a GPU, cost per camera-hour, drift detection delay.
 
 | Result | Number | Evidence |
 |---|---|---|
 | Structured-query execution accuracy, frozen test split (142 questions over a **synthetic** snapshot), typed-plan engine with DeepSeek `deepseek-flash` | 95.8% [92.3, 98.6]; plan-expressible 95.9% [91.8, 99.0]; red team 13/13 refused, 0 breaches; $0.24 for the split (upper bound) | E-036, [`2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json`](../eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json) |
-| Rated capacity, CPU (one yolo11n worker, PyTorch, batch 1) | **2 cameras at 5 FPS** (3/3 repetitions; freshness p95 0.24 s, 0 lost); the worker saturates at 14.2 frames/s | E-039, [`ramp-cpu`](../bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json) |
+| Rated capacity, CPU, one yolo11n worker (D5: ONNX Runtime FP32, cross-camera batch 4, no thread spinning) | **5 cameras at 5 FPS** (3/3 repetitions; freshness p95 0.40 s, 0 lost), up from **2** with PyTorch at batch 1; worker ceiling 26.3 vs 14.5 frames/s (**1.8x**) at 1.3 to 4.0 worker cores | E-047 to E-049 (Ingest and pipeline capacity, optimized worker) |
 | Structured-query latency under ingest, CPU, canned planner (LLM excluded) | p95 39 ms at 1 client, 98 ms at 8 (159 q/s, one core saturated) | E-040, [`query-load-cpu`](../bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json) |
 | Detection quality, yolo11s (PyTorch CPU) | COCO-500 mAP@50-95 45.8 [44.1, 49.6]; MOT17 person mAP@50-95 45.0 [43.1, 47.0] | E-034 (Evaluation, detection quality) |
 | Precision ladder, CPU, model-only (`detect_batch`, batch 1) | ONNX Runtime FP32 **1.84x** PyTorch for yolo11n (48.8 vs 26.5 images/s) and **1.65x** for yolo11s (21.3 vs 12.9), identical mAP; INT8 is faster still (65.8 and 38.2) but fails D32 for both models (COCO mAP@50-95 -1.30 and -1.07 points), so not kept | E-044 to E-046 (Inference, precision ladder) |
@@ -52,6 +52,30 @@ Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacit
 **Rated capacity on CPU: 2 cameras at 5 FPS.** The worker's ceiling is 14.2 frames/s (2.8 cameras); whole-camera steps hide that headroom, so a gain of about 1.1x would rate 3 cameras. Above the ceiling nothing is lost (frames queue in Postgres); freshness grows with the queue instead, which is what `worker.queue_wait` shows (p95 9.4 s at 3 cameras, equal to freshness). Per-frame stage p95 at every load: infer 73 ms, decode 9.5, fetch 8.5, write 9, stats 8, track 4.5, which sum to about the 70 ms per frame the ceiling implies, because the stages run one after another (section "Baseline bottlenecks"). Harness: loadgen 0.04 cores and `generator_ok` in every step; ingest 0.15 cores at 20 frames/s.
 
 Evidence: [`bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json`](../bench/results/2026-10-14-ramp-cpu-01M4XTS4MEBS8ZM7X2GERGGHS3.json). A first attempt was aborted by a full disk (E-038).
+
+### Optimized worker ramp, CPU (task 5.5; E-047 to E-049)
+
+Same setup as the baseline ramp (`laptop`, yolo11n, data-mini at 5 FPS per camera, warmup 20 s, hold 90 s, 3 repetitions, no query load), one variable changed per row, every run pinned to its worker by `expect_worker` and recorded in the results file; clean commits 168a613 (first three), be6d039 and 124158a. Rated capacity is the most whole cameras that meet the ingest SLO (freshness p95 under 2 s, 0 lost, no backlog growth) in 3/3 repetitions; the ceiling is the worker's frames/s at the first failing step (above it throughput sags slightly as the backlog grows, e.g. 25.6 / 25.4 / 24.9 at 6 / 7 / 8 cameras for batch 4).
+
+| Worker | Rated cameras | Ceiling frames/s (std) | Freshness p95 s at 1 camera / rated | Worker cores at 1 camera / rated / saturated | Infer p95 ms at 1 camera | Evidence |
+|---|---|---|---|---|---|---|
+| PyTorch, batch 1 (same-session baseline) | 2 | 14.5 (0.1) | 0.24 / 0.24 | 1.39 / 2.59 / 3.5 | 74 | [`ramp-cpu-pt`](../bench/results/2026-10-15-ramp-cpu-pt-01M50WC3BVFQ08BEKDRWPKS9K3.json) |
+| ONNX Runtime FP32, batch 1 | 4 | 22.7 (0.7) | 0.24 / 0.23 | 9.20 / 9.78 / 9.9 | 25 | [`ramp-cpu-ort`](../bench/results/2026-10-15-ramp-cpu-ort-01M50YD7G3ASG4EN12Y9XM5P2A.json) |
+| ONNX Runtime FP32, batch 4 | 5 | 25.6 (0.5) | 0.23 / 0.28 | 9.17 / 9.87 / 9.9 | 25 | [`-b4`](../bench/results/2026-10-16-ramp-cpu-ort-b4-01M5105QDGP84HKNTTMR82HGNJ.json), [`-b4-ext`](../bench/results/2026-10-16-ramp-cpu-ort-b4-ext-01M511Z4V0FE0MA4TK3YDAY1SD.json) |
+| **ONNX Runtime FP32, batch 4, no spinning (D5)** | **5** | **26.3 (0.4)** | 0.24 / 0.40 | **1.29** / 4.01 / 4.0 | 49 | [`-b4-nospin`](../bench/results/2026-10-16-ramp-cpu-ort-b4-nospin-01M513W7G2ACAK5X5PFR9WNXV8.json) |
+
+Model-only vs end to end, against PyTorch at batch 1:
+
+| Change | Model-only (`detect_batch`, E-046) | End-to-end ceiling | Rated cameras |
+|---|---|---|---|
+| ONNX Runtime FP32, batch 1 | 1.84x (48.8 vs 26.5 images/s) | 1.56x | 2 -> 4 |
+| + batch 4 | 2.13x (56.5) | 1.77x | 2 -> 5 |
+| + no spinning | (not measured model-only) | 1.81x | 2 -> 5 |
+
+- **End to end gains less than model-only** because the forward pass is only part of each frame (fetch, decode, statistics, tracking and the write remain, E-041), and the ONNX worker shares the host's cores with ingest and Postgres.
+- **Rated cameras overstate the gain**: whole-camera steps round PyTorch's 2.9 cameras of ceiling down to 2, so 2 -> 5 cameras is 2.5x while throughput is 1.8x.
+- **Spinning**: ONNX Runtime's default keeps its intra-op threads busy-waiting between runs, so the worker shows ~9.2 cores at any load. With it off the same capacity costs 1.3 cores at 1 camera; each call pays a wake-up (infer p95 49 vs 25 ms), which adds 0.12 s to freshness p95 at 5 cameras, far inside the 2 s SLO.
+- The PyTorch rerun reproduces E-039 (ceiling 14.5 vs 14.2, same rated capacity), so the batched worker loop costs nothing at batch 1. 0 frames lost in every step of every run; loadgen under 0.06 cores and `harness_ok` everywhere. Per-step stage p95s are in the results files.
 
 ### Load generator ceiling (harness, not the system)
 
@@ -178,7 +202,7 @@ Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch 
 - **Batching does not help ONNX Runtime on this CPU** (batch 4 is +5%, inside the repetition std): one image already uses all 10 cores. PyTorch gains 17% at batch 4.
 - Calibration: 64 COCO train2017 images and 64 frames of MOT17-05/10/11/13 (`configs/calibration.v1.lock.jsonl`, sha256 35018eeb...), disjoint from the eval subset (unit test). MinMax ranges, per-channel weights.
 - **yolo11n:** ONNX Runtime FP32 is 1.84x PyTorch at batch 1 with identical mAP; INT8 loses 1.3 to 1.4 points on both sources with intervals that exclude 0, so it fails D32 clearly. Here batch 4 adds 16% for ONNX Runtime (smaller convolutions leave cores idle at batch 1), which the batch sweep (5.3) will pin down.
-- Not measured: the GPU rungs (TensorRT FP16 and INT8, waiting for the GPU quota) and anything end to end (5.5).
+- Not measured: the GPU rungs (TensorRT FP16 and INT8, waiting for the GPU quota). End to end: "Optimized worker ramp, CPU".
 
 ## Evaluation
 
@@ -299,6 +323,7 @@ One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/s
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
 - CPU baseline: `make up`, `make data-mini`, `make models`, then start the app containers with the canned planner (`LLM_MODEL= docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile app up -d --wait ingest worker query` after `make app`), stop other CPU-heavy work, and run `make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` (~45 min), `query-load-cpu.yaml` (~20 min), `profile-worker-cpu.yaml` and `profile-query-cpu.yaml` (~2 min each).
+- Optimized worker ramps (5.5): as the CPU baseline, but start the worker each scenario's `expect_worker` names (commands in RUNBOOK, Benchmarks), then `make bench SCENARIO=bench/scenarios/ramp-cpu-pt.yaml`, `ramp-cpu-ort.yaml`, `ramp-cpu-ort-b4.yaml`, `ramp-cpu-ort-b4-ext.yaml`, `ramp-cpu-ort-b4-nospin.yaml` (~35 to 45 min each). The compose defaults are the D5 worker; the E-039 `ramp-cpu.yaml` now needs `WORKER_BACKEND=ultralytics WORKER_INFER_BATCH=1`.
 - ONNX parity: `make models`, `make eval-detection-data`, `make data-mini`, `make onnx`, then `make onnx-parity` and `make onnx-parity WEIGHTS=yolo11s` (~25 min each); ONNX mAP: `VMS_DETECTOR__BACKEND=onnxruntime make eval SUITE=detection` (and `WEIGHTS=yolo11n`).
 - Precision ladder, CPU: `make models`, `make data-mini`, `make eval-detection-data`, `make onnx`, `make calibration-data`, `make quantize WEIGHTS=yolo11s`; then `make eval SUITE=detection NAME=detection-yolo11s`, `... BACKEND=onnxruntime NAME=detection-yolo11s-onnx`, `... BACKEND=onnxruntime PRECISION=int8 NAME=detection-yolo11s-int8` (~1.5 min each), `make eval-detection-compare BASE=<onnx run> OTHER=<int8 run>` (~2 min), and with the compose stack stopped `make bench SCENARIO=bench/scenarios/ladder-cpu.yaml` (~15 min). The whole-graph INT8 of E-043: `VMS_INT8__EXCLUDE_NODES='[]' make quantize WEIGHTS=yolo11s`.
 - Structured eval set: `make up`, `make eval-db` (pulls or regenerates the snapshot and checks its hashes), `make eval-build` (re-runs every gold; the split files must come out unchanged), `make eval-check`.
