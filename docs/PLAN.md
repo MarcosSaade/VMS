@@ -93,7 +93,7 @@ After each step the README headline numbers and the write-up are updated.
 ## Phase 9: Drift detection
 - [x] 9.1 Per-camera drift statistics (input: brightness, blur, noise; output: detections per frame, confidence and class mix). Done 2026-10-16 (D33, E-050: `vms.drift` monitor reading Postgres windows, gauges in the demo)
   - Understand it: what is the reference window, and which statistic reacts to darkening vs a class-mix change?
-- [ ] 9.2 Drift injection scenarios with known, seeded onsets, and mAP under each drift
+- [x] 9.2 Drift injection scenarios with known, seeded onsets, and mAP under each drift. Done 2026-10-16 (E-051, E-052: blur sigma 6 costs 17 points of MOT17 mAP@50-95, the largest drop; `bench/scenarios/drift-*.yaml`)
   - Understand it: why must onsets be known and seeded, and which drift hurt mAP most?
 - [ ] 9.3 Sequential change detection: CUSUM vs fixed threshold, detection delay vs false-alarm rate across seeds
   - Understand it: what does CUSUM accumulate, which knob trades delay for false alarms, and what did the curve show?

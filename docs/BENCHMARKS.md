@@ -310,7 +310,25 @@ _Placeholder (tasks 8.1, 8.4)._
 
 ## Drift detection
 
-_Placeholder (tasks 9.3, 9.5)._
+### Detection quality under drift (task 9.2, E-051)
+
+Self-measured on `laptop`, `make eval-drift` (`bench/scenarios/drift-map-cpu.yaml`): the deployed CPU worker's model (yolo11n, ONNX Runtime FP32, D5) on detection subset v1, clean and with each photometric transform of `vms.drift.transforms` at full strength on every image. mAP@50-95 in points with 95% intervals; the change is drifted minus clean, paired percentile bootstrap over images (2,000 resamples, seed 20261014). Synthetic drift: these are augmentations, not real night, fog or sensor noise. Summary: [`2026-10-16-drift-map-cpu-01M5263733J106GJX458JF9108.json`](../eval/results/2026-10-16-drift-map-cpu-01M5263733J106GJX458JF9108.json).
+
+| Condition | COCO mAP@50-95 | change | MOT17 person mAP@50-95 | change |
+|---|---|---|---|---|
+| clean | 37.9 [36.1, 42.2] | | 40.3 [38.6, 42.0] | |
+| darken, gain 0.5 | 37.4 [35.5, 41.7] | -0.5 [-1.0, -0.0] | 39.2 [37.6, 40.9] | -1.1 [-1.5, -0.7] |
+| darken, gain 0.25 | 35.5 [34.0, 40.0] | -2.4 [-3.4, -1.1] | 37.1 [35.6, 38.7] | -3.2 [-4.0, -2.5] |
+| blur, sigma 3 px at 1280 | 33.3 [32.1, 37.8] | -4.5 [-5.9, -2.9] | 35.1 [33.6, 36.6] | -5.2 [-5.9, -4.6] |
+| blur, sigma 6 px at 1280 | 26.1 [24.5, 30.2] | **-11.8** [-13.6, -10.0] | 23.2 [21.9, 24.7] | **-17.1** [-18.6, -15.5] |
+| noise, sigma 10 | 34.8 [33.2, 39.1] | -3.1 [-4.1, -1.9] | 39.5 [38.0, 41.1] | -0.8 [-1.1, -0.4] |
+| noise, sigma 25 | 24.9 [23.7, 28.9] | **-12.9** [-14.8, -10.9] | 34.3 [32.9, 35.8] | -6.0 [-7.0, -4.9] |
+
+- Blur is the drift that hurts the camera scenes most (-17 points, 42% of mAP@50-95 at sigma 6), so it is the 9.5 fine-tune target. Darkening barely matters until the gain is very low (gain 0.5: -0.5 and -1.1), plausibly because a pure gain keeps relative contrast; real low light also adds noise and motion blur, which this transform does not.
+- Noise hurts COCO about twice as much as MOT17: MOT frames are 1280x720 and the letterbox downscales them to 640, which averages noise down (sigma roughly halves), while COCO images enter at about their own size. Noise sigma is therefore not comparable across input resolutions; blur sigma is scaled with the width and is.
+- The clean run reproduces the PyTorch baseline exactly (37.9 and 40.3, E-034), as E-046 found for ONNX Runtime FP32.
+
+_Detection delay and false alarms: placeholder (task 9.3). Fine-tune: placeholder (task 9.5)._
 
 ## Cost
 
@@ -322,6 +340,7 @@ One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/s
 
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
+- Detection quality under drift: `make models`, `make onnx`, `make eval-detection-data`, then `make eval-drift` (~13 min).
 - CPU baseline: `make up`, `make data-mini`, `make models`, then start the app containers with the canned planner (`LLM_MODEL= docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile app up -d --wait ingest worker query` after `make app`), stop other CPU-heavy work, and run `make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` (~45 min), `query-load-cpu.yaml` (~20 min), `profile-worker-cpu.yaml` and `profile-query-cpu.yaml` (~2 min each).
 - Optimized worker ramps (5.5): as the CPU baseline, but start the worker each scenario's `expect_worker` names (commands in RUNBOOK, Benchmarks), then `make bench SCENARIO=bench/scenarios/ramp-cpu-pt.yaml`, `ramp-cpu-ort.yaml`, `ramp-cpu-ort-b4.yaml`, `ramp-cpu-ort-b4-ext.yaml`, `ramp-cpu-ort-b4-nospin.yaml` (~35 to 45 min each). The compose defaults are the D5 worker; the E-039 `ramp-cpu.yaml` now needs `WORKER_BACKEND=ultralytics WORKER_INFER_BATCH=1`.
 - ONNX parity: `make models`, `make eval-detection-data`, `make data-mini`, `make onnx`, then `make onnx-parity` and `make onnx-parity WEIGHTS=yolo11s` (~25 min each); ONNX mAP: `VMS_DETECTOR__BACKEND=onnxruntime make eval SUITE=detection` (and `WEIGHTS=yolo11n`).

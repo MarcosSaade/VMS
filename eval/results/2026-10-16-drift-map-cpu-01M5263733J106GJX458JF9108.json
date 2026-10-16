@@ -1,0 +1,641 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5263733J106GJX458JF9108",
+  "name": "drift-map-cpu",
+  "kind": "eval.detection.drift",
+  "started_at": "2026-10-16T10:50:41.893957Z",
+  "ended_at": "2026-10-16T11:03:30.147320Z",
+  "seed": 20261014,
+  "git": {
+    "sha": "920d05df54484906607bf532c896ccf117f7c1bf",
+    "dirty": true
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0",
+    "torch": "2.14.1+cpu",
+    "torchvision": "0.29.1+cpu",
+    "ultralytics": "8.4.175",
+    "onnxruntime": "1.31.0"
+  },
+  "config": {
+    "service": "eval-detection",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 1.0
+    },
+    "paths": {
+      "spec": "configs/eval/detection.v1.yaml",
+      "subset": "eval/detection/subset.v1.jsonl",
+      "manifest": "eval/detection/subset.v1.json",
+      "images_dir": "data/eval/detection/v1",
+      "fetch_workers": 8
+    },
+    "results_dir": "eval/results",
+    "predictions_dir": "data/eval/detection/predictions",
+    "sources": [
+      "coco",
+      "mot17"
+    ],
+    "detector": {
+      "weights": "yolo11n",
+      "backend": "onnxruntime",
+      "precision": "fp32",
+      "device": "cpu",
+      "imgsz": 640,
+      "conf": 0.001,
+      "iou": 0.7,
+      "max_det": 300,
+      "threads": null,
+      "spin": true
+    },
+    "max_dets_per_class": 100,
+    "mot_frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "bootstrap": {
+      "seed": 20261014,
+      "resamples": 2000,
+      "confidence": 0.95
+    },
+    "drift": null,
+    "max_images": null
+  },
+  "scenario": {
+    "name": "drift-map-cpu",
+    "description": "Task 9.2: detection quality under each photometric drift that loadgen can inject, so the impact of each drift is measured before detecting it (9.3) or fine-tuning against it (9.5). The deployed CPU worker's model (YOLO11n, ONNX Runtime FP32; D5) on the frozen detection subset v1 (500 COCO val2017 images, 73 MOT17 frames as loadgen sends them), clean and with each transform of vms.drift.transforms at full strength on every image, two strengths per kind (moderate, severe). Paired bootstrap of the change against clean (2,000 resamples).\n",
+    "kind": "eval-drift",
+    "config": {
+      "detector": {
+        "weights": "yolo11n",
+        "backend": "onnxruntime"
+      }
+    },
+    "conditions": [
+      {
+        "name": "darken-0.5",
+        "drift": {
+          "kind": "darken",
+          "strength": 0.5,
+          "seed": 20261016
+        }
+      },
+      {
+        "name": "darken-0.25",
+        "drift": {
+          "kind": "darken",
+          "strength": 0.25,
+          "seed": 20261016
+        }
+      },
+      {
+        "name": "blur-3",
+        "drift": {
+          "kind": "blur",
+          "strength": 3.0,
+          "seed": 20261016
+        }
+      },
+      {
+        "name": "blur-6",
+        "drift": {
+          "kind": "blur",
+          "strength": 6.0,
+          "seed": 20261016
+        }
+      },
+      {
+        "name": "noise-10",
+        "drift": {
+          "kind": "noise",
+          "strength": 10.0,
+          "seed": 20261016
+        }
+      },
+      {
+        "name": "noise-25",
+        "drift": {
+          "kind": "noise",
+          "strength": 25.0,
+          "seed": 20261016
+        }
+      }
+    ]
+  },
+  "metrics": {
+    "model_version": "yolo11n@0ebbc80d4a76+onnx",
+    "subset": {
+      "version": 1,
+      "subset_sha256": "1661781dd3045ca39c1baba92807b0815f5c09e5f7a161fc42a061a3183f87dc",
+      "spec_sha256": "f6030d96dbf01a67b2e101f646ec9d87bb94dccff4e2baa936154cada32f7b16",
+      "partial": false
+    },
+    "clean": {
+      "run_id": "01M525BS2FQMHDYYCEF4EDVA41",
+      "results_file": "eval/results/2026-10-16-drift-map-cpu-clean-01M525BS2FQMHDYYCEF4EDVA41.json",
+      "sources": {
+        "coco": {
+          "map50": {
+            "value": 0.5255308080806069,
+            "ci_lo": 0.5059796019799632,
+            "ci_hi": 0.5734343167100436,
+            "boot_std": 0.017333094290763858,
+            "boot_mean": 0.5403318070603851
+          },
+          "map50_95": {
+            "value": 0.37852247244283665,
+            "ci_lo": 0.3613696519190799,
+            "ci_hi": 0.42171453972655165,
+            "boot_std": 0.015361877228666172,
+            "boot_mean": 0.3917099012032037
+          }
+        },
+        "mot17": {
+          "map50": {
+            "value": 0.6668986845533995,
+            "ci_lo": 0.6448889512040064,
+            "ci_hi": 0.6864880042331166,
+            "boot_std": 0.010447914709902162,
+            "boot_mean": 0.66699630201688
+          },
+          "map50_95": {
+            "value": 0.403111692433888,
+            "ci_lo": 0.3859952382563832,
+            "ci_hi": 0.4197536736489473,
+            "boot_std": 0.008413440816003849,
+            "boot_mean": 0.40370637546337956
+          }
+        }
+      }
+    },
+    "conditions": [
+      {
+        "name": "darken-0.5",
+        "drift": {
+          "kind": "darken",
+          "strength": 0.5,
+          "seed": 20261016
+        },
+        "run_id": "01M525DCNESKM29DZWW6Q32Y8D",
+        "results_file": "eval/results/2026-10-16-drift-map-cpu-darken-0.5-01M525DCNESKM29DZWW6Q32Y8D.json",
+        "sources": {
+          "coco": {
+            "map50": {
+              "value": 0.5175336760835249,
+              "ci_lo": 0.4970624912571096,
+              "ci_hi": 0.5670047254420149,
+              "boot_std": 0.017649699186795986,
+              "boot_mean": 0.5326713404787918
+            },
+            "map50_95": {
+              "value": 0.3736617241671026,
+              "ci_lo": 0.35518634297144724,
+              "ci_hi": 0.41672136357671197,
+              "boot_std": 0.015453508800047002,
+              "boot_mean": 0.386451879336521
+            },
+            "delta_map50": {
+              "value": -0.007992331953018628,
+              "ci_lo": -0.014743765415186199,
+              "ci_hi": -0.0006235372224336715,
+              "boot_std": 0.0036401148621787974,
+              "boot_mean": -0.007662092247868812
+            },
+            "delta_map50_95": {
+              "value": -0.0048379556936213874,
+              "ci_lo": -0.01039672690960804,
+              "ci_hi": -0.00006290368264400235,
+              "boot_std": 0.002628271942327412,
+              "boot_mean": -0.005243605709207831
+            },
+            "relative_change_map50_95": -0.012781603564207815
+          },
+          "mot17": {
+            "map50": {
+              "value": 0.6476618179264069,
+              "ci_lo": 0.6281067114710457,
+              "ci_hi": 0.6682277839935562,
+              "boot_std": 0.0103718383008855,
+              "boot_mean": 0.6489456479907224
+            },
+            "map50_95": {
+              "value": 0.39215517838754443,
+              "ci_lo": 0.375593825664114,
+              "ci_hi": 0.40865516028896254,
+              "boot_std": 0.008637957133368797,
+              "boot_mean": 0.39284365643221253
+            },
+            "delta_map50": {
+              "value": -0.019224677407405966,
+              "ci_lo": -0.024969720140912383,
+              "ci_hi": -0.011734576285691455,
+              "boot_std": 0.0034161610600296948,
+              "boot_mean": -0.018050901157764407
+            },
+            "delta_map50_95": {
+              "value": -0.010935422790454674,
+              "ci_lo": -0.015063023750423944,
+              "ci_hi": -0.006613801550285153,
+              "boot_std": 0.002174015885454565,
+              "boot_mean": -0.010843592607960383
+            },
+            "relative_change_map50_95": -0.027127822709523627
+          }
+        }
+      },
+      {
+        "name": "darken-0.25",
+        "drift": {
+          "kind": "darken",
+          "strength": 0.25,
+          "seed": 20261016
+        },
+        "run_id": "01M525GXDGBKXD3JPRBMG2284Q",
+        "results_file": "eval/results/2026-10-16-drift-map-cpu-darken-0.25-01M525GXDGBKXD3JPRBMG2284Q.json",
+        "sources": {
+          "coco": {
+            "map50": {
+              "value": 0.4940147792943146,
+              "ci_lo": 0.4762889096367962,
+              "ci_hi": 0.5459598714087943,
+              "boot_std": 0.017644393399778108,
+              "boot_mean": 0.5112192514519727
+            },
+            "map50_95": {
+              "value": 0.35501605371522194,
+              "ci_lo": 0.33960392812833,
+              "ci_hi": 0.3996120330017532,
+              "boot_std": 0.015072809851138881,
+              "boot_mean": 0.369438191064101
+            },
+            "delta_map50": {
+              "value": -0.031515277329728864,
+              "ci_lo": -0.04368624825685601,
+              "ci_hi": -0.014848533233763022,
+              "boot_std": 0.0074660296298986115,
+              "boot_mean": -0.02911392744738949
+            },
+            "delta_map50_95": {
+              "value": -0.02351667998967072,
+              "ci_lo": -0.033601901075670494,
+              "ci_hi": -0.011494014549837346,
+              "boot_std": 0.005615004445050669,
+              "boot_mean": -0.02228784145217812
+            },
+            "relative_change_map50_95": -0.06212972995404058
+          },
+          "mot17": {
+            "map50": {
+              "value": 0.6256414563518412,
+              "ci_lo": 0.6057351107185087,
+              "ci_hi": 0.6463353638227963,
+              "boot_std": 0.010360634694038785,
+              "boot_mean": 0.6266453440840486
+            },
+            "map50_95": {
+              "value": 0.3708860457175754,
+              "ci_lo": 0.35571657053312017,
+              "ci_hi": 0.3870723145402115,
+              "boot_std": 0.008264940507184475,
+              "boot_mean": 0.3716434470348195
+            },
+            "delta_map50": {
+              "value": -0.041253731759515744,
+              "ci_lo": -0.05109990206279303,
+              "ci_hi": -0.02974593410420745,
+              "boot_std": 0.005500976435558921,
+              "boot_mean": -0.04035027546578319
+            },
+            "delta_map50_95": {
+              "value": -0.03223113455352644,
+              "ci_lo": -0.039522818575638295,
+              "ci_hi": -0.024739830677971385,
+              "boot_std": 0.0037884113520451237,
+              "boot_mean": -0.0320730241890788
+            },
+            "relative_change_map50_95": -0.07995671686860423
+          }
+        }
+      },
+      {
+        "name": "blur-3",
+        "drift": {
+          "kind": "blur",
+          "strength": 3.0,
+          "seed": 20261016
+        },
+        "run_id": "01M525MCESK1FEMWTT6JSQBN55",
+        "results_file": "eval/results/2026-10-16-drift-map-cpu-blur-3-01M525MCESK1FEMWTT6JSQBN55.json",
+        "sources": {
+          "coco": {
+            "map50": {
+              "value": 0.4648623398130211,
+              "ci_lo": 0.44974278699744447,
+              "ci_hi": 0.5175470744544071,
+              "boot_std": 0.017529739435057007,
+              "boot_mean": 0.4827101462201715
+            },
+            "map50_95": {
+              "value": 0.33341584939118807,
+              "ci_lo": 0.3205172303037915,
+              "ci_hi": 0.3782204528875313,
+              "boot_std": 0.014598147408305768,
+              "boot_mean": 0.3485668085511881
+            },
+            "delta_map50": {
+              "value": -0.06067211641696135,
+              "ci_lo": -0.07843713012453539,
+              "ci_hi": -0.03851421569886577,
+              "boot_std": 0.010088227961300667,
+              "boot_mean": -0.057627374902591955
+            },
+            "delta_map50_95": {
+              "value": -0.04507463008609869,
+              "ci_lo": -0.05942462059774331,
+              "ci_hi": -0.02878701275252949,
+              "boot_std": 0.007898636826956542,
+              "boot_mean": -0.0431192195450663
+            },
+            "relative_change_map50_95": -0.11908460702180931
+          },
+          "mot17": {
+            "map50": {
+              "value": 0.5934028990385964,
+              "ci_lo": 0.5738502972619324,
+              "ci_hi": 0.6135953570275687,
+              "boot_std": 0.010190639651400801,
+              "boot_mean": 0.5945991470399863
+            },
+            "map50_95": {
+              "value": 0.35063945284402737,
+              "ci_lo": 0.3360945295244772,
+              "ci_hi": 0.3659381730802717,
+              "boot_std": 0.0077327857097250815,
+              "boot_mean": 0.3513874637385251
+            },
+            "delta_map50": {
+              "value": -0.07349026077246157,
+              "ci_lo": -0.08374883324436268,
+              "ci_hi": -0.06008037827263134,
+              "boot_std": 0.006120857536372955,
+              "boot_mean": -0.07239629166823781
+            },
+            "delta_map50_95": {
+              "value": -0.05238090284472491,
+              "ci_lo": -0.058708758620359625,
+              "ci_hi": -0.045879582380788674,
+              "boot_std": 0.0033567013270359523,
+              "boot_mean": -0.052227989851083026
+            },
+            "relative_change_map50_95": -0.12994283558719155
+          }
+        }
+      },
+      {
+        "name": "blur-6",
+        "drift": {
+          "kind": "blur",
+          "strength": 6.0,
+          "seed": 20261016
+        },
+        "run_id": "01M525QYMADWQXWVB9KDXKWMD8",
+        "results_file": "eval/results/2026-10-16-drift-map-cpu-blur-6-01M525QYMADWQXWVB9KDXKWMD8.json",
+        "sources": {
+          "coco": {
+            "map50": {
+              "value": 0.37023538506881126,
+              "ci_lo": 0.3526104105890978,
+              "ci_hi": 0.4229747867612866,
+              "boot_std": 0.01806563955498339,
+              "boot_mean": 0.3874389121325019
+            },
+            "map50_95": {
+              "value": 0.2605226810606958,
+              "ci_lo": 0.24543857675196745,
+              "ci_hi": 0.3015331067113964,
+              "boot_std": 0.014555604767372825,
+              "boot_mean": 0.27374028637922027
+            },
+            "delta_map50": {
+              "value": -0.1553070265043901,
+              "ci_lo": -0.177916964773209,
+              "ci_hi": -0.12921768666777006,
+              "boot_std": 0.012563481019619545,
+              "boot_mean": -0.15290448861833478
+            },
+            "delta_map50_95": {
+              "value": -0.11800955824488668,
+              "ci_lo": -0.1363990390593881,
+              "ci_hi": -0.10016750616096418,
+              "boot_std": 0.009156350470826783,
+              "boot_mean": -0.11798312728130929
+            },
+            "relative_change_map50_95": -0.31177453573254554
+          },
+          "mot17": {
+            "map50": {
+              "value": 0.4257764080195159,
+              "ci_lo": 0.4003539039285749,
+              "ci_hi": 0.4500682159904711,
+              "boot_std": 0.013000966089153961,
+              "boot_mean": 0.4260111520292402
+            },
+            "map50_95": {
+              "value": 0.2323265399194629,
+              "ci_lo": 0.2193561673236664,
+              "ci_hi": 0.24674361026791802,
+              "boot_std": 0.00709713147261498,
+              "boot_mean": 0.23269790861090242
+            },
+            "delta_map50": {
+              "value": -0.2411311117868018,
+              "ci_lo": -0.261886306750995,
+              "ci_hi": -0.22014268901500614,
+              "boot_std": 0.010903194791716022,
+              "boot_mean": -0.2409856632748136
+            },
+            "delta_map50_95": {
+              "value": -0.17082862826761286,
+              "ci_lo": -0.18596989841117706,
+              "ci_hi": -0.15518500266779708,
+              "boot_std": 0.007717343499414023,
+              "boot_mean": -0.17104731901517736
+            },
+            "relative_change_map50_95": -0.42377956757191243
+          }
+        }
+      },
+      {
+        "name": "noise-10",
+        "drift": {
+          "kind": "noise",
+          "strength": 10.0,
+          "seed": 20261016
+        },
+        "run_id": "01M525VHK918XMKBAVGZ63Y6EB",
+        "results_file": "eval/results/2026-10-16-drift-map-cpu-noise-10-01M525VHK918XMKBAVGZ63Y6EB.json",
+        "sources": {
+          "coco": {
+            "map50": {
+              "value": 0.47997622414535895,
+              "ci_lo": 0.4634138794801977,
+              "ci_hi": 0.5307337547075489,
+              "boot_std": 0.01699186803608812,
+              "boot_mean": 0.49688695821459467
+            },
+            "map50_95": {
+              "value": 0.34763146827930125,
+              "ci_lo": 0.33164315363608327,
+              "ci_hi": 0.3912113675516725,
+              "boot_std": 0.014829318290435255,
+              "boot_mean": 0.36144382471357006
+            },
+            "delta_map50": {
+              "value": -0.045567950923285805,
+              "ci_lo": -0.058810563998568356,
+              "ci_hi": -0.028771507691681422,
+              "boot_std": 0.007583442211100629,
+              "boot_mean": -0.04346387317118939
+            },
+            "delta_map50_95": {
+              "value": -0.030901755360927263,
+              "ci_lo": -0.041462441292068414,
+              "ci_hi": -0.019261135419381514,
+              "boot_std": 0.005665371873119218,
+              "boot_mean": -0.030277312666739213
+            },
+            "relative_change_map50_95": -0.08164067872350715
+          },
+          "mot17": {
+            "map50": {
+              "value": 0.6598434911411375,
+              "ci_lo": 0.6409425642911887,
+              "ci_hi": 0.6799966393058914,
+              "boot_std": 0.009779218415233206,
+              "boot_mean": 0.6617615381977363
+            },
+            "map50_95": {
+              "value": 0.3953689763535803,
+              "ci_lo": 0.3803207507521532,
+              "ci_hi": 0.4111311121031015,
+              "boot_std": 0.007781543496314552,
+              "boot_mean": 0.3964428333782255
+            },
+            "delta_map50": {
+              "value": -0.007053078318311035,
+              "ci_lo": -0.012172408636014752,
+              "ci_hi": 0.0012578703492871117,
+              "boot_std": 0.0034795440139388225,
+              "boot_mean": -0.005234075209075061
+            },
+            "delta_map50_95": {
+              "value": -0.007675879472611946,
+              "ci_lo": -0.010588382544695593,
+              "ci_hi": -0.003765204640297923,
+              "boot_std": 0.0017583440448847149,
+              "boot_mean": -0.007158864488907773
+            },
+            "relative_change_map50_95": -0.019041778398769235
+          }
+        }
+      },
+      {
+        "name": "noise-25",
+        "drift": {
+          "kind": "noise",
+          "strength": 25.0,
+          "seed": 20261016
+        },
+        "run_id": "01M525ZAXWAXA56F2T54CRD9T6",
+        "results_file": "eval/results/2026-10-16-drift-map-cpu-noise-25-01M525ZAXWAXA56F2T54CRD9T6.json",
+        "sources": {
+          "coco": {
+            "map50": {
+              "value": 0.35463193304566043,
+              "ci_lo": 0.34042569142447937,
+              "ci_hi": 0.4030431354820728,
+              "boot_std": 0.016036667294673096,
+              "boot_mean": 0.3718405181750741
+            },
+            "map50_95": {
+              "value": 0.2492526347585871,
+              "ci_lo": 0.23678568430204056,
+              "ci_hi": 0.28945810978749614,
+              "boot_std": 0.013492444576833885,
+              "boot_mean": 0.26306508854880617
+            },
+            "delta_map50": {
+              "value": -0.17089967328716577,
+              "ci_lo": -0.19397808390150797,
+              "ci_hi": -0.143043777211601,
+              "boot_std": 0.013002000944832968,
+              "boot_mean": -0.1684930648094736
+            },
+            "delta_map50_95": {
+              "value": -0.12925549950301216,
+              "ci_lo": -0.14848501138043474,
+              "ci_hi": -0.1088825716836024,
+              "boot_std": 0.00999545840987935,
+              "boot_mean": -0.12863277388163022
+            },
+            "relative_change_map50_95": -0.34148567241311584
+          },
+          "mot17": {
+            "map50": {
+              "value": 0.600244403580895,
+              "ci_lo": 0.5793255413122168,
+              "ci_hi": 0.6208119483092928,
+              "boot_std": 0.010516538402488812,
+              "boot_mean": 0.6011273328248111
+            },
+            "map50_95": {
+              "value": 0.34314295814265605,
+              "ci_lo": 0.32853639118513583,
+              "ci_hi": 0.3581073307633929,
+              "boot_std": 0.0075760472103404575,
+              "boot_mean": 0.34386364773775063
+            },
+            "delta_map50": {
+              "value": -0.06664698745949393,
+              "ci_lo": -0.08165345731672649,
+              "ci_hi": -0.05053710654477086,
+              "boot_std": 0.007908989868212837,
+              "boot_mean": -0.06586895315279223
+            },
+            "delta_map50_95": {
+              "value": -0.05996130212215178,
+              "ci_lo": -0.07028996392957781,
+              "ci_hi": -0.048990218805152475,
+              "boot_std": 0.00540631459493969,
+              "boot_mean": -0.05982435881583813
+            },
+            "relative_change_map50_95": -0.1487477534770546
+          }
+        }
+      }
+    ]
+  },
+  "cost_usd": 0.0,
+  "notes": "Each condition applies one photometric transform (vms.drift.transforms) at full strength to every image; delta = drifted - clean, paired percentile bootstrap over images with the same resamples. Augmentation is not real domain shift: real night, rain or defocus also change colour, motion blur and compression in ways these transforms do not."
+}
