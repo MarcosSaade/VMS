@@ -240,7 +240,7 @@ def test_detector_alarms_on_the_drift_and_counts_one_onset() -> None:
     for t in range(100, 125, 5):  # clean windows
         at(t)
     assert sample("alarm_value") == 0
-    assert sample("cusum_value") == 0
+    assert sample("detector_statistic_value") == 0  # S drains to 0 on clean windows
     for t in range(155, 180, 5):  # dark from 120 s: z about -40 per update
         at(t)
     assert sample("alarm_value") == 1
@@ -248,6 +248,15 @@ def test_detector_alarms_on_the_drift_and_counts_one_onset() -> None:
     z = sample("z_value")
     assert z is not None
     assert z < -20
+    assert sample("detector_statistic_value") == 20  # S capped at cap * h
+    assert metrics.registry.get_sample_value("vms_drift_detector_h_value") == 10
+    # CUSUM has no fixed band in the signal's units
+    assert (
+        metrics.registry.get_sample_value(
+            "vms_drift_band_value", {"camera_id": "cam-1", "signal": "brightness", "bound": "upper"}
+        )
+        is None
+    )
 
 
 def test_detector_skips_partly_filled_windows() -> None:
@@ -293,3 +302,63 @@ def test_detector_skips_partly_filled_windows() -> None:
     assert math.isnan(z)
     at(238)  # a full window of the dark stream
     assert metrics.registry.get_sample_value("vms_drift_alarm_value", labels) == 1
+
+
+def test_threshold_detector_exports_its_statistic_and_the_alarm_band() -> None:
+    from vms.drift.detect import Calibration, ChannelCalibration, DetectorSettings
+
+    store = clean_then_dark()
+    clock = FakeClock(T0)
+    metrics = Metrics("drift")
+    cal = Calibration(channels={"shift:brightness": ChannelCalibration(mean=0.1, std=0.5)})
+    monitor = DriftMonitor(
+        store,
+        SETTINGS,
+        SignalSettings(),
+        metrics,
+        clock=clock,
+        detector=DetectorSettings(kind="threshold", h=10),
+        calibration=cal,
+    )
+
+    def at(seconds: float) -> None:
+        clock.set(T0 + timedelta(seconds=seconds))
+        asyncio.run(monitor.update())
+
+    def get(name: str, **labels: str) -> float:
+        value = metrics.registry.get_sample_value(f"vms_drift_{name}", labels)
+        assert value is not None, (name, labels)
+        return value
+
+    at(20)
+    at(100)
+    channel = {"camera_id": "cam-1", "channel": "shift:brightness"}
+    signal = {"camera_id": "cam-1", "signal": "brightness"}
+    assert get("detector_statistic_value", **channel) == pytest.approx(
+        abs(get("z_value", **channel))
+    )
+    assert get("detector_h_value") == 10
+    ref_mean = get("reference_mean_value", **signal)
+    scale = max(get("reference_std_value", **signal), SignalSettings().min_std["brightness"])
+    lower = get("band_value", bound="lower", **signal)
+    upper = get("band_value", bound="upper", **signal)
+    assert lower == pytest.approx(ref_mean + scale * (0.1 - 10 * 0.5))
+    assert upper == pytest.approx(ref_mean + scale * (0.1 + 10 * 0.5))
+    # the band is where the alarm flips: a clean window mean is inside it
+    assert lower < get("window_mean_value", **signal) < upper
+    assert get("alarm_value", **channel) == 0
+    # The onset counter exists at 0 before the first alarm, or Prometheus' increase() would
+    # miss that alarm (a series that appears at 1 has no earlier sample to increase from).
+    assert get("alarms_total", **channel) == 0
+    for t in range(155, 180, 5):  # 40 levels darker from 120 s
+        at(t)
+    assert get("window_mean_value", **signal) < get("band_value", bound="lower", **signal)
+    assert get("alarm_value", **channel) == 1
+    assert get("alarms_total", **channel) == 1
+    # channels without calibration get no band
+    assert (
+        metrics.registry.get_sample_value(
+            "vms_drift_band_value", {"camera_id": "cam-1", "signal": "noise", "bound": "upper"}
+        )
+        is None
+    )

@@ -6,6 +6,9 @@
 // Chromium binary. `from` and `to` are Grafana time range values (default now-15m, now), for
 // example Unix milliseconds of a run. Dashboards are opened in kiosk mode (no menus) as the
 // anonymous viewer, in the light theme, at a size that fits each dashboard without scrolling.
+// The Drift dashboard repeats a row per camera: DRIFT_CAMERAS=cam-a,cam-b picks the cameras
+// (default: all cameras with data in the range, and only the first camera's row fits the
+// screenshot).
 
 import { mkdirSync, readFileSync } from "node:fs";
 
@@ -13,12 +16,15 @@ import { chromium } from "playwright-core";
 
 const [base = "http://localhost:3000", outDir = "screenshots", from = "now-15m", to = "now"] =
   process.argv.slice(2);
+const only = process.env.DASHBOARDS?.split(",");
 const dashboards = [
   ["vms-pipeline", "grafana-pipeline.png"],
   ["vms-inference", "grafana-inference.png"],
   ["vms-query", "grafana-query.png"],
   ["vms-resources", "grafana-resources.png"],
+  ["vms-drift", "grafana-drift.png"],
 ];
+const driftCameras = (process.env.DRIFT_CAMERAS ?? "").split(",").filter(Boolean);
 const HEADER_PX = 90; // kiosk mode's dashboard controls and bottom margin
 const executablePath = process.env.CHROMIUM_PATH;
 if (!executablePath) throw new Error("set CHROMIUM_PATH to a Chromium or Chrome binary");
@@ -26,17 +32,23 @@ if (!executablePath) throw new Error("set CHROMIUM_PATH to a Chromium or Chrome 
 mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({ executablePath });
 const errors = [];
-for (const [uid, file] of dashboards) {
+for (const [uid, file] of dashboards.filter(([u]) => !only || only.includes(u))) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   page.on("console", (m) => m.type() === "error" && errors.push(`${uid}: ${m.text()}`));
   const query = new URLSearchParams({ kiosk: "true", theme: "light", from, to });
+  if (uid === "vms-drift") for (const c of driftCameras) query.append("var-camera", c);
   await page.goto(`${base}/d/${uid}?${query}`, { waitUntil: "networkidle" });
   await page.waitForSelector(".react-grid-layout", { timeout: 30_000 });
   // Grafana scrolls inside its own container and renders panels lazily, so the window is
   // sized to the whole grid up front, from the dashboard JSON: 30 px rows plus 8 px margins.
   const json = new URL(`../../deploy/grafana/dashboards/${uid.slice(4)}.json`, import.meta.url);
   const grid = JSON.parse(readFileSync(json, "utf8"));
-  const units = Math.max(...grid.panels.map((p) => p.gridPos.y + p.gridPos.h));
+  let units = Math.max(...grid.panels.map((p) => p.gridPos.y + p.gridPos.h));
+  // A repeated row (the last one) appears once per selected value.
+  const repeated = grid.panels.find((p) => p.type === "row" && p.repeat);
+  if (repeated && driftCameras.length > 1) {
+    units += (driftCameras.length - 1) * (units - repeated.gridPos.y);
+  }
   await page.setViewportSize({ width: 1600, height: HEADER_PX + units * 38 });
   await page.waitForTimeout(5000); // let every panel finish its queries and draw
   const noData = await page.locator("text=No data").count();

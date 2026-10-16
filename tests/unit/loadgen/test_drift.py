@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from concurrent.futures import Executor, Future
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -16,6 +16,7 @@ from tests.unit.loadgen.conftest import ScriptedTransport, fake_clip
 from vms.common.clock import FakeClock
 from vms.datasets.clips import decode_jpeg, encode_jpeg
 from vms.loadgen.drift import (
+    ONSET_TAG,
     DriftEvent,
     DriftInjectionSettings,
     active_clip,
@@ -173,3 +174,42 @@ def test_a_failed_render_counts_as_a_failed_send(vrun: VRun, recorder: Recorder)
     frames = recorder.summary(2.0, 10.0)["frames"]
     assert frames["failed"] == 10  # cam-001: every frame drifted and failed
     assert frames["accepted"] == 10  # cam-002 unaffected
+
+
+def test_onset_annotation_is_a_point_if_abrupt_and_the_ramp_if_gradual() -> None:
+    settings = DriftInjectionSettings(
+        events=[
+            event(cameras=[0], onset_s=10, strength=0.3),
+            event(cameras=[1], onset_s=20, ramp_s=120, strength=0.3),
+            event(kind="switch_clip", cameras=[2], strength=None, clip="b", onset_s=30),
+        ]
+    )
+    drift = schedule_drift(settings, PLANS, seed=1)
+    abrupt = drift["cam-001"][0].annotation(START, "run-r0")
+    assert abrupt.time == START + timedelta(seconds=10)
+    assert abrupt.time_end is None
+    assert abrupt.tags == (ONSET_TAG, "darken", "cam-001")
+    assert abrupt.text == "Injected darken on cam-001 (strength 0.3, abrupt); run run-r0"
+    gradual = drift["cam-002"][0].annotation(START, "run-r0")
+    assert gradual.time_end is not None
+    assert gradual.time_end - gradual.time == timedelta(seconds=120)
+    assert "ramp 120 s" in gradual.text
+    switch = drift["cam-003"][0].annotation(START, "run-r0")
+    assert "clip b" in switch.text
+
+
+def test_runner_reports_its_time_zero_to_on_start(vrun: VRun, recorder: Recorder) -> None:
+    started: list[datetime] = []
+    s = LoadgenSettings(fps=5.0, duration_s=1.0, warmup_s=0.0, cameras=1)
+    runner = Runner(
+        s,
+        PLANS[:1],
+        {"real": real_clip()},
+        ScriptedTransport(),
+        recorder,
+        clock=FakeClock(START),
+        run_id="r",
+        on_start=started.append,
+    )
+    vrun(runner.run())
+    assert started == [START]

@@ -68,6 +68,7 @@ class Runner:
         process_time: Callable[[], float] = time.process_time,
         drift: Mapping[str, Sequence[ScheduledDrift]] | None = None,
         render_executor: Executor | None = None,
+        on_start: Callable[[datetime], None] | None = None,
     ) -> None:
         self._s = settings
         self._plans = plans
@@ -83,6 +84,7 @@ class Runner:
         self._drift = drift or {}
         self._render_executor = render_executor
         self._owns_executor = render_executor is None
+        self._on_start = on_start  # called with the schedule's wall-clock time zero
         self.render_s: list[float] = []  # time to transform and re-encode each drifted frame
 
     def stop(self) -> None:
@@ -98,6 +100,8 @@ class Runner:
         cpu0 = self._process_time()
         wall0 = self._clock.now()
         t0 = loop.time()
+        if self._on_start is not None:
+            self._on_start(wall0)
         body = self._paced if self._s.mode == "paced" else self._unpaced
         cameras = [asyncio.create_task(body(plan, t0, wall0)) for plan in self._plans]
         try:

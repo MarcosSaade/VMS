@@ -20,7 +20,7 @@ import asyncio
 import random
 import signal
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -35,14 +35,21 @@ from vms.common.clock import SystemClock
 from vms.common.ids import new_ulid
 from vms.common.observability import Observability, init_observability
 from vms.common.settings import deep_merge, load_settings
-from vms.loadgen.drift import schedule_drift
+from vms.loadgen.drift import ScheduledDrift, schedule_drift
 from vms.loadgen.frames import LoadedClip, load_clip
 from vms.loadgen.recorder import Recorder
 from vms.loadgen.runner import Runner
 from vms.loadgen.schedule import plan_cameras
-from vms.loadgen.settings import LoadgenSettings
+from vms.loadgen.settings import AnnotationSettings, LoadgenSettings
 from vms.loadgen.stub import serve
 from vms.loadgen.transport import HttpTransport, NullTransport, RetryingTransport, Transport
+from vms.observe.annotations import (
+    AnnotationSink,
+    GrafanaAnnotations,
+    GrafanaSettings,
+    PostResult,
+    post_all,
+)
 
 SERVICE = "loadgen"
 # Summary fields aggregated across repetitions (dotted paths into a repetition's summary).
@@ -159,6 +166,12 @@ async def _repetition(
     drift = schedule_drift(settings.drift, plans, seed)
     recorder = Recorder(obs.metrics, settings.warmup_s)
     transport = _transport(settings, kind, random.Random(seed))
+    rep_id = f"{run_id}-r{rep}"
+    annotate = (
+        _onset_annotator(settings, drift, rep_id, random.Random(seed))
+        if drift and kind == "run" and settings.annotations.enabled
+        else None
+    )
     runner = Runner(
         settings,
         plans,
@@ -166,9 +179,10 @@ async def _repetition(
         transport,
         recorder,
         clock=SystemClock(),
-        run_id=f"{run_id}-r{rep}",
+        run_id=rep_id,
         tracer=obs.tracer,
         drift=drift,
+        on_start=annotate.start if annotate else None,
     )
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -179,6 +193,7 @@ async def _repetition(
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.remove_signal_handler(sig)
         await transport.aclose()
+        annotations = await annotate.result() if annotate else None
 
     steady_s = max(0.0, min(timing.elapsed_s, settings.duration_s) - settings.warmup_s)
     paced = settings.mode == "paced" and kind == "run"
@@ -202,6 +217,8 @@ async def _repetition(
             "events": [e.record(wall0) for events in drift.values() for e in events],
             "rendered_frames": len(runner.render_s),
             "render_ms": stats.percentiles_ms(runner.render_s),
+            # Onset markers posted to Grafana (task 9.4); null when disabled.
+            "annotations": annotations.summary() if annotations else None,
         }
         summary["cameras"] = {p.camera_id: p.clip_id for p in plans}
     lag_p99 = summary["schedule_lag_ms"]["p99"]
@@ -213,6 +230,59 @@ async def _repetition(
         )
     obs.logger.info("repetition done", extra={"rep": rep, **_headline(summary)})
     return summary, runner.stopped
+
+
+class _OnsetAnnotator:
+    """Posts a repetition's drift onsets to Grafana in the background once its time zero is
+    known (`start`, called by the runner), so the markers appear while the run is live."""
+
+    def __init__(
+        self,
+        sink: AnnotationSink,
+        drift: Mapping[str, Sequence[ScheduledDrift]],
+        run_id: str,
+        settings: AnnotationSettings,
+        rng: random.Random,
+    ) -> None:
+        self._sink = sink
+        self._drift = drift
+        self._run_id = run_id
+        self._settings = settings
+        self._rng = rng
+        self._task: asyncio.Task[PostResult] | None = None
+
+    def start(self, wall0: datetime) -> None:
+        annotations = [
+            e.annotation(wall0, self._run_id) for events in self._drift.values() for e in events
+        ]
+        s = self._settings
+        self._task = asyncio.create_task(
+            post_all(
+                self._sink,
+                annotations,
+                max_retries=s.max_retries,
+                base_s=s.retry_base_s,
+                max_s=s.retry_max_s,
+                rng=self._rng,
+            ),
+            name="drift-annotations",
+        )
+
+    async def result(self) -> PostResult | None:
+        try:
+            return await self._task if self._task is not None else None
+        finally:
+            await self._sink.aclose()
+
+
+def _onset_annotator(
+    settings: LoadgenSettings,
+    drift: Mapping[str, Sequence[ScheduledDrift]],
+    run_id: str,
+    rng: random.Random,
+) -> _OnsetAnnotator:
+    sink = GrafanaAnnotations(GrafanaSettings(), timeout_s=settings.annotations.timeout_s)
+    return _OnsetAnnotator(sink, drift, run_id, settings.annotations, rng)
 
 
 def _headline(summary: dict[str, Any]) -> dict[str, Any]:

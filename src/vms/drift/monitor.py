@@ -14,14 +14,18 @@ Every `update_every_s`, `update`:
 5. Compares window and reference (vms.drift.signals) and sets the gauges.
 6. If a detector and its clean-run calibration are configured (task 9.3), standardizes each
    channel, updates the camera's detector (vms.drift.detect) and exports each channel's z,
-   its CUSUM statistic and whether it alarms; Prometheus alert rules fire on the alarm gauge
-   (deploy/compose/prometheus/rules/drift.yml). A camera's detector restarts when its
+   the detector statistic it compares with h (threshold: |z|; CUSUM: S) and whether it
+   alarms; Prometheus alert rules fire on the alarm gauge
+   (deploy/compose/prometheus/rules/drift.yml). For the threshold detector it also exports
+   each signal's alarm band in the signal's own units (the window means at which the shift
+   channel would alarm), which the Drift dashboard draws around the window mean (task 9.4).
+   A camera's detector restarts when its
    reference changes. Windows whose frames span less than `detect_min_coverage` of
    `window_s` (a camera starting, resuming or stopping) are not fed to the detector.
 
 Gauges carry `camera_id` (and `signal`); an undefined statistic (too few frames or
 detections) is exported as NaN, which Prometheus stores and Grafana draws as a gap, so "no
-data" never looks like "no drift". Alerting on these gauges is task 9.3.
+data" never looks like "no drift".
 
 The monitor is one process for every camera: it is independent of which worker holds which
 camera, and it only reads aggregates' raw inputs that the worker already stores. Its cost is
@@ -39,7 +43,13 @@ from datetime import datetime, timedelta
 from vms.common.clock import Clock
 from vms.common.logs import get_logger
 from vms.common.metrics import Metrics
-from vms.drift.detect import Calibration, CameraDetector, DetectorSettings, channel_values
+from vms.drift.detect import (
+    Calibration,
+    CameraDetector,
+    ChannelDetector,
+    DetectorSettings,
+    channel_values,
+)
 from vms.drift.settings import MonitorSettings
 from vms.drift.signals import (
     SIGNALS,
@@ -134,11 +144,20 @@ class DriftMonitor:
         self._z = metrics.gauge(
             "z", "value", "Channel statistic standardized by its clean-run calibration", channel
         )
-        self._cusum = metrics.gauge(
-            "cusum",
+        self._statistic = metrics.gauge(
+            "detector_statistic",
             "value",
-            "Detector statistic (CUSUM S, larger side); 0 for a threshold",
+            "What the detector compares with h: |z| (z if one-sided) for a threshold, "
+            "the larger CUSUM S for cusum",
             channel,
+        )
+        self._h = metrics.gauge("detector_h", "value", "The detector's decision threshold h")
+        self._band = metrics.gauge(
+            "band",
+            "value",
+            "Window mean at which the signal's shift channel alarms (threshold detector "
+            "only), in the signal's units",
+            ["camera_id", "signal", "bound"],
         )
         self._alarm = metrics.gauge(
             "alarm", "value", "1 while the channel's detector alarms, else 0", channel
@@ -155,6 +174,8 @@ class DriftMonitor:
         self._duration = metrics.histogram(
             "update_duration", "seconds", "Time per monitor update", buckets=UPDATE_BUCKETS_S
         )
+        if self._detector is not None:
+            self._h.set(self._detector.h)
 
     async def run(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
@@ -282,10 +303,35 @@ class DriftMonitor:
             self._reference_mean.labels(**labels).set(reference.mean(signal))
             self._reference_std.labels(**labels).set(reference.std(signal))
             self._shift.labels(**labels).set(stats.shift.get(signal, math.nan))
+            self._export_band(camera_id, signal, reference)
         self._ks.labels(camera_id=camera_id).set(stats.confidence_ks)
         self._w1.labels(camera_id=camera_id).set(stats.confidence_wasserstein)
         self._psi.labels(camera_id=camera_id).set(stats.class_psi)
         self._detect(camera_id, stats, full)
+
+    def _export_band(self, camera_id: str, signal: str, reference: Sample) -> None:
+        """The window means at which `shift:<signal>` alarms: |z| = h with z = (shift - mu) /
+        sigma and shift = (mean - ref mean) / max(ref std, min_std), solved for the mean. Only
+        the threshold detector has a fixed band (CUSUM depends on its history)."""
+        det, cal = self._detector, self._calibration
+        channel = f"shift:{signal}"
+        if det is None or cal is None or det.kind != "threshold":
+            return
+        c = cal.channels.get(channel)
+        if c is None or channel not in det.channels:
+            return
+        scale = max(reference.std(signal), self._signals.min_std[signal])
+        mean = reference.mean(signal)
+        for bound, z in (("lower", -det.h), ("upper", det.h)):
+            self._band.labels(camera_id=camera_id, signal=signal, bound=bound).set(
+                mean + scale * (c.mean + z * c.std)
+            )
+
+    @staticmethod
+    def _detector_statistic(settings: DetectorSettings, cd: ChannelDetector, z: float) -> float:
+        if settings.kind == "cusum":
+            return cd.statistic
+        return abs(z) if cd.two_sided else z
 
     def _detect(self, camera_id: str, stats: DriftStatistics, full: bool) -> None:
         """A partly filled window (`full` false) counts as undefined: the state is kept and
@@ -295,14 +341,17 @@ class DriftMonitor:
         det = self._detectors.get(camera_id)
         if det is None:
             det = self._detectors[camera_id] = CameraDetector(self._detector, self._calibration)
+            for channel in det.channels:  # from 0, so increase() sees the first onset
+                self._alarms.labels(camera_id=camera_id, channel=channel)
         values = channel_values(stats)
         if not full:
             values = dict.fromkeys(values, math.nan)
         firing = set(det.update(values))
         for channel, cd in det.channels.items():
             labels = {"camera_id": camera_id, "channel": channel}
-            self._z.labels(**labels).set(self._calibration.z(channel, values[channel]))
-            self._cusum.labels(**labels).set(cd.statistic)
+            z = self._calibration.z(channel, values[channel])
+            self._z.labels(**labels).set(z)
+            self._statistic.labels(**labels).set(self._detector_statistic(self._detector, cd, z))
             self._alarm.labels(**labels).set(1 if channel in firing else 0)
             key = (camera_id, channel)
             was = key in self._alarming

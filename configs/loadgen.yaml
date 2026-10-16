@@ -36,6 +36,13 @@ stub:
   reject_ratio: 0.0
   workers: 1                         # processes sharing the port; >1 for max-rate runs
 
+annotations:                         # Grafana markers for injected drift onsets (GRAFANA_* in .env)
+  enabled: true                      # best effort: without Grafana, a warning and no markers
+  timeout_s: 3.0
+  max_retries: 2
+  retry_base_s: 0.2
+  retry_max_s: 2.0
+
 metrics_port: 9105                   # Prometheus /metrics while running; null disables
 results_dir: bench/results
 

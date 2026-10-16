@@ -69,6 +69,17 @@ class StubSettings(_Section):
     workers: int = Field(default=1, ge=1)
 
 
+class AnnotationSettings(_Section):
+    """Grafana annotations for injected drift onsets (vms.observe.annotations). Best effort:
+    a run without Grafana only logs a warning. The URL and credentials come from GRAFANA_*."""
+
+    enabled: bool = True
+    timeout_s: float = Field(default=3.0, gt=0)
+    max_retries: int = Field(default=2, ge=0, le=10)
+    retry_base_s: float = Field(default=0.2, gt=0)
+    retry_max_s: float = Field(default=2.0, gt=0)
+
+
 class LoadgenSettings(ServiceSettings):
     target_url: str = "http://127.0.0.1:8080"
     # paced: each camera sends at `fps` on a fixed schedule (open loop), the normal mode.
@@ -89,6 +100,8 @@ class LoadgenSettings(ServiceSettings):
     stub: StubSettings = Field(default_factory=StubSettings)
     # Scheduled, seeded drift on some cameras (task 9.2, vms.loadgen.drift); none by default.
     drift: DriftInjectionSettings = Field(default_factory=DriftInjectionSettings)
+    # Onset markers on the dashboards (task 9.4); only runs with drift events post any.
+    annotations: AnnotationSettings = Field(default_factory=AnnotationSettings)
     # Prometheus /metrics while running; null disables.
     metrics_port: int | None = Field(default=9105, ge=1, le=65535)
     results_dir: Path = Path("bench/results")

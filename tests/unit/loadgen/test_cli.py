@@ -64,3 +64,35 @@ def test_scenario_file_round_trip(tmp_path: Path) -> None:
     path = tmp_path / "s.yaml"
     path.write_text(yaml.safe_dump({"name": "s", "kind": "selftest", "repeats": 3}))
     assert load_scenario(path) == Scenario(name="s", kind="selftest", repeats=3)
+
+
+def test_onset_annotator_posts_every_event_from_the_run_start_and_closes() -> None:
+    import asyncio
+    import random
+    from datetime import UTC, datetime, timedelta
+
+    from tests.unit.observe.test_annotations import ScriptedSink
+    from vms.loadgen.cli import _OnsetAnnotator
+    from vms.loadgen.drift import DriftEvent, DriftInjectionSettings, schedule_drift
+    from vms.loadgen.schedule import CameraPlan
+    from vms.loadgen.settings import AnnotationSettings
+    from vms.observe.annotations import AnnotationError, PostResult
+
+    plans = [CameraPlan(f"cam-00{i}", "c", 0, 0.0) for i in (1, 2)]
+    events = DriftInjectionSettings(
+        events=[DriftEvent(kind="blur", cameras=[0, 1], onset_s=5, strength=3)]
+    )
+    drift = schedule_drift(events, plans, seed=1)
+    sink = ScriptedSink([AnnotationError("http 403", retryable=False)])
+    annotator = _OnsetAnnotator(sink, drift, "run-r0", AnnotationSettings(), random.Random(0))
+    wall0 = datetime(2026, 10, 16, tzinfo=UTC)
+
+    async def go() -> PostResult | None:
+        annotator.start(wall0)
+        return await annotator.result()
+
+    result = asyncio.run(go())
+    assert result is not None
+    assert result.summary() == {"posted": 1, "failed": 1, "errors": ["http 403"]}
+    assert [a.time for a in sink.attempts] == [wall0 + timedelta(seconds=5)] * 2
+    assert sink.closed

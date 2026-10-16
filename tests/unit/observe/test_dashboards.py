@@ -14,6 +14,10 @@ from vms.common.clock import FakeClock
 from vms.common.ids import UlidGenerator
 from vms.common.metrics import Metrics
 from vms.common.probes import create_probe_app
+from vms.drift.detect import Calibration, DetectorSettings
+from vms.drift.monitor import DriftMonitor
+from vms.drift.settings import MonitorSettings
+from vms.drift.signals import SignalSettings
 from vms.ingest.app import create_app as ingest_app
 from vms.ingest.service import FrameIngestor
 from vms.ingest.settings import FrameLimits
@@ -83,7 +87,22 @@ def declared_metrics() -> set[str]:
         logger=MagicMock(),
     )
     query_app(MagicMock(), MagicMock(), MagicMock(), MagicMock(), query, ready_checks={})
-    return families(ingest.registry) | families(worker.registry) | families(query.registry)
+    drift = Metrics("drift")
+    DriftMonitor(
+        MagicMock(),
+        MonitorSettings(),
+        SignalSettings(),
+        drift,
+        clock=clock,
+        detector=DetectorSettings(),
+        calibration=Calibration(channels={}),
+    )
+    return (
+        families(ingest.registry)
+        | families(worker.registry)
+        | families(query.registry)
+        | families(drift.registry)
+    )
 
 
 def test_committed_json_matches_the_code(tmp_path: Path) -> None:
@@ -145,6 +164,36 @@ def test_dashboards_have_unique_uids_and_link_to_each_other() -> None:
         assert "vms" in data["tags"]
 
 
-def test_only_gpu_and_placeholder_panels_may_be_empty() -> None:
+def test_only_gpu_panels_may_be_empty() -> None:
     optional = {p.title for d in DASHBOARDS for p in d.panels() if p.optional}
-    assert optional == {"GPU utilization", "GPU memory used", "What goes here"}
+    assert optional == {"GPU utilization", "GPU memory used"}
+
+
+def test_variables_are_replaced_for_the_telemetry_check() -> None:
+    drift = next(d for d in DASHBOARDS if d.uid == "vms-drift")
+    exprs = [expr for _, expr in panel_queries(drift)]
+    assert exprs
+    assert all("$camera" not in e for e in exprs)
+    assert any('camera_id=~".+"' in e for e in exprs)
+    assert dashboard_json(drift)["templating"]["list"][0]["name"] == "camera"
+
+
+def test_drift_dashboard_repeats_a_row_per_camera_and_marks_onsets_and_alarms() -> None:
+    from vms.loadgen.drift import ONSET_TAG
+
+    data = dashboard_json(next(d for d in DASHBOARDS if d.uid == "vms-drift"))
+    repeated = [p for p in data["panels"] if p.get("repeat") == "camera"]
+    assert len(repeated) == 1
+    assert repeated[0]["type"] == "row"
+    annotations = {a["name"]: a for a in data["annotations"]["list"]}
+    assert annotations["Injected drift onsets"]["target"]["tags"] == [ONSET_TAG]
+    assert "vms_drift_alarm_value" in annotations["Drift alarms"]["expr"]
+
+
+def test_bands_fill_between_series_that_exist_in_the_panel() -> None:
+    for d in DASHBOARDS:
+        for p in d.panels():
+            legends = {t.legend for t in p.targets}
+            for t in p.targets:
+                if t.fill_below_to:
+                    assert t.fill_below_to in legends, p.title

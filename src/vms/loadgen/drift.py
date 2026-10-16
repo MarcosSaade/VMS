@@ -13,6 +13,10 @@ on (a class-mix change: the same camera now sees another scene). Frames before t
 sent exactly as without drift; transformed frames are decoded, transformed and re-encoded at
 `frame.jpeg_quality` in a thread pool (see vms.loadgen.runner).
 
+Each event is also posted to Grafana as an annotation when the repetition starts
+(`ScheduledDrift.annotation`, task 9.4), so the Drift dashboard marks the onset that an
+alarm should answer.
+
 Noise is drawn from a generator seeded per camera and frame, and the occluder's position per
 camera, so a repetition's pixels are reproducible from its seed.
 """
@@ -31,6 +35,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from vms.datasets.clips import decode_jpeg, encode_jpeg
 from vms.drift.transforms import TransformKind, apply, check_strength
 from vms.loadgen.schedule import CameraPlan
+from vms.observe.annotations import Annotation
+
+# Grafana tag of onset annotations; the Drift dashboard queries it (vms.observe.dashboards).
+ONSET_TAG = "drift-onset"
 
 DriftKind = Literal["darken", "blur", "noise", "shift", "occlusion", "switch_clip"]
 
@@ -103,6 +111,18 @@ class ScheduledDrift:
             "strength": self.strength,
             "clip": self.clip,
         }
+
+    def annotation(self, wall0: datetime, run_id: str) -> Annotation:
+        """The onset marker for the dashboards: a point if abrupt, the ramp as a region."""
+        onset = wall0 + timedelta(seconds=self.onset_s)
+        what = f"clip {self.clip}" if self.kind == "switch_clip" else f"strength {self.strength:g}"
+        how = f"ramp {self.ramp_s:g} s" if self.ramp_s else "abrupt"
+        return Annotation(
+            time=onset,
+            time_end=onset + timedelta(seconds=self.ramp_s) if self.ramp_s else None,
+            text=f"Injected {self.kind} on {self.camera_id} ({what}, {how}); run {run_id}",
+            tags=(ONSET_TAG, self.kind, self.camera_id),
+        )
 
 
 def schedule_drift(

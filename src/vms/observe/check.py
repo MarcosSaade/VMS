@@ -150,11 +150,13 @@ class TelemetryCheck:
 
     def empty_panels(self, dashboards: Sequence[Dashboard]) -> list[str]:
         """Dashboard panels whose query returns no series (GPU and placeholder panels are
-        exempt). `$__rate_interval` becomes 5m, which covers a demo run."""
+        exempt). `$__rate_interval` becomes 5m and `$__range` 15m, which cover a demo run."""
         empty = []
         for d in dashboards:
             for title, expr in panel_queries(d):
-                query = urllib.parse.urlencode({"query": expr.replace(RATE, "5m")})
+                query = urllib.parse.urlencode(
+                    {"query": expr.replace(RATE, "5m").replace("$__range", "15m")}
+                )
                 data = self._get(f"{self._prom}/api/v1/query?{query}")
                 if not data["data"]["result"]:
                     empty.append(f"{d.title}: {title}")

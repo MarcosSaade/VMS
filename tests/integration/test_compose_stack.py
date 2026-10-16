@@ -5,10 +5,13 @@ Run with `make up && make test-integration`.
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import json
 import urllib.error
 import urllib.request
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import psycopg
@@ -17,8 +20,10 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from pydantic import SecretStr
 
 from tests.integration.conftest import StackSettings, get_json, poll
+from vms.observe.annotations import Annotation, GrafanaAnnotations, GrafanaSettings
 
 pytestmark = pytest.mark.integration
 
@@ -76,6 +81,39 @@ def test_grafana_datasources_are_provisioned_and_healthy(stack: StackSettings) -
     for uid in ("prometheus", "tempo"):
         health = get_json(stack.url(stack.grafana_port, f"/api/datasources/uid/{uid}/health"), auth)
         assert health["status"] == "OK", (uid, health)
+
+
+def test_grafana_accepts_drift_onset_annotations(stack: StackSettings) -> None:
+    # The load generator posts injected drift onsets for the Drift dashboard (task 9.4).
+    grafana = GrafanaSettings(
+        port=stack.grafana_port,
+        admin_user=stack.grafana_admin_user,
+        admin_password=SecretStr(stack.grafana_admin_password),
+    )
+    tag = f"it-{uuid.uuid4().hex[:8]}"
+    sink = GrafanaAnnotations(grafana, timeout_s=5)
+
+    async def post() -> None:
+        try:
+            await sink.post(Annotation(datetime.now(UTC), "integration test", ("drift-onset", tag)))
+        finally:
+            await sink.aclose()
+
+    asyncio.run(post())
+    token = base64.b64encode(
+        f"{stack.grafana_admin_user}:{stack.grafana_admin_password}".encode()
+    ).decode()
+    auth = {"Authorization": f"Basic {token}"}
+    found = get_json(stack.url(stack.grafana_port, f"/api/annotations?tags={tag}"), auth)
+    assert [a["text"] for a in found] == ["integration test"]
+    for a in found:
+        req = urllib.request.Request(
+            stack.url(stack.grafana_port, f"/api/annotations/{a['id']}"),
+            method="DELETE",
+            headers=auth,
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            json.loads(resp.read())
 
 
 def test_span_reaches_tempo_through_collector(stack: StackSettings) -> None:

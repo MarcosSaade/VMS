@@ -9,7 +9,8 @@ provisions on `make up`. The JSON is generated, never edited by hand:
 Every panel's description says what it shows and which decision it informs, so each panel
 earns its place. `python -m vms.observe` (the demo's last step) runs every panel query against
 Prometheus and fails on an empty one, except panels marked `optional` (GPU metrics exist only on
-the GPU instance; drift arrives in task 9.4).
+the GPU instance). Template variables (the Drift dashboard's `$camera`) are replaced by their
+"all" regex for that check.
 
 PromQL conventions: rates over `$__rate_interval` (the datasource's 5 s scrape interval makes it
 20 s); queries for counters that may have no series yet (errors, retries) end in
@@ -34,10 +35,11 @@ QUERY_SLO_S = 1.5  # ARCHITECTURE 8
 GRID_WIDTH = 24
 RATE = "$__rate_interval"
 
-PanelKind = Literal["timeseries", "stat", "heatmap", "text"]
+PanelKind = Literal["timeseries", "stat", "heatmap", "text", "state-timeline"]
 
 # Fixed colors per series, so the same thing has the same color on every dashboard.
 GREEN, BLUE, ORANGE, RED, PURPLE, YELLOW = "green", "blue", "orange", "red", "purple", "yellow"
+GRAY = "text"  # Grafana's theme text color: neutral in light and dark
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,8 @@ class Target:
     legend: str = ""
     color: str | None = None
     right_unit: str | None = None  # plot on a right-hand axis with this unit
+    dashed: bool = False  # reference lines and limits, not measurements
+    fill_below_to: str | None = None  # shade down to the series with this legend (a band)
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,8 @@ class Panel:
     decimals: int | None = None
     optional: bool = False  # may be empty (GPU only, placeholders): skipped by the check
     content: str = ""  # text panels
+    value_text: tuple[tuple[int, str, str], ...] = ()  # (value, text, color): state timelines
+    fill: bool = True  # shade under lines; off where the axis does not start at 0
 
     @property
     def exprs(self) -> list[str]:
@@ -78,6 +84,39 @@ class Row:
     title: str
     panels: tuple[Panel, ...]
     collapsed: bool = False
+    repeat: str | None = None  # repeat the row once per selected value of this variable
+
+
+@dataclass(frozen=True)
+class Variable:
+    """A multi-select dashboard variable filled from a Prometheus query. Panels use it as
+    `label=~"$name"`; "All" selects every value the query found."""
+
+    name: str
+    label: str
+    query: str  # query_result(...) whose `regex` group is the value
+    regex: str
+    all_regex: str = ".+"  # what `$name` stands for in the telemetry check
+
+
+@dataclass(frozen=True)
+class PromAnnotation:
+    """Markers where `expr` has a value (consecutive points merge into a region)."""
+
+    name: str
+    expr: str
+    title: str
+    text: str
+    color: str
+
+
+@dataclass(frozen=True)
+class TagAnnotation:
+    """Grafana's own annotations carrying every tag in `tags` (posted through its API)."""
+
+    name: str
+    tags: tuple[str, ...]
+    color: str
 
 
 @dataclass(frozen=True)
@@ -87,6 +126,8 @@ class Dashboard:
     description: str
     rows: tuple[Row, ...]
     tags: tuple[str, ...] = ("vms",)
+    variables: tuple[Variable, ...] = ()
+    annotations: tuple[PromAnnotation | TagAnnotation, ...] = ()
 
     def panels(self) -> Iterator[Panel]:
         for row in self.rows:
@@ -788,37 +829,308 @@ def resources() -> Dashboard:
     )
 
 
+CAMERA = 'camera_id=~"$camera"'
+
+
+def _signal_panel(signal: str, title: str, unit: str, what: str) -> Panel:
+    """One signal of one camera (row repeated per camera): the window mean inside its alarm
+    band, with the reference mean as a dashed line."""
+    sel = f'camera_id=~"$camera", signal="{signal}"'
+    return Panel(
+        title,
+        f"{what} Solid: mean over the last 30 s window; dashed: the reference mean; shaded: "
+        "the alarm band (window means where the threshold detector stays quiet, from the "
+        "reference and the clean-run calibration). Leaving the band raises VmsCameraDrift; "
+        "gaps mean too few frames or detections in the window.",
+        (
+            Target(f"max(vms_drift_window_mean_value{{{sel}}})", "window", BLUE),
+            Target(f"max(vms_drift_reference_mean_value{{{sel}}})", "reference", GRAY, dashed=True),
+            Target(
+                f'max(vms_drift_band_value{{{sel}, bound="upper"}})',
+                "alarm above",
+                RED,
+                dashed=True,
+                fill_below_to="alarm below",
+            ),
+            Target(
+                f'max(vms_drift_band_value{{{sel}, bound="lower"}})',
+                "alarm below",
+                RED,
+                dashed=True,
+            ),
+        ),
+        unit=unit,
+        min=None,  # fit the signal and its band: a 0 floor flattens a 110-to-120 band
+        fill=False,
+        width=6,
+        height=7,
+    )
+
+
 def drift() -> Dashboard:
+    alarm_by_camera = f"max by (camera_id) (vms_drift_alarm_value{{{CAMERA}}})"
+    alarm_before = f"max by (camera_id) (vms_drift_alarm_value{{{CAMERA}}} offset 5s)"
+    h_line = Target("max(vms_drift_detector_h_value)", "h", RED, dashed=True)
     return Dashboard(
         uid="vms-drift",
         title="VMS / Drift",
-        description="Per-camera input and output statistics and change alarms (task 9.4).",
+        description=(
+            "Per-camera input and output statistics against their reference, the drift "
+            "detector against h, alarms, and injected onsets (tasks 9.1 to 9.4)."
+        ),
+        variables=(
+            Variable(
+                "camera",
+                "Camera",
+                # Cameras with frames in the time range: the monitor keeps gauges for every
+                # camera it has seen, and old benchmark cameras would fill the page.
+                "query_result(max by (camera_id) "
+                "(max_over_time(vms_drift_window_frames[$__range])) > 0)",
+                '/camera_id="([^"]+)"/',
+            ),
+        ),
+        annotations=(
+            TagAnnotation("Injected drift onsets", ("drift-onset",), BLUE),
+            # Onsets only (alarming now, not 5 s ago): a region per alarm would shade every
+            # panel for as long as the drift lasts.
+            PromAnnotation(
+                "Drift alarms",
+                f"({alarm_by_camera} == 1) unless ({alarm_before} == 1)",
+                "Drift alarm",
+                "{{camera_id}}",
+                RED,
+            ),
+        ),
         rows=(
             Row(
-                "Drift (placeholder until task 9.4)",
+                "Now",
                 (
                     Panel(
-                        "What goes here",
-                        "Placeholder: what the drift panels will show and how alarms will be "
-                        "handled, until task 9.4 replaces it with live per-camera statistics.",
-                        kind="text",
-                        width=24,
-                        height=7,
-                        optional=True,
-                        content=(
-                            "### Drift detection arrives in task 9.4\n\n"
-                            "Per camera, against a reference window (tasks 9.1 to 9.3):\n\n"
-                            "- **Input:** brightness, blur (Laplacian variance), noise. The "
-                            "worker already stores brightness, contrast and blur per frame in "
-                            "the `frames` table.\n"
-                            "- **Output:** detections per frame, confidence distribution, "
-                            "class mix.\n"
-                            "- **Alarms:** CUSUM statistic against its threshold, alarms per "
-                            "camera, detection delay on the injected scenarios (9.2).\n\n"
-                            "The procedure for an alarm is in `docs/RUNBOOK.md` (9.4)."
+                        "Cameras alarming",
+                        "Cameras with at least one channel past h now (VmsCameraDrift). Above "
+                        '0: follow RUNBOOK "Drift alerts", starting with the camera\'s row '
+                        "below.",
+                        (Target(f"count({alarm_by_camera} == 1) or vector(0)"),),
+                        kind="stat",
+                        unit="short",
+                        width=4,
+                        height=4,
+                        thresholds=((1, RED),),
+                    ),
+                    Panel(
+                        "Cameras monitored",
+                        "Cameras with a finished reference, so with statistics and a detector. "
+                        "Fewer than the cameras sending means some are still calibrating "
+                        "(the first 60 s after a camera appears or is recalibrated).",
+                        (
+                            Target(
+                                f"count(vms_drift_reference_frames{{{CAMERA}}} > 0) or vector(0)"
+                            ),
                         ),
+                        kind="stat",
+                        unit="short",
+                        width=4,
+                        height=4,
+                    ),
+                    Panel(
+                        "Calibrating",
+                        "Cameras whose reference period is still running: no statistics and no "
+                        "alarms yet. A camera stuck here never got enough frames; check the "
+                        "Pipeline dashboard.",
+                        (
+                            Target(
+                                f"count(vms_drift_reference_frames{{{CAMERA}}} == 0) or vector(0)"
+                            ),
+                        ),
+                        kind="stat",
+                        unit="short",
+                        width=4,
+                        height=4,
+                        thresholds=((1, YELLOW),),
+                    ),
+                    Panel(
+                        "Alarm onsets in range",
+                        "Channel alarms started (0 to 1) over the dashboard's time range, "
+                        "summed over channels and cameras (one drift often trips several "
+                        "channels). Many onsets "
+                        "on a healthy site mean the calibration understates its normal "
+                        "variation: recalibrate it or raise h (RUNBOOK).",
+                        (
+                            Target(
+                                "sum(increase(vms_drift_alarms_total"
+                                f"{{{CAMERA}}}[$__range])) or vector(0)"
+                            ),
+                        ),
+                        kind="stat",
+                        unit="short",
+                        width=4,
+                        height=4,
+                        decimals=0,
+                        thresholds=((1, ORANGE),),
+                    ),
+                    Panel(
+                        "Fewest frames per window",
+                        "The smallest number of processed frames in any selected camera's 30 s "
+                        "window (150 at 5 FPS). Under 20 the statistics are undefined and "
+                        "drift goes unseen: the camera stopped or the worker is behind.",
+                        (Target(f"min(vms_drift_window_frames{{{CAMERA}}})"),),
+                        kind="stat",
+                        unit="short",
+                        width=4,
+                        height=4,
+                        thresholds=((0, RED), (20, GREEN)),
+                    ),
+                    Panel(
+                        "Detector h",
+                        "The decision threshold in clean-run standard deviations (D34: 10, "
+                        "3x the largest clean value). Raising it trades detection delay for "
+                        "fewer false alarms; see the delay vs false-alarm plot (BENCHMARKS).",
+                        (Target("max(vms_drift_detector_h_value)"),),
+                        kind="stat",
+                        unit="short",
+                        width=4,
+                        height=4,
+                        thresholds=((0, BLUE),),
                     ),
                 ),
+            ),
+            Row(
+                "Detector",
+                (
+                    Panel(
+                        "Alarm by camera",
+                        "Red while any channel of the camera is past h. Blue markers are "
+                        "injected drift onsets (loadgen scenarios); the gap from a marker to "
+                        "red is the detection delay (5 to 30 s on the injected drifts, E-054).",
+                        (Target(alarm_by_camera, "{{camera_id}}"),),
+                        kind="state-timeline",
+                        unit="short",
+                        width=24,
+                        height=6,
+                        thresholds=((1, RED),),
+                        value_text=((0, "ok", GREEN), (1, "drift", RED)),
+                    ),
+                    Panel(
+                        "Detector statistic by camera",
+                        "Per camera, the largest channel statistic the detector compares with "
+                        "h (threshold: |z|, the window's distance from its reference in "
+                        "clean-run standard deviations; CUSUM: S). Log scale: clean cameras sit "
+                        "near 1, drifted ones at tens or hundreds.",
+                        (
+                            Target(
+                                "max by (camera_id) "
+                                f"(vms_drift_detector_statistic_value{{{CAMERA}}})",
+                                "{{camera_id}}",
+                            ),
+                            h_line,
+                        ),
+                        unit="short",
+                        log_scale=True,
+                        fill=False,
+                    ),
+                    Panel(
+                        "Detector statistic by channel",
+                        "The same statistic per channel, the largest over the selected cameras: "
+                        "which statistic moved. It names the symptom, not the cause: darkening "
+                        "also lowers noise, a camera shift reads as blur (RUNBOOK).",
+                        (
+                            Target(
+                                "max by (channel) "
+                                f"(vms_drift_detector_statistic_value{{{CAMERA}}})",
+                                "{{channel}}",
+                            ),
+                            h_line,
+                        ),
+                        unit="short",
+                        log_scale=True,
+                        fill=False,
+                    ),
+                ),
+            ),
+            Row(
+                "Camera $camera",
+                (
+                    _signal_panel(
+                        "brightness",
+                        "Brightness",
+                        "short",
+                        "Mean gray level (0 to 255). Falls with night, a dirty lens, a "
+                        "failing sensor or IR switching.",
+                    ),
+                    _signal_panel(
+                        "contrast",
+                        "Contrast",
+                        "short",
+                        "Std of gray levels. Falls with fog, glare or a washed-out exposure.",
+                    ),
+                    _signal_panel(
+                        "log_blur",
+                        "Sharpness",
+                        "short",
+                        "ln(1 + variance of the Laplacian). Falls with defocus, a smeared or "
+                        "wet lens, motion blur, or a camera shift (fewer edges).",
+                    ),
+                    _signal_panel(
+                        "noise",
+                        "Noise",
+                        "short",
+                        "Noise estimate (Immerkaer). Rises with low light and high gain; "
+                        "darkening lowers it.",
+                    ),
+                    _signal_panel(
+                        "detections_per_frame",
+                        "Detections per frame",
+                        "short",
+                        "Objects with confidence >= 0.25. Moves with traffic and with the "
+                        "model failing (blur, occlusion) or the scene changing.",
+                    ),
+                    _signal_panel(
+                        "confidence",
+                        "Mean confidence",
+                        "percentunit",
+                        "Mean detection confidence. Falls when the model is less sure: "
+                        "blur, noise, darkness it was not trained on.",
+                    ),
+                    Panel(
+                        "Confidence and class-mix distances",
+                        "The one-sided channels as z against h: KS and Wasserstein-1 between "
+                        "the window's and the reference's confidences, and PSI of the class "
+                        "mix (a new scene, or a model that confuses classes).",
+                        (
+                            Target(
+                                "max by (channel) (vms_drift_z_value"
+                                f'{{{CAMERA}, channel=~"confidence_ks|confidence_wasserstein|'
+                                'class_psi"})',
+                                "{{channel}}",
+                            ),
+                            h_line,
+                        ),
+                        unit="short",
+                        min=None,
+                        fill=False,
+                        width=6,
+                        height=7,
+                    ),
+                    Panel(
+                        "Frames in window",
+                        "Processed frames and detections in the 30 s window. Below 20 frames or "
+                        "20 detections the statistics are undefined (gaps above), which is "
+                        'VmsDriftNoData, not "no drift".',
+                        (
+                            Target(f"max(vms_drift_window_frames{{{CAMERA}}})", "frames", BLUE),
+                            Target(
+                                f"max(vms_drift_window_detections{{{CAMERA}}})",
+                                "detections",
+                                PURPLE,
+                                right_unit="short",
+                            ),
+                        ),
+                        unit="short",
+                        width=6,
+                        height=7,
+                    ),
+                ),
+                repeat="camera",
             ),
         ),
     )
@@ -875,6 +1187,17 @@ def _overrides(panel: Panel) -> list[dict[str, Any]]:
                 {"id": "unit", "value": t.right_unit},
                 {"id": "custom.axisPlacement", "value": "right"},
             ]
+        if t.dashed:
+            props += [
+                {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [6, 4]}},
+                {"id": "custom.lineWidth", "value": 1},
+                {"id": "custom.fillOpacity", "value": 0},
+            ]
+        if t.fill_below_to:
+            props += [
+                {"id": "custom.fillBelowTo", "value": t.fill_below_to},
+                {"id": "custom.fillOpacity", "value": 6},
+            ]
         if props and t.legend:
             out.append({"matcher": {"id": "byName", "options": t.legend}, "properties": props})
     return out
@@ -903,18 +1226,19 @@ def panel_json(panel: Panel, panel_id: int, x: int, y: int) -> dict[str, Any]:
         defaults["custom"] = {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 25 if panel.stack else 8,
+            "fillOpacity": (25 if panel.stack else 8) if panel.fill else 0,
             "showPoints": "never",
             # Gaps stay gaps: a quantile with no traffic is undefined, not the last value.
             "spanNulls": False,
             "stacking": {"mode": "normal" if panel.stack else "none", "group": "A"},
             "thresholdsStyle": {"mode": "dashed" if panel.threshold_line else "off"},
-            "axisSoftMin": 0,
         }
+        if panel.min is not None:
+            defaults["custom"]["axisSoftMin"] = 0
         if panel.log_scale:
             defaults["custom"]["scaleDistribution"] = {"type": "log", "log": 10}
-            del defaults["min"]  # zero has no place on a log axis
-            defaults["custom"].pop("axisSoftMin")
+            defaults.pop("min", None)  # zero has no place on a log axis
+            defaults["custom"].pop("axisSoftMin", None)
         if panel.soft_max is not None:
             defaults["custom"]["axisSoftMax"] = panel.soft_max
         base["options"] = {
@@ -930,6 +1254,26 @@ def panel_json(panel: Panel, panel_id: int, x: int, y: int) -> dict[str, Any]:
             "justifyMode": "center",
             "textMode": "value",
             "orientation": "auto",
+        }
+    elif panel.kind == "state-timeline":
+        defaults["color"] = {"mode": "thresholds"}
+        defaults["custom"] = {"fillOpacity": 80, "lineWidth": 0}
+        defaults["mappings"] = [
+            {
+                "type": "value",
+                "options": {
+                    str(value): {"text": text, "color": color, "index": i}
+                    for i, (value, text, color) in enumerate(panel.value_text)
+                },
+            }
+        ]
+        base["options"] = {
+            "mergeValues": True,
+            "showValue": "never",
+            "alignValue": "left",
+            "rowHeight": 0.8,
+            "legend": {"showLegend": False, "displayMode": "list", "placement": "bottom"},
+            "tooltip": {"mode": "single", "sort": "none"},
         }
     elif panel.kind == "heatmap":
         defaults["unit"] = "short"  # cells are observation counts; the y axis carries the unit
@@ -961,6 +1305,8 @@ def _layout(rows: Sequence[Row]) -> list[dict[str, Any]]:
             "gridPos": {"x": 0, "y": y, "w": GRID_WIDTH, "h": 1},
             "panels": [],
         }
+        if row.repeat:
+            row_json["repeat"] = row.repeat
         next_id += 1
         y += 1
         out.append(row_json)
@@ -977,6 +1323,47 @@ def _layout(rows: Sequence[Row]) -> list[dict[str, Any]]:
     return out
 
 
+def _variable_json(v: Variable) -> dict[str, Any]:
+    return {
+        "type": "query",
+        "name": v.name,
+        "label": v.label,
+        "datasource": PROM,
+        "definition": v.query,
+        "query": {"query": v.query, "refId": f"{v.name}-variable"},
+        "regex": v.regex,
+        "refresh": 2,  # on time range change: the cameras of the range on screen
+        "includeAll": True,
+        "multi": True,
+        "current": {"selected": True, "text": ["All"], "value": ["$__all"]},
+        "options": [],
+        "sort": 1,
+        "hide": 0,
+    }
+
+
+def _annotation_json(a: PromAnnotation | TagAnnotation) -> dict[str, Any]:
+    if isinstance(a, TagAnnotation):
+        return {
+            "name": a.name,
+            "datasource": {"type": "datasource", "uid": "grafana"},
+            "enable": True,
+            "iconColor": a.color,
+            "target": {"type": "tags", "tags": list(a.tags), "matchAny": False, "limit": 200},
+        }
+    return {
+        "name": a.name,
+        "datasource": PROM,
+        "enable": True,
+        "iconColor": a.color,
+        "expr": a.expr,
+        "step": "5s",
+        "titleFormat": a.title,
+        "textFormat": a.text,
+        "useValueForTime": False,
+    }
+
+
 def dashboard_json(d: Dashboard) -> dict[str, Any]:
     return {
         "uid": d.uid,
@@ -989,8 +1376,8 @@ def dashboard_json(d: Dashboard) -> dict[str, Any]:
         "time": {"from": "now-15m", "to": "now"},
         "refresh": "5s",
         "schemaVersion": 41,
-        "templating": {"list": []},
-        "annotations": {"list": []},
+        "templating": {"list": [_variable_json(v) for v in d.variables]},
+        "annotations": {"list": [_annotation_json(a) for a in d.annotations]},
         "links": [
             {
                 "type": "dashboards",
@@ -1010,11 +1397,14 @@ def render(d: Dashboard) -> str:
 
 
 def panel_queries(d: Dashboard, *, include_optional: bool = False) -> Iterator[tuple[str, str]]:
-    """(panel title, PromQL) for every query panel, for the telemetry check."""
+    """(panel title, PromQL) for every query panel, for the telemetry check, with each
+    template variable replaced by its "all" regex."""
     for panel in d.panels():
         if panel.optional and not include_optional:
             continue
         for expr in panel.exprs:
+            for v in d.variables:
+                expr = expr.replace(f"${v.name}", v.all_regex)
             yield panel.title, expr
 
 

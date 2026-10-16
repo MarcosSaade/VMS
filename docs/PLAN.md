@@ -97,7 +97,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: why must onsets be known and seeded, and which drift hurt mAP most?
 - [x] 9.3 Sequential change detection: CUSUM vs fixed threshold, detection delay vs false-alarm rate across seeds
   - Understand it: what does CUSUM accumulate, which knob trades delay for false alarms, and what did the curve show?
-- [ ] 9.4 Drift dashboard and runbook procedure
+- [x] 9.4 Drift dashboard and runbook procedure. Done 2026-10-16 (E-056: per-camera rows with alarm bands, detector vs h, alarm and injected-onset annotations; RUNBOOK "Drift alerts" procedure)
   - Understand it: an alert fires on one camera at 3 a.m.; what do you check, in order?
 - [ ] 9.5 Detector fine-tune on drifted data: before/after mAP on drifted and clean sets (SHRINK: no sweep, no W&B)
   - Understand it: did fine-tuning help the drifted set without hurting the clean set, and why is augmentation not real domain shift?
