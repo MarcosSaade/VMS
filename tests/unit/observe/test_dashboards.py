@@ -13,6 +13,7 @@ from prometheus_client.core import CollectorRegistry
 from vms.common.clock import FakeClock
 from vms.common.ids import UlidGenerator
 from vms.common.metrics import Metrics
+from vms.common.probes import create_probe_app
 from vms.ingest.app import create_app as ingest_app
 from vms.ingest.service import FrameIngestor
 from vms.ingest.settings import FrameLimits
@@ -26,7 +27,6 @@ from vms.observe.dashboards import (
 )
 from vms.query.app import create_app as query_app
 from vms.query.engine import PlanEngine
-from vms.worker.app import create_app as worker_app
 from vms.worker.service import Worker
 from vms.worker.settings import QueueSettings
 
@@ -65,7 +65,9 @@ def declared_metrics() -> set[str]:
         ids=ids,
         executor=MagicMock(),
     )
-    worker_app(worker, ready_checks={}, on_startup=MagicMock(), on_shutdown=MagicMock())
+    create_probe_app(
+        "vms worker", worker, ready_checks={}, on_startup=MagicMock(), on_shutdown=MagicMock()
+    )
     PlanEngine(
         MagicMock(),
         MagicMock(),

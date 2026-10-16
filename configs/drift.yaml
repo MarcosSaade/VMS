@@ -1,0 +1,37 @@
+# Drift monitor (vms.drift, task 9.1). Overrides configs/common.yaml; VMS_* environment
+# variables override this file (e.g. VMS_MONITOR__REFERENCE_S=300). Database connection
+# settings come from POSTGRES_* in .env.
+
+http:                          # /healthz, /readyz, /metrics
+  host: 127.0.0.1
+  port: 8095
+
+monitor:                       # windows in capture time (vms.drift.monitor)
+  window_s: 30                 # current window: 150 frames per camera at 5 FPS
+  reference_s: 60              # calibration period of a camera seen for the first time;
+                               # short so the 3-minute demo gets statistics
+  update_every_s: 5
+  settle_s: 3                  # window ends this long before now (frames still in the queue)
+  discover_every_s: 30
+  shutdown_grace_s: 5
+
+signals:                       # vms.drift.signals
+  min_conf: 0.25               # = tracker.store_min_conf (configs/worker.yaml)
+  classes: [person, bicycle, car, motorcycle, bus, truck]   # class-mix bins, plus "other"
+  min_frames: 20
+  min_detections: 20
+  psi_eps: 0.0001
+  min_std:                     # floor of the reference std, in each signal's units
+    brightness: 1.0
+    contrast: 1.0
+    log_blur: 0.05
+    noise: 0.1
+    detections_per_frame: 0.5
+    confidence: 0.01
+
+db:
+  min_size: 1
+  max_size: 2
+  connect_timeout_s: 5
+  acquire_timeout_s: 2
+  statement_timeout_ms: 5000

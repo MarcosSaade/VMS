@@ -43,6 +43,14 @@ scrape_configs:
         port: 8090
         refresh_interval: 5s
 
+  - job_name: drift
+    scrape_interval: 5s
+    dns_sd_configs:
+      - names: [drift]
+        type: A
+        port: 8095
+        refresh_interval: 5s
+
   - job_name: query
     scrape_interval: 5s
     dns_sd_configs:

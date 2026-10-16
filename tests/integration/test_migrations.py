@@ -11,7 +11,8 @@ from tests.integration.conftest import StackSettings, alembic_config
 pytestmark = pytest.mark.integration
 
 SCHEMA_V1 = {"frames", "cameras", "zones", "detections", "tracks", "events", "query_log"}
-HEAD = {*SCHEMA_V1, "camera_leases", "alembic_version"}  # 0004 adds the worker leases
+# 0004 adds the worker leases, 0007 the drift references.
+HEAD = {*SCHEMA_V1, "camera_leases", "drift_references", "alembic_version"}
 
 
 def tables(stack: StackSettings, db: str) -> set[str]:

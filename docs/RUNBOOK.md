@@ -151,6 +151,20 @@ VMS_DETECTOR__BACKEND=onnxruntime make worker   # the ONNX backend (needs make o
 - Ultralytics runs offline (`YOLO_OFFLINE=1`, `YOLO_AUTOINSTALL=0`, set by `vms.worker.detector`): no usage analytics, no packages installed at runtime. Weights and the package are AGPL-3.0 (see `configs/models.yaml`).
 - PyTorch comes from the CPU wheel index (`pyproject.toml`, `[tool.uv.sources]`). GPU sessions install the CUDA build (task 2.4).
 
+### Drift monitor
+
+```bash
+make drift                                       # on the host: probes and /metrics on http://127.0.0.1:8095 (configs/drift.yaml)
+uv run python -m vms.drift references            # each camera's reference range
+uv run python -m vms.drift recalibrate cam-001   # new calibration period from now (reference_s); --all for every camera
+uv run python -m vms.drift recalibrate cam-001 --start 2026-10-16T09:00:00+00:00 --end 2026-10-16T09:10:00+00:00
+```
+
+- The compose service `drift` (profile app) starts with `make demo`; Prometheus scrapes it as job `drift`. A camera's statistics appear `reference_s` (60 s, `DRIFT_REFERENCE_S`) plus a few seconds after its first frame; until then `vms_drift_reference_frames` is 0. Check with `curl -s localhost:8095/metrics | grep vms_drift_shift` or in Prometheus: `vms_drift_shift_value{signal="brightness"}`.
+- The reference is stored as a capture-time range per camera (`SELECT * FROM drift_references`); the monitor rereads the range's rows after a restart. A reference recorded while the camera was already drifted makes the drift the new normal: recalibrate onto a known-clean period. Re-running `make demo` keeps the first run's references (same camera ids and clips).
+- NaN means undefined, not "no drift": fewer than `signals.min_frames` frames in the window (camera stopped, backlog), or fewer than `signals.min_detections` detections (empty scene) for the confidence and class-mix statistics.
+- The data-mini clips loop every 10 s, so a 30 s window of a 300-frame clip holds the same frames as the reference and its input shifts are exactly 0 (E-050); expect clean values to vary more on real cameras.
+
 ### Query service
 
 ```bash
@@ -214,7 +228,7 @@ Every service exports spans to the collector (`OTEL_EXPORTER_OTLP_ENDPOINT`) and
   - questions that needed a repair: `{name="query.llm" && span.attempt = 2}`
   - Traces become searchable 1 to 2 minutes after they end (E-024); fetching one by ID works at once.
 - **Sampling.** Loadgen decides per frame (`telemetry.sample_ratio` in `configs/loadgen.yaml`, 1%; `VMS_TELEMETRY__SAMPLE_RATIO=0.1` for more); ingest and the worker follow that decision. Every question is traced (`configs/query.yaml`).
-- **Metrics.** Prometheus at http://localhost:9090 scrapes `ingest`, `worker` and `query` containers every 5 s, found by Docker DNS (`deploy/compose/prometheus/prometheus.yml`). Status > Targets lists them; a job with no target means that container is not running. Services started on the host (`make ingest`, `make worker`, `make query`) are not scraped: use their `/metrics` directly, or the containers. Useful queries:
+- **Metrics.** Prometheus at http://localhost:9090 scrapes `ingest`, `worker`, `drift` and `query` containers every 5 s, found by Docker DNS (`deploy/compose/prometheus/prometheus.yml`). Status > Targets lists them; a job with no target means that container is not running. Containers stopped after they ran (`compose stop`, `rm`) stay listed as down targets, because Prometheus keeps a DNS name's last answer when the lookup fails; `make test-integration` then fails `test_prometheus_scrapes_every_target`. Restart Prometheus (`docker compose -f deploy/compose/docker-compose.yml restart prometheus`) or use `make down && make up`. Services started on the host (`make ingest`, `make worker`, `make query`) are not scraped: use their `/metrics` directly, or the containers. Useful queries:
   - freshness p95: `histogram_quantile(0.95, sum by (le) (rate(vms_worker_capture_to_done_seconds_bucket[1m])))`
   - share of frames within the 2 s SLO: `sum(rate(vms_worker_capture_to_done_seconds_bucket{le="2.0"}[5m])) / sum(rate(vms_worker_capture_to_done_seconds_count[5m]))`
   - ingest rate by outcome: `sum by (outcome) (rate(vms_ingest_frames_total[1m]))`
@@ -368,7 +382,7 @@ Grafana (http://localhost:3000, anonymous viewer) opens on **VMS / Pipeline**; t
 | Inference | Where does a worker's time go per frame? | "Where worker time goes" (stage shares), then "Stage latency p95" |
 | Query | Are questions fast and answered? | "Question latency" against the 1.5 s line, then "Time per stage" (LLM vs database) |
 | Resources | Which process is short of CPU or memory? | "CPU per service" against the machine's cores |
-| Drift | Placeholder until task 9.4 | |
+| Drift | Placeholder until task 9.4 (the gauges exist from 9.1: see Drift monitor) | |
 
 - Dashboards are code: edit `src/vms/observe/dashboards.py`, run `make dashboards`, and Grafana picks up the regenerated JSON in `deploy/grafana/dashboards/` within 10 s (no restart). Edits made in the Grafana UI cannot be saved (provisioned, read-only); a unit test fails if the JSON and the code disagree.
 - Rates use `$__rate_interval` (20 s at the 5 s scrape interval). Quantile panels show gaps when there was no traffic: no frames or questions means no latency, not the last value.

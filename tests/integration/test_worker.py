@@ -74,6 +74,7 @@ def result(frame_id: str, camera: str, n_detections: int = 2) -> FrameResult:
         brightness=1.0,
         contrast=1.0,
         blur_var=1.0,
+        noise=1.0,
         model_version="test@0",
         detections=tuple(
             DetectionRow(i, "person", 0.9, 0.0, 0.0, 1.0, 1.0) for i in range(n_detections)
@@ -302,6 +303,7 @@ def test_tracks_are_upserted_and_events_appended_in_the_fenced_write(
                 brightness=1.0,
                 contrast=1.0,
                 blur_var=1.0,
+                noise=1.0,
                 model_version="test@0",
                 detections=(DetectionRow(0, "person", 0.9, 0, 0, 1, 1, "cam-a:s:1"),),
                 tracks=(TrackUpdate("cam-a:s:1", "person"),),
@@ -400,12 +402,13 @@ def test_loadgen_to_detections_with_yolo11n(
     frames = fetch(
         stack,
         fresh_db,
-        "SELECT width, height, brightness, contrast, blur_var, model_version, attempts FROM frames",
+        "SELECT width, height, brightness, contrast, blur_var, noise, model_version, attempts "
+        "FROM frames",
     )
     assert {f[:2] for f in frames} == {(clip.width, clip.height)}
-    assert all(f[2] > 0 and f[3] > 0 and f[4] > 0 for f in frames)
-    assert {f[5] for f in frames} == {version}
-    assert {f[6] for f in frames} == {1}
+    assert all(f[2] > 0 and f[3] > 0 and f[4] > 0 and f[5] > 0 for f in frames)
+    assert {f[6] for f in frames} == {version}
+    assert {f[7] for f in frames} == {1}
 
     by_class = dict(
         fetch(

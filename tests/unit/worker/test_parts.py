@@ -15,7 +15,7 @@ from vms.common.settings import load_settings
 from vms.datasets.http import ChecksumError, RetryPolicy
 from vms.worker.detector import DetectorSettings, to_detections
 from vms.worker.settings import QueueSettings, WorkerSettings
-from vms.worker.stats import input_stats
+from vms.worker.stats import input_stats, noise_sigma
 from vms.worker.weights import ModelsConfig, ensure_weights, load_models_config
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -32,6 +32,7 @@ def test_stats_of_a_flat_image() -> None:
     assert stats.brightness == pytest.approx(100.0)
     assert stats.contrast == pytest.approx(0.0)
     assert stats.blur_var == pytest.approx(0.0)
+    assert stats.noise == pytest.approx(0.0)
 
 
 def test_stats_react_to_darkening_and_blur() -> None:
@@ -43,6 +44,17 @@ def test_stats_react_to_darkening_and_blur() -> None:
     assert darker.contrast < base.contrast
     assert blurred.blur_var < base.blur_var / 10
     assert blurred.brightness == pytest.approx(base.brightness, rel=0.05)
+
+
+@pytest.mark.parametrize("sigma", [3.0, 10.0])
+def test_noise_estimate_recovers_added_gaussian_noise(sigma: float) -> None:
+    rng = np.random.default_rng(42)
+    # A smooth ramp plus noise: the estimator cancels locally planar content.
+    ramp = np.tile(np.linspace(60, 190, 320), (240, 1))
+    gray = np.clip(ramp + rng.normal(0, sigma, ramp.shape), 0, 255).round().astype(np.uint8)
+    stats = input_stats(np.dstack([gray] * 3))
+    assert stats.noise == pytest.approx(sigma, rel=0.08)
+    assert noise_sigma(np.zeros((2, 2), dtype=np.uint8)) == 0.0
 
 
 def test_to_detections_maps_classes_and_orders_by_confidence() -> None:

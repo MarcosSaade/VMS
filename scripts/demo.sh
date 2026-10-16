@@ -3,7 +3,8 @@
 #
 #   1. the stack (make up: Postgres, object store, observability; migrations; camera catalog)
 #   2. the mini clips (make data-mini) and the detector weights (yolo11n by default)
-#   3. the application containers: ingest, one worker, the query service with the UI
+#   3. the application containers: ingest, one worker, the drift monitor, the query service
+#      with the UI
 #   4. loadgen: DEMO_CAMERAS virtual cameras at DEMO_FPS for DEMO_SECONDS, then waits until the
 #      worker has processed every frame
 #   5. the example questions, answered by the canned planner unless LLM_MODEL is set
@@ -47,11 +48,11 @@ if [[ "$backend" == "onnxruntime" && ! -f "models/onnx/$weights.onnx" ]]; then
   uv run python -m vms.worker export-onnx "$weights"
 fi
 
-step "3/6 application containers: ingest, worker ($weights), query + UI"
+step "3/6 application containers: ingest, worker ($weights), drift monitor, query + UI"
 # Build the one image first: ingest and worker reuse it and must not try to pull it.
 "${compose[@]}" --profile app build query
 DEMO_WEIGHTS="$weights" "${compose[@]}" --profile app up -d --wait --wait-timeout 600 \
-  query ingest worker
+  query ingest worker drift
 
 started="$(date +%s)"  # the telemetry check looks only at traces from this run on
 step "4/6 loadgen: $cameras cameras x $fps FPS for $seconds s, then wait for the worker"

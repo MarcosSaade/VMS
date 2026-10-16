@@ -124,6 +124,7 @@ class Analysis:
     brightness: float
     contrast: float
     blur_var: float
+    noise: float
     detections: tuple[DetectionRow, ...]
     tracks: tuple[TrackUpdate, ...]
     zone_events: tuple[ZoneEvent, ...]
@@ -410,6 +411,7 @@ class Worker:
             brightness=analysis.brightness,
             contrast=analysis.contrast,
             blur_var=analysis.blur_var,
+            noise=analysis.noise,
             model_version=self._detector.model_version,
             detections=analysis.detections,
             tracks=analysis.tracks,
@@ -511,6 +513,7 @@ class Worker:
                 stats.brightness,
                 stats.contrast,
                 stats.blur_var,
+                stats.noise,
                 tracked.detections,
                 tracked.tracks,
                 tracked.zone_events,

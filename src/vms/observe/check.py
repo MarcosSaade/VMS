@@ -3,7 +3,7 @@
 `make demo` runs this last, so CI fails if a service stops exporting, a scrape target goes
 missing, or the trace context is lost somewhere between loadgen and the worker's DB write.
 
-1. Prometheus: the ingest, worker and query jobs each have a target that is up, every
+1. Prometheus: the ingest, worker, drift and query jobs each have a target that is up, every
    metric in REQUIRED_METRICS has at least one series, and every dashboard panel's query
    returns data (vms.observe.dashboards; GPU and placeholder panels exempt).
 2. Tempo, frame trace: a trace in which a worker.frame span descends from a loadgen span
@@ -37,7 +37,7 @@ from vms.observe.dashboards import RATE, Dashboard, all_dashboards, panel_querie
 
 log = get_logger(__name__)
 
-SCRAPE_JOBS = ("ingest", "worker", "query")
+SCRAPE_JOBS = ("ingest", "worker", "drift", "query")
 REQUIRED_METRICS = (
     "vms_ingest_frames_total",
     "vms_ingest_stage_duration_seconds_count",
@@ -48,6 +48,10 @@ REQUIRED_METRICS = (
     "vms_worker_queue_wait_seconds_count",
     "vms_worker_backlog_frames",
     "vms_worker_backlog_age_seconds",
+    # Set for every camera with frames, from the monitor's first update (the statistics
+    # themselves need a finished reference period, longer than a CI demo).
+    "vms_drift_window_frames",
+    "vms_drift_updates_total",
     "vms_query_requests_total",
     "vms_query_stage_duration_seconds_count",
     "vms_query_llm_tokens_total",

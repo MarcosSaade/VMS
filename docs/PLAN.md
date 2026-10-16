@@ -91,7 +91,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: how much of the model-only speedup survived end to end, and why not all of it?
 
 ## Phase 9: Drift detection
-- [ ] 9.1 Per-camera drift statistics (input: brightness, blur, noise; output: detections per frame, confidence and class mix)
+- [x] 9.1 Per-camera drift statistics (input: brightness, blur, noise; output: detections per frame, confidence and class mix). Done 2026-10-16 (D33, E-050: `vms.drift` monitor reading Postgres windows, gauges in the demo)
   - Understand it: what is the reference window, and which statistic reacts to darkening vs a class-mix change?
 - [ ] 9.2 Drift injection scenarios with known, seeded onsets, and mAP under each drift
   - Understand it: why must onsets be known and seeded, and which drift hurt mAP most?

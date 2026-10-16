@@ -1,8 +1,9 @@
-"""HTTP surface of the worker (FastAPI): probes and metrics only; the work runs in the
-background task started by the lifespan.
+"""HTTP surface of a background service (FastAPI): probes and metrics only; the work runs in
+a background task started by the lifespan. Used by the worker and the drift monitor.
 
     GET /healthz   the process is up
-    GET /readyz    Postgres and the object store answer, the model is loaded (503 otherwise)
+    GET /readyz    every ready check passes within READY_TIMEOUT_S (503 otherwise; the worker:
+                   Postgres, the object store, the model; the drift monitor: Postgres)
     GET /metrics   Prometheus
 """
 
@@ -24,7 +25,8 @@ READY_TIMEOUT_S = 2.0
 ReadyCheck = Callable[[], Awaitable[bool]]
 
 
-def create_app(
+def create_probe_app(
+    title: str,
     metrics: Metrics,
     *,
     ready_checks: dict[str, ReadyCheck],
@@ -40,7 +42,7 @@ def create_app(
             await on_shutdown()
 
     app = FastAPI(
-        title="vms worker",
+        title=title,
         lifespan=lifespan,
         docs_url=None,
         redoc_url=None,

@@ -14,11 +14,11 @@ from fastapi import FastAPI
 from vms.common.clock import SystemClock
 from vms.common.ids import UlidGenerator, new_ulid
 from vms.common.observability import Observability, init_observability
+from vms.common.probes import create_probe_app
 from vms.common.settings import load_settings
 from vms.storage.config import ObjectStoreSettings, PostgresSettings
 from vms.storage.objects import S3ObjectStore
 from vms.storage.work import PostgresWorkQueue
-from vms.worker.app import create_app
 from vms.worker.detector import Detector, YoloDetector, build_detector
 from vms.worker.onnx_detector import OnnxDetector
 from vms.worker.service import Worker
@@ -116,7 +116,8 @@ def build_app(settings: WorkerSettings, obs: Observability, detector: Detector) 
     async def model_ready() -> bool:
         return True  # loaded and warmed up before the app starts
 
-    return create_app(
+    return create_probe_app(
+        "vms worker",
         obs.metrics,
         ready_checks={"postgres": queue.ready, "object_store": store.ready, "model": model_ready},
         on_startup=startup,

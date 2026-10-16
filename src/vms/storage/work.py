@@ -98,6 +98,7 @@ class FrameResult:
     brightness: float
     contrast: float
     blur_var: float
+    noise: float  # input statistic for drift (vms.worker.stats)
     model_version: str
     detections: tuple[DetectionRow, ...]
     tracks: tuple[TrackUpdate, ...] = ()
@@ -222,7 +223,8 @@ COMPLETE_FRAME_SQL = """
 UPDATE frames
 SET status = 'done', processed_at = now(), claimed_by = NULL, error = NULL,
     width = %(width)s, height = %(height)s, brightness = %(brightness)s,
-    contrast = %(contrast)s, blur_var = %(blur_var)s, model_version = %(model_version)s
+    contrast = %(contrast)s, blur_var = %(blur_var)s, noise = %(noise)s,
+    model_version = %(model_version)s
 WHERE frame_id = %(frame_id)s AND claimed_by = %(worker_id)s AND status = 'processing'
 RETURNING frame_id
 """
@@ -358,6 +360,7 @@ class PostgresWorkQueue:
             "brightness": result.brightness,
             "contrast": result.contrast,
             "blur_var": result.blur_var,
+            "noise": result.noise,
             "model_version": result.model_version,
         }
         try:

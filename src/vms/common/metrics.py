@@ -46,6 +46,9 @@ BASE_UNITS: Final = frozenset(
         "cameras",
         "items",
         "usd",
+        # A statistic in its own units (a mean luma level, a standardized shift, a PSI), for
+        # gauges whose unit depends on a label (vms_drift_*{signal=...}).
+        "value",
     }
 )
 _SNAKE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")

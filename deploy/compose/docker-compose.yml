@@ -244,6 +244,34 @@ services:
         - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/readyz', timeout=2)"
     restart: unless-stopped
 
+  # Drift monitor (task 9.1): per-camera window vs reference statistics from Postgres.
+  drift:
+    profiles: [app]
+    image: vms/app:local
+    pull_policy: never  # built locally by the query service's build (make app / make demo build first)
+    command: ["python", "-m", "vms.drift", "run"]
+    environment:
+      <<: *app-env
+      VMS_HTTP__HOST: 0.0.0.0
+      VMS_HTTP__PORT: "8095"
+      # Calibration period of a camera seen for the first time (configs/drift.yaml).
+      VMS_MONITOR__REFERENCE_S: ${DRIFT_REFERENCE_S:-60}
+    ports:
+      - "127.0.0.1:${DRIFT_PORT:-8095}:8095"
+    depends_on:
+      query:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8095/readyz', timeout=2)"
+    restart: unless-stopped
+
   query:
     profiles: [app]
     build:
