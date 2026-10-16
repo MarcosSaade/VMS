@@ -16,7 +16,8 @@ Every `update_every_s`, `update`:
    channel, updates the camera's detector (vms.drift.detect) and exports each channel's z,
    its CUSUM statistic and whether it alarms; Prometheus alert rules fire on the alarm gauge
    (deploy/compose/prometheus/rules/drift.yml). A camera's detector restarts when its
-   reference changes.
+   reference changes. Windows whose frames span less than `detect_min_coverage` of
+   `window_s` (a camera starting, resuming or stopping) are not fed to the detector.
 
 Gauges carry `camera_id` (and `signal`); an undefined statistic (too few frames or
 detections) is exported as NaN, which Prometheus stores and Grafana draws as a gap, so "no
@@ -48,6 +49,7 @@ from vms.drift.signals import (
     Sample,
     SignalSettings,
     compare,
+    coverage,
 )
 from vms.drift.store import DriftStore, ReferenceRange
 from vms.storage.frames import FrameStoreError
@@ -199,7 +201,11 @@ class DriftMonitor:
                 self._export_window_only(camera_id, window)
                 continue
             self._reference_frames.labels(camera_id=camera_id).set(reference.frames)
-            self._export(camera_id, window, reference)
+            full = (
+                coverage(frames.get(camera_id, []), self._settings.window_s)
+                >= self._settings.detect_min_coverage
+            )
+            self._export(camera_id, window, reference, full=full)
 
         for camera_id in set(self._references) - set(refs):  # deleted: start over next time
             del self._references[camera_id]
@@ -268,7 +274,7 @@ class DriftMonitor:
         for signal in SIGNALS:
             self._window_mean.labels(camera_id=camera_id, signal=signal).set(window.mean(signal))
 
-    def _export(self, camera_id: str, window: Sample, reference: Sample) -> None:
+    def _export(self, camera_id: str, window: Sample, reference: Sample, *, full: bool) -> None:
         stats = compare(window, reference, self._signals)
         for signal in SIGNALS:
             labels = {"camera_id": camera_id, "signal": signal}
@@ -279,15 +285,19 @@ class DriftMonitor:
         self._ks.labels(camera_id=camera_id).set(stats.confidence_ks)
         self._w1.labels(camera_id=camera_id).set(stats.confidence_wasserstein)
         self._psi.labels(camera_id=camera_id).set(stats.class_psi)
-        self._detect(camera_id, stats)
+        self._detect(camera_id, stats, full)
 
-    def _detect(self, camera_id: str, stats: DriftStatistics) -> None:
+    def _detect(self, camera_id: str, stats: DriftStatistics, full: bool) -> None:
+        """A partly filled window (`full` false) counts as undefined: the state is kept and
+        nothing alarms."""
         if self._detector is None or self._calibration is None:
             return
         det = self._detectors.get(camera_id)
         if det is None:
             det = self._detectors[camera_id] = CameraDetector(self._detector, self._calibration)
         values = channel_values(stats)
+        if not full:
+            values = dict.fromkeys(values, math.nan)
         firing = set(det.update(values))
         for channel, cd in det.channels.items():
             labels = {"camera_id": camera_id, "channel": channel}

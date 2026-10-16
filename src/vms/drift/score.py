@@ -58,7 +58,14 @@ from vms.drift.detect import (
     channel_values,
 )
 from vms.drift.settings import MonitorSettings
-from vms.drift.signals import DetectionRow, FrameRow, Sample, SignalSettings, compare
+from vms.drift.signals import (
+    DetectionRow,
+    FrameRow,
+    Sample,
+    SignalSettings,
+    compare,
+    coverage,
+)
 from vms.drift.store import DriftStore
 
 log = get_logger(__name__)
@@ -167,9 +174,13 @@ def camera_series(
     t = ref_end + timedelta(seconds=monitor.window_s)
     last = frames[-1].ts
     while t <= last + timedelta(seconds=1e-6):
-        stats = compare(sample(t - timedelta(seconds=monitor.window_s), t), reference, signals)
+        a = t - timedelta(seconds=monitor.window_s)
+        stats = compare(sample(a, t), reference, signals)
+        v = channel_values(stats)
+        if coverage(_slice(frames, keys, a, t), monitor.window_s) < monitor.detect_min_coverage:
+            v = dict.fromkeys(v, math.nan)  # as the live monitor: not fed to the detector
         times.append((t - start).total_seconds())
-        values.append(channel_values(stats))
+        values.append(v)
         t += timedelta(seconds=monitor.update_every_s)
     return times, values
 

@@ -11,11 +11,12 @@ A channel's value is first standardized against clean data, z = (x - mu) / sigma
 sigma calibrated per channel on clean runs (`Calibration`). Then one of two detectors watches
 each channel:
 
-- `FixedThreshold`: alarm when z > h (or |z| > h, two-sided). Memoryless: reacts to a large
-  step at once and to a small persistent change never.
-- `Cusum` (Page 1954): accumulates evidence, S = max(0, S + z - k) (and S- for the other side),
-  alarm when S > h. `k` is the allowance: drift smaller than k clean standard deviations is
-  ignored and S drains by k per update on clean data; `h` trades delay for false alarms. A
+- threshold (`kind: threshold`): alarm when z > h (or |z| > h, two-sided). Memoryless:
+  reacts to a large step at once and to a small persistent change never.
+- CUSUM (`kind: cusum`, Page 1954): accumulates evidence, S = max(0, S + z - k) (and S- for
+  the other side), alarm when S > h. `k` is the allowance: drift smaller than k clean
+  standard deviations is ignored and S drains by k per update on clean data; `h` trades
+  delay for false alarms. A
   persistent shift d > k reaches h after about h / (d - k) updates, so small drifts are caught
   eventually and large ones about as fast as a threshold.
 

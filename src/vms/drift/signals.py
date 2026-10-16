@@ -106,6 +106,14 @@ class DetectionRow:
     confidence: float
 
 
+def coverage(frames: Sequence[FrameRow], window_s: float) -> float:
+    """Share of the window spanned by its frames (first to last capture time), 0 if empty."""
+    if not frames:
+        return 0.0
+    ts = [f.ts for f in frames]
+    return (max(ts) - min(ts)).total_seconds() / window_s
+
+
 @dataclass(frozen=True)
 class Sample:
     """One camera's signals over one time range. `values` holds per-frame arrays for the

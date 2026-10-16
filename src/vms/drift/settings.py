@@ -32,6 +32,10 @@ class MonitorSettings(_Section):
     settle_s: float = Field(default=3.0, ge=0)
     discover_every_s: float = Field(default=30.0, gt=0)  # look for new cameras
     shutdown_grace_s: float = Field(default=5.0, gt=0)
+    # The detector only sees windows whose frames span at least this share of window_s: the
+    # first windows after a camera starts or resumes (and the last as it stops) hold a few
+    # seconds of frames, unlike every window the clean-run calibration saw (task 9.3, E-055).
+    detect_min_coverage: float = Field(default=0.9, ge=0, le=1)
 
     @model_validator(mode="after")
     def _check(self) -> MonitorSettings:

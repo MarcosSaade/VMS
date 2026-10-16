@@ -248,3 +248,48 @@ def test_detector_alarms_on_the_drift_and_counts_one_onset() -> None:
     z = sample("z_value")
     assert z is not None
     assert z < -20
+
+
+def test_detector_skips_partly_filled_windows() -> None:
+    # Seen live in task 9.3 (E-055): when a camera starts or resumes, the first windows hold a
+    # few seconds of frames, whose class mix and means differ from any full 30 s window, and
+    # the alarm fired on them. Offline calibration only ever saw full windows.
+    from vms.drift.detect import Calibration, ChannelCalibration, DetectorSettings
+
+    rng = np.random.default_rng(11)
+    store = FakeDriftStore()
+    store.add(stream("cam-1", T0, 120, Scene(), rng))
+    store.add(stream("cam-1", T0 + timedelta(seconds=200), 60, Scene(brightness=80.0), rng))
+    clock = FakeClock(T0)
+    metrics = Metrics("drift")
+    cal = Calibration(channels={"shift:brightness": ChannelCalibration(mean=0.0, std=0.5)})
+    monitor = DriftMonitor(
+        store,
+        SETTINGS,
+        SignalSettings(),
+        metrics,
+        clock=clock,
+        detector=DetectorSettings(kind="threshold", h=10),
+        calibration=cal,
+    )
+    labels = {"camera_id": "cam-1", "channel": "shift:brightness"}
+
+    def at(seconds: float) -> None:
+        clock.set(T0 + timedelta(seconds=seconds))
+        asyncio.run(monitor.update())
+
+    at(20)
+    at(100)
+    at(208)  # window [175, 205): 5 s of the resumed, darker stream
+    assert (
+        metrics.registry.get_sample_value(
+            "vms_drift_shift_value", {"camera_id": "cam-1", "signal": "brightness"}
+        )
+        < -10
+    )  # the statistic is still exported
+    assert metrics.registry.get_sample_value("vms_drift_alarm_value", labels) == 0
+    z = metrics.registry.get_sample_value("vms_drift_z_value", labels)
+    assert z is not None
+    assert math.isnan(z)
+    at(238)  # a full window of the dark stream
+    assert metrics.registry.get_sample_value("vms_drift_alarm_value", labels) == 1
