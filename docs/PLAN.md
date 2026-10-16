@@ -8,7 +8,7 @@
 
 **Estimate.** 29 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). The biggest schedule risk is the GPU quota: spot is denied by the account's SCP, and the on-demand G quota is 0 (4 vCPUs requested 2026-10-13; D28): Phase 5 and 9.5 need a GPU, and both have a CPU fallback in `PLAN_FULL.md`.
 
-**Order of work.** Phase 1, then 2.1 to 2.3, then Phase 3, then 2.4 to 2.6 (first GPU session), then Phase 5, then Phase 9, then Phase 11. Phase numbers are kept for stable IDs, so this order differs from the numbering.
+**Order of work.** Phase 1, then 2.1 to 2.3, then Phase 3, then 2.4 to 2.6 (first GPU session), then Phase 5, then Phase 9, then Phase 11 (publish at C1), then Phase 8 (after C1, added 2026-10-16; 8.1 may run early on the first GPU session, alongside the 3.5 local LLM run). Phase numbers are kept for stable IDs, so this order differs from the numbering.
 
 **Understand it.** Each task carries one question the user must be able to answer with specifics before the task is ticked. This is how the user verifies they understand what the agent built.
 
@@ -104,6 +104,19 @@
 - [ ] 11.4 Fresh-clone reproduction test
   - Understand it: which steps needed fixing on a clean machine, and is anything still manual?
 
+## Phase 8: LLM serving and LoRA (after C1)
+Added 2026-10-16 by the user's decision, as work after checkpoint C1: C1's scope is unchanged, and the README and write-up are updated as each task lands. 8.1 to 8.4 need a GPU session.
+- [ ] 8.1 vLLM serving with prefix caching and structured outputs (overhead measured); load test vs llama.cpp/Ollama
+  - Understand it: what did prefix caching save on the long schema prompt, and what does constrained decoding cost in tokens/s and plan validity?
+- [ ] 8.2 Synthetic (question, QueryPlan) training data with filtering and leakage checks (DVC)
+  - Understand it: which filter removed the most pairs, and how do you know no test question leaked in?
+- [ ] 8.3 LoRA fine-tune on plan JSON with ablations (results JSON, no W&B: D16; optional SQL adapter for D11)
+  - Understand it: how did accuracy move with data size and rank on dev, and what did the one test run show?
+- [ ] 8.4 Quantization; multi-LoRA (plan + SQL adapters) or adapter vs merged overhead
+  - Understand it: what did AWQ/GPTQ cost in accuracy and buy in latency and memory?
+- [ ] 8.5 Decide D7: hosted vs few-shot vs LoRA on accuracy, p95, cost
+  - Understand it: at what query volume does self-hosting beat the hosted model per 1,000 queries, if ever?
+
 ## Interview defense
 
 The finished project should let the user answer each of these with specifics from their own measurements:
@@ -125,6 +138,7 @@ The finished project should let the user answer each of these with specifics fro
 - **2026-10-06:** The local object store is SeaweedFS instead of MinIO, which no longer publishes images (D12). Task 0.6 no longer ports the old smart-vision prototype: by the user's decision, the query assets (draft `QueryPlan`, SQL validator, few-shot bank, prompt templates) are built from scratch (D13, D14).
 - **2026-10-06 (re-scope):** The 18-week plan is cut to a finishable core of about 6 part-time weeks, chosen for hiring signal and learning per hour, because the semester is shared with a research paper and quant work. Kept: the end-to-end baseline with a UI and good dashboards (the demo and write-up are visual for recruiters who skim), observability, the benchmark runner and bottleneck analysis, the evaluation harness with bootstrap confidence intervals and an error taxonomy, a minimal model-internals track (ONNX parity, precision ladder, batch sweep), drift detection framed as sequential change detection, and packaging. Deferred: storage and queue benchmarks, gRPC, Kubernetes, autoscaling, chaos and capacity tests, CLIP with semantic and hybrid search (retrieval labels are the most expensive labeling in the plan), the free-form SQL engine, LLM serving and LoRA, full Terraform, CD and the retraining stretch. Decisions that depended on deferred tasks now have defaults marked "accepted (default, not benchmarked)" (D1 to D4, D6 to D11). Redis, MLflow and W&B are removed because no kept task measures a need for them (new task 0.7, D16). Tally over the original 65 tasks: 24 kept (7 already done), 14 shrunk, 27 deferred; plus the new task 0.7. A scope lock and checkpoint C1 now head this file.
 - **2026-10-14:** By the user's decision, the second LLM in 3.5 is not run now through another hosted API; it runs locally on the first GPU session (2.4/2.5) instead, with the same harness and dev split. 3.5 closes without it, with DeepSeek as the provisional planner (D7 stays "default, not compared" until then). No work is added or removed, only moved.
+- **2026-10-16:** By the user's decision, Phase 8 (LLM serving and LoRA, 5 tasks) comes back as work after C1 rather than as a swap: the user publishes at C1, starts applying, and keeps going, updating the README and write-up per phase. C1's scope and the scope lock for it are unchanged. 8.3 drops W&B and the MLflow registry (removed by D16; results JSON and DVC instead), and 8.1 drops Helm (6.4 stays deferred). 8.1 may run on the first GPU session next to the 3.5 local LLM run, since both need the same served model.
 
 ## Deferred (not planned)
 
@@ -147,11 +161,6 @@ Kept unchanged so nothing is lost. A deferred task comes back only through the s
 - [ ] 7.1 Hybrid search: shared `QueryPlan` with visual query, filtered ANN or prefilter + rerank
 - [ ] 7.2 Query engine improvements and D11: few-shot retrieval, schema and plan pruning, repair, caching; free-form SQL engine; compare once on test
 - [ ] 7.3 Re-evaluate all modes; error analysis
-- [ ] 8.1 vLLM serving with prefix caching and structured outputs (overhead measured); load test vs llama.cpp/Ollama
-- [ ] 8.2 Synthetic (question, QueryPlan) training data with filtering and leakage checks (DVC)
-- [ ] 8.3 LoRA fine-tune on plan JSON with ablations, W&B tracking (optional SQL adapter for D11)
-- [ ] 8.4 Quantization; multi-LoRA (plan + SQL adapters) or adapter vs merged overhead
-- [ ] 8.5 Decide D7: hosted vs few-shot vs LoRA on accuracy, p95, cost
 - [ ] 10.1 Full AWS stack in Terraform (EC2 spot GPU + k3s, S3, ECR, IAM, Budgets; EKS only if justified)
 - [ ] 10.2 CD pipeline with eval gate; champion in MLflow registry
 - [ ] 10.3 Full-scale cloud benchmark; cost per camera-hour

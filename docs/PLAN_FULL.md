@@ -401,42 +401,42 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 ## Phase 8: LLM serving and LoRA
 
-**Status:** whole phase deferred (2026-10-06 re-scope). It is the first candidate to swap in under the scope lock (for example, in place of 9.5 and 5.3). D7 has a default.
+**Status:** planned after checkpoint C1 (2026-10-16, user's decision; was deferred in the 2026-10-06 re-scope). C1's scope is unchanged. 8.1 may run early on the first GPU session, next to the 3.5 local LLM run. D7 keeps its default until 8.5.
 
 **Goal:** efficient self-hosted LLM serving and an evidence-based choice between prompting, fine-tuning and hosted models (D7).
 **Exit gate:** D7 accepted with accuracy, latency and cost per 1,000 queries for each option.
 
 ### 8.1 vLLM serving
 
-**Status:** deferred (2026-10-06 re-scope; not planned). Kept unchanged for reference; it returns only through the scope-lock rule in `PLAN.md`.
+**Status:** planned after C1 (2026-10-16). Changed: Helm dropped (6.4 is deferred).
 
-**Prompt:** Serve candidate small open models with vLLM behind the OpenAI-compatible interface; check which current small models are strongest at structured JSON output and SQL before choosing candidates. Enable prefix caching (the schema prompt is long and shared) and measure its effect. Measure constrained-decoding overhead: structured outputs on vs off for `QueryPlan` generation (tokens/s, time to first token, p95, and plan validity rate). Load test concurrent requests for tokens/s, time to first token and p95, and compare with llama.cpp or Ollama on the same GPU. Add the llm-service to compose and Helm.
+**Prompt:** Serve candidate small open models with vLLM behind the OpenAI-compatible interface; check which current small models are strongest at structured JSON output and SQL before choosing candidates. Enable prefix caching (the schema prompt is long and shared) and measure its effect. Measure constrained-decoding overhead: structured outputs on vs off for `QueryPlan` generation (tokens/s, time to first token, p95, and plan validity rate). Load test concurrent requests for tokens/s, time to first token and p95, and compare with llama.cpp or Ollama on the same GPU. Add the llm-service to compose (GPU profile).
 **Done when:** serving comparison in `BENCHMARKS.md`; query service runs against vLLM.
 
 ### 8.2 Training data
 
-**Status:** deferred (2026-10-06 re-scope; not planned). Kept unchanged for reference; it returns only through the scope-lock rule in `PLAN.md`.
+**Status:** planned after C1 (2026-10-16).
 
 **Prompt:** Generate training (question, `QueryPlan`) pairs with a strong model over the schema and varied synthetic DB states. Filter: the plan is schema-valid, compiles successfully, executes, and the result sets of two independent generations agree. Deduplicate and run leakage checks against the test set: exact match, near-duplicate by embedding similarity and template overlap. Target 2k to 10k pairs; record generation cost and filter pass rates. If a SQL adapter is planned for D11 (8.3), keep the compiled or independently generated SQL for each pair as well.
 **Done when:** dataset tracked with DVC (generation script, seed and filter config in git); leakage report shows no overlap.
 
 ### 8.3 LoRA fine-tune
 
-**Status:** deferred (2026-10-06 re-scope; not planned). Kept unchanged for reference; it returns only through the scope-lock rule in `PLAN.md`.
+**Status:** planned after C1 (2026-10-16). Changed: W&B and the MLflow registry are gone (D16); runs write results JSON, adapters go to DVC.
 
-**Prompt:** Fine-tune the chosen base with LoRA (PEFT or Unsloth) on a rented GPU via the session script, with plan JSON as the target. Log training runs and sweeps to W&B and eval results to MLflow through the `Tracker`. Ablate data size (e.g., 500, 2k, all) and rank on the dev split; evaluate the best once on test. Optionally train a second adapter with SQL targets on the same questions for the D11 comparison.
-**Done when:** ablation table and final test numbers recorded; adapter weights tracked with DVC; candidate registered in the MLflow registry.
+**Prompt:** Fine-tune the chosen base with LoRA (PEFT or Unsloth) on a rented GPU via the session script, with plan JSON as the target. Each training run and eval writes a results JSON (D16). Ablate data size (e.g., 500, 2k, all) and rank on the dev split; evaluate the best once on test. Optionally train a second adapter with SQL targets on the same questions for the D11 comparison.
+**Done when:** ablation table and final test numbers recorded; adapter weights tracked with DVC; the chosen adapter pinned by hash in config.
 
 ### 8.4 Quantization and multi-LoRA
 
-**Status:** deferred (2026-10-06 re-scope; not planned). Kept unchanged for reference; it returns only through the scope-lock rule in `PLAN.md`.
+**Status:** planned after C1 (2026-10-16).
 
 **Prompt:** Quantize the base model (AWQ or GPTQ) and measure the accuracy and latency effect. If both a plan adapter and a SQL adapter exist, serve them on one base with vLLM multi-LoRA and measure overhead vs merged single models. If only the plan adapter exists (hybrid shares the plan, so there is no separate hybrid adapter), measure adapter vs merged serving overhead and state that multi-LoRA was not needed.
 **Done when:** results recorded; serving config committed.
 
 ### 8.5 Decide D7
 
-**Status:** deferred (2026-10-06 re-scope; not planned). Kept unchanged for reference; it returns only through the scope-lock rule in `PLAN.md`.
+**Status:** planned after C1 (2026-10-16).
 
 **Prompt:** Compare hosted model, base model few-shot, LoRA, and quantized LoRA on structured-query execution accuracy (test), p95 latency under load and cost per 1,000 queries (including amortized GPU cost). Write D7 honestly, including the case where fine-tuning loses.
 **Done when:** D7 accepted; default model in config matches the decision.
