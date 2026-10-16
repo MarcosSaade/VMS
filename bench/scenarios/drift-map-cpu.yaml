@@ -1,0 +1,26 @@
+name: drift-map-cpu
+description: >
+  Task 9.2: detection quality under each photometric drift that loadgen can inject, so the
+  impact of each drift is measured before detecting it (9.3) or fine-tuning against it (9.5).
+  The deployed CPU worker's model (YOLO11n, ONNX Runtime FP32; D5) on the frozen detection
+  subset v1 (500 COCO val2017 images, 73 MOT17 frames as loadgen sends them), clean and with
+  each transform of vms.drift.transforms at full strength on every image, two strengths per
+  kind (moderate, severe). Paired bootstrap of the change against clean (2,000 resamples).
+kind: eval-drift
+config:
+  detector:
+    weights: yolo11n
+    backend: onnxruntime
+conditions:
+  - name: darken-0.5          # gain 0.5: dusk, an underexposed camera
+    drift: {kind: darken, strength: 0.5}
+  - name: darken-0.25         # gain 0.25: night without enough light
+    drift: {kind: darken, strength: 0.25}
+  - name: blur-3              # Gaussian sigma 3 px at 1280 px width: soft focus
+    drift: {kind: blur, strength: 3.0}
+  - name: blur-6              # sigma 6 px: defocused or fogged lens
+    drift: {kind: blur, strength: 6.0}
+  - name: noise-10            # sigma 10 levels per channel: high gain
+    drift: {kind: noise, strength: 10.0}
+  - name: noise-25            # sigma 25: very high gain, interference
+    drift: {kind: noise, strength: 25.0}

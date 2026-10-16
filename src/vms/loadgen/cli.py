@@ -35,6 +35,7 @@ from vms.common.clock import SystemClock
 from vms.common.ids import new_ulid
 from vms.common.observability import Observability, init_observability
 from vms.common.settings import deep_merge, load_settings
+from vms.loadgen.drift import schedule_drift
 from vms.loadgen.frames import LoadedClip, load_clip
 from vms.loadgen.recorder import Recorder
 from vms.loadgen.runner import Runner
@@ -99,7 +100,8 @@ def aggregate(reps: Sequence[dict[str, Any]]) -> dict[str, dict[str, float | Non
 
 def _load_clips(settings: LoadgenSettings, obs: Observability) -> dict[str, LoadedClip]:
     clips = {}
-    for clip_id in dict.fromkeys(settings.clips.ids):
+    # Clips a drift event switches cameras to are loaded too (vms.loadgen.drift).
+    for clip_id in dict.fromkeys([*settings.clips.ids, *settings.drift.clips()]):
         t0 = time.perf_counter()
         clip = load_clip(
             settings.clips.data_dir, clip_id, settings.frame, settings.clips.max_frames
@@ -154,6 +156,7 @@ async def _repetition(
         assignment=settings.clips.assignment,
         prefix=settings.camera_prefix,
     )
+    drift = schedule_drift(settings.drift, plans, seed)
     recorder = Recorder(obs.metrics, settings.warmup_s)
     transport = _transport(settings, kind, random.Random(seed))
     runner = Runner(
@@ -165,6 +168,7 @@ async def _repetition(
         clock=SystemClock(),
         run_id=f"{run_id}-r{rep}",
         tracer=obs.tracer,
+        drift=drift,
     )
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -191,6 +195,15 @@ async def _repetition(
             round(timing.cpu_s * 1e6 / recorder.total_sent, 1) if recorder.total_sent else None
         ),
     }
+    if drift:
+        wall0 = datetime.fromisoformat(timing.started_at)
+        summary["drift"] = {
+            # Known onsets, for scoring detection delay (task 9.3).
+            "events": [e.record(wall0) for events in drift.values() for e in events],
+            "rendered_frames": len(runner.render_s),
+            "render_ms": stats.percentiles_ms(runner.render_s),
+        }
+        summary["cameras"] = {p.camera_id: p.clip_id for p in plans}
     lag_p99 = summary["schedule_lag_ms"]["p99"]
     summary["generator_ok"] = lag_p99 is None or lag_p99 <= settings.max_schedule_lag_p99_ms
     if not summary["generator_ok"]:

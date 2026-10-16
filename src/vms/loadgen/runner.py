@@ -10,6 +10,12 @@ counted.
 Unpaced mode is closed loop on purpose: every camera sends as fast as its in-flight limit
 allows. It measures the maximum rate of the generator plus whatever transport it uses.
 
+Drift injection (task 9.2, vms.loadgen.drift): a camera with scheduled drift sends, from the
+onset on, its frame from the switched clip and/or transformed in a thread pool (decode,
+transform, re-encode take a few milliseconds per 1280x720 frame, which must not stall the
+event loop). Schedule lag is measured at launch, as for every frame; the render time is
+recorded apart (`render_s`) and the send latency starts after it.
+
 Time comes from the event loop (`loop.time()`, monotonic), which is also what `asyncio.sleep`
 uses, so tests can run the loop on virtual time. Frame timestamps are wall clock: the run start
 read from the injected `Clock`, plus the frame's due offset.
@@ -21,6 +27,7 @@ import asyncio
 import contextlib
 import time
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 
@@ -28,7 +35,8 @@ from opentelemetry import propagate, trace
 
 from vms.common.clock import Clock
 from vms.common.logs import get_logger
-from vms.loadgen.frames import LoadedClip
+from vms.loadgen.drift import ScheduledDrift, active_clip, active_transforms, render
+from vms.loadgen.frames import FALLBACK_JPEG_QUALITY, LoadedClip
 from vms.loadgen.recorder import Recorder
 from vms.loadgen.schedule import CameraPlan, clip_frame, due_time
 from vms.loadgen.settings import LoadgenSettings
@@ -58,6 +66,8 @@ class Runner:
         run_id: str,
         tracer: trace.Tracer | None = None,
         process_time: Callable[[], float] = time.process_time,
+        drift: Mapping[str, Sequence[ScheduledDrift]] | None = None,
+        render_executor: Executor | None = None,
     ) -> None:
         self._s = settings
         self._plans = plans
@@ -70,6 +80,10 @@ class Runner:
         self._process_time = process_time
         self._stop = asyncio.Event()
         self._tasks: set[asyncio.Task[None]] = set()
+        self._drift = drift or {}
+        self._render_executor = render_executor
+        self._owns_executor = render_executor is None
+        self.render_s: list[float] = []  # time to transform and re-encode each drifted frame
 
     def stop(self) -> None:
         """Stop scheduling new frames (graceful shutdown); in-flight sends still complete."""
@@ -93,6 +107,9 @@ class Runner:
                 task.cancel()
         t_end = loop.time()
         await self._drain()
+        if self._owns_executor and self._render_executor is not None:
+            self._render_executor.shutdown(wait=True)
+            self._render_executor = None
         return RunTiming(
             started_at=wall0.isoformat(),
             elapsed_s=t_end - t0,
@@ -147,6 +164,10 @@ class Runner:
         wall0: datetime,
         limit: asyncio.Semaphore,
     ) -> None:
+        events = self._drift.get(plan.camera_id, ())
+        switched = active_clip(events, due)
+        if switched is not None:
+            clip = self._clips[switched]
         index = clip_frame(plan, k, self._s.fps, clip.fps, len(clip.frames))
         ts = wall0 + timedelta(seconds=due)
         frame = OutgoingFrame(
@@ -156,15 +177,30 @@ class Runner:
             ts_unix_ms=int(ts.timestamp() * 1000),
             jpeg=clip.frames[index],
         )
+        transforms = active_transforms(events, due)
         self._recorder.sent(due, lag)
-        task = asyncio.create_task(self._send(frame, due, limit))
+        task = asyncio.create_task(self._send(frame, due, limit, transforms))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    async def _send(self, frame: OutgoingFrame, due: float, limit: asyncio.Semaphore) -> None:
+    async def _send(
+        self,
+        frame: OutgoingFrame,
+        due: float,
+        limit: asyncio.Semaphore,
+        transforms: Sequence[tuple[ScheduledDrift, float]] = (),
+    ) -> None:
         loop = asyncio.get_running_loop()
         start = loop.time()
         try:
+            if transforms:
+                quality = self._s.frame.jpeg_quality or FALLBACK_JPEG_QUALITY
+                jpeg = await loop.run_in_executor(
+                    self._renderer(), render, frame.jpeg, transforms, frame.seq, quality
+                )
+                frame = replace(frame, jpeg=jpeg)
+                self.render_s.append(loop.time() - start)
+                start = loop.time()
             with self._tracer.start_as_current_span(
                 "loadgen.send_frame",
                 kind=trace.SpanKind.CLIENT,
@@ -177,12 +213,20 @@ class Runner:
                 result = await self._transport.send(frame)
                 span.set_attribute("outcome", result.outcome.value)
         except Exception:
-            # A transport must not raise; if one does, count it instead of losing the frame.
+            # A transport (or a drift render) must not raise; if one does, count it instead
+            # of losing the frame.
             log.exception("send raised", extra={"camera_id": frame.camera_id, "seq": frame.seq})
             result = SendResult(Outcome.FAILED, None, "error")
         finally:
             limit.release()
         self._recorder.completed(due, result, loop.time() - start)
+
+    def _renderer(self) -> Executor:
+        if self._render_executor is None:
+            self._render_executor = ThreadPoolExecutor(
+                self._s.drift.render_workers, thread_name_prefix="drift-render"
+            )
+        return self._render_executor
 
     async def _drain(self) -> None:
         if not self._tasks:

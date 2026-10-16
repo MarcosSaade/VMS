@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from vms.common.settings import ServiceSettings
+from vms.loadgen.drift import DriftInjectionSettings
 
 
 class _Section(BaseModel):
@@ -86,6 +87,8 @@ class LoadgenSettings(ServiceSettings):
     clips: ClipSettings = Field(default_factory=ClipSettings)
     http: HttpSettings = Field(default_factory=HttpSettings)
     stub: StubSettings = Field(default_factory=StubSettings)
+    # Scheduled, seeded drift on some cameras (task 9.2, vms.loadgen.drift); none by default.
+    drift: DriftInjectionSettings = Field(default_factory=DriftInjectionSettings)
     # Prometheus /metrics while running; null disables.
     metrics_port: int | None = Field(default=9105, ge=1, le=65535)
     results_dir: Path = Path("bench/results")

@@ -1,0 +1,21 @@
+name: drift-classmix
+description: >
+  Task 9.2 drift scenario (vms.loadgen.drift), run against the containerized pipeline with
+  the drift monitor (make demo stack): `python -m vms.loadgen run --scenario bench/scenarios/drift-classmix.yaml`.
+  4 cameras x 5 FPS for 360 s on four full-length clips (make data; the data-mini clips loop
+  every 10 s, E-050). The monitor's reference is each camera's first 60 s; onsets are at
+  120 s plus a seeded jitter in [0, 60) s per camera and repetition, recorded in the results
+  (repetitions[].drift.events). Class-mix change: cameras 0 and 2 switch to commons-roncesvalles (a street with cars and cyclists) from their pedestrian scenes; abrupt only (a camera re-pointed, or a feed swapped). Cameras 1 and 3 stay clean. The switch changes the input statistics too: it is a scene change, not a pure class-mix change.
+kind: run
+repeats: 3
+config:
+  cameras: 4
+  fps: 5
+  duration_s: 360
+  warmup_s: 10
+  camera_prefix: drift-classmix-
+  clips:
+    ids: [mot17-09, mot17-04, mot17-02, mot17-08]
+  drift:
+    events:
+      - {kind: switch_clip, clip: commons-roncesvalles, cameras: [0, 2], onset_s: 120, onset_jitter_s: 60}

@@ -4,7 +4,8 @@ The detector is anything behind the worker's `Detector` interface, built from se
 `vms.worker.detector.build_detector` (`detector.backend`: Ultralytics PyTorch or ONNX
 Runtime). COCO images go in as stored; MOT17 frames go through loadgen's resize and re-encode
 first, with their boxes scaled to match, so the mot17 numbers describe the frames the worker
-actually sees.
+actually sees. With `drift` set, every image then goes through that photometric transform
+(task 9.2) before detection.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from __future__ import annotations
 import gzip
 import json
 import time
+import zlib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,7 @@ from vms.bench.results import (
 )
 from vms.common.ids import new_ulid
 from vms.common.logs import get_logger
+from vms.drift.transforms import apply as apply_drift
 from vms.eval.detection.metrics import ImageGt, ImagePred, evaluate, match_dataset
 from vms.eval.detection.settings import DetectionEvalSettings
 from vms.eval.detection.subset import GtImage, SubsetManifest, image_ok, read_subset
@@ -67,6 +70,14 @@ def load_image(
         f = settings.mot_frame
         data = prepare_frame(data, (f.width, f.height), f.jpeg_quality)
     return decode_jpeg(data), ground_truth(image, settings)
+
+
+def drifted(pixels: np.ndarray, image_id: str, settings: DetectionEvalSettings) -> np.ndarray:
+    d = settings.drift
+    if d is None:
+        return pixels
+    rng = np.random.default_rng([d.seed, zlib.crc32(image_id.encode())])
+    return apply_drift(d.kind, pixels, 1.0, d.strength, rng=rng)
 
 
 def predict(detector: Detector, pixels: np.ndarray) -> ImagePred:
@@ -142,6 +153,7 @@ def run(
     dump: list[str] = []
     for k, image in enumerate(subset):
         pixels, gt = load_image(image, images_dir, settings)
+        pixels = drifted(pixels, image.id, settings)
         if k == 0:
             detector.detect(pixels)  # warmup, not timed
         t0 = time.perf_counter()
@@ -174,6 +186,7 @@ def run(
         config=settings.model_dump(mode="json"),
         metrics={
             "model_version": detector.model_version,
+            "drift": settings.drift.model_dump() if settings.drift else None,
             "subset": {
                 "version": manifest.version,
                 "subset_sha256": manifest.subset_sha256,

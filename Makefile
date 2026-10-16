@@ -279,6 +279,10 @@ eval-detection-compare: ## Paired mAP difference between two detection runs, wit
 	@test -n "$(BASE)" -a -n "$(OTHER)" || { echo "set BASE=<results JSON> OTHER=<results JSON>" >&2; exit 1; }
 	$(RUN) python -m vms.eval.detection compare $(BASE) $(OTHER) $(if $(NAME),--name $(NAME))
 
+.PHONY: eval-drift
+eval-drift: ## Detection mAP clean and under each photometric drift, paired deltas (SCENARIO=bench/scenarios/drift-map-cpu.yaml)
+	$(RUN) python -m vms.eval.detection drift --scenario $(or $(SCENARIO),bench/scenarios/drift-map-cpu.yaml)
+
 .PHONY: eval-report
 eval-report: ## Markdown tables of eval results files (RESULTS="eval/results/a.json ...")
 	@test -n "$(RESULTS)" || { echo "make eval-report: set RESULTS=<results JSON files>" >&2; exit 1; }

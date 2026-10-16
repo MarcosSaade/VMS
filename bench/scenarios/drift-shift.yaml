@@ -1,0 +1,22 @@
+name: drift-shift
+description: >
+  Task 9.2 drift scenario (vms.loadgen.drift), run against the containerized pipeline with
+  the drift monitor (make demo stack): `python -m vms.loadgen run --scenario bench/scenarios/drift-shift.yaml`.
+  4 cameras x 5 FPS for 360 s on four full-length clips (make data; the data-mini clips loop
+  every 10 s, E-050). The monitor's reference is each camera's first 60 s; onsets are at
+  120 s plus a seeded jitter in [0, 60) s per camera and repetition, recorded in the results
+  (repetitions[].drift.events). Camera shift (view cropped by 15% per side toward the bottom right and rescaled): camera 0 abrupt (bumped), camera 2 gradual over 120 s (a loose mount); cameras 1 and 3 stay clean.
+kind: run
+repeats: 3
+config:
+  cameras: 4
+  fps: 5
+  duration_s: 360
+  warmup_s: 10
+  camera_prefix: drift-shift-
+  clips:
+    ids: [mot17-09, mot17-04, mot17-02, mot17-08]
+  drift:
+    events:
+      - {kind: shift, strength: 0.15, cameras: [0], onset_s: 120, onset_jitter_s: 60}
+      - {kind: shift, strength: 0.15, cameras: [2], onset_s: 120, onset_jitter_s: 60, ramp_s: 120}

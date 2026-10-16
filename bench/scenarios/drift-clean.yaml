@@ -1,0 +1,15 @@
+name: drift-clean
+description: >
+  Task 9.2/9.3 control: the drift scenarios' cameras, clips and length without any drift, for
+  false alarms per camera-hour (`python -m vms.loadgen run --scenario bench/scenarios/drift-clean.yaml`).
+  4 cameras x 5 FPS for 360 s on four full-length clips (make data).
+kind: run
+repeats: 3
+config:
+  cameras: 4
+  fps: 5
+  duration_s: 360
+  warmup_s: 10
+  camera_prefix: drift-clean-
+  clips:
+    ids: [mot17-09, mot17-04, mot17-02, mot17-08]

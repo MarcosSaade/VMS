@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from vms.common.settings import ServiceSettings
+from vms.drift.transforms import check_strength
 from vms.worker.detector import DetectorSettings
 
 
@@ -40,6 +41,22 @@ class BootstrapSettings(_Section):
     confidence: float = Field(default=0.95, gt=0, lt=1)
 
 
+class EvalDrift(_Section):
+    """A photometric drift applied to every image before detection (task 9.2), at full
+    intensity, with the same transform loadgen injects (vms.drift.transforms). Boxes stay
+    valid, so the ground truth is unchanged. Noise is seeded per image from `seed` and the
+    image id."""
+
+    kind: Literal["darken", "blur", "noise"]
+    strength: float
+    seed: int = 20261016
+
+    @model_validator(mode="after")
+    def _check(self) -> EvalDrift:
+        check_strength(self.kind, self.strength)
+        return self
+
+
 class DetectionEvalSettings(ServiceSettings):
     service: str = "eval-detection"
     paths: SubsetPaths = Field(default_factory=SubsetPaths)
@@ -52,6 +69,7 @@ class DetectionEvalSettings(ServiceSettings):
     max_dets_per_class: int = Field(default=100, ge=1)  # per image, as in the COCO protocol
     mot_frame: WorkerFrame = Field(default_factory=WorkerFrame)
     bootstrap: BootstrapSettings = Field(default_factory=BootstrapSettings)
+    drift: EvalDrift | None = None  # none: the clean subset
     max_images: int | None = Field(
         default=None, ge=1
     )  # smoke runs only; never for reported numbers

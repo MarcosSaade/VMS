@@ -1,0 +1,22 @@
+name: drift-occlusion
+description: >
+  Task 9.2 drift scenario (vms.loadgen.drift), run against the containerized pipeline with
+  the drift monitor (make demo stack): `python -m vms.loadgen run --scenario bench/scenarios/drift-occlusion.yaml`.
+  4 cameras x 5 FPS for 360 s on four full-length clips (make data; the data-mini clips loop
+  every 10 s, E-050). The monitor's reference is each camera's first 60 s; onsets are at
+  120 s plus a seeded jitter in [0, 60) s per camera and repetition, recorded in the results
+  (repetitions[].drift.events). A black occluder covering 30% of the frame at a seeded position: camera 0 abrupt (parked truck), camera 2 growing over 120 s; cameras 1 and 3 stay clean.
+kind: run
+repeats: 3
+config:
+  cameras: 4
+  fps: 5
+  duration_s: 360
+  warmup_s: 10
+  camera_prefix: drift-occlusion-
+  clips:
+    ids: [mot17-09, mot17-04, mot17-02, mot17-08]
+  drift:
+    events:
+      - {kind: occlusion, strength: 0.3, cameras: [0], onset_s: 120, onset_jitter_s: 60}
+      - {kind: occlusion, strength: 0.3, cameras: [2], onset_s: 120, onset_jitter_s: 60, ramp_s: 120}

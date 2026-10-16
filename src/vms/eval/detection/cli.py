@@ -9,6 +9,9 @@ Commands:
   compare BASE OTHER
           paired bootstrap of the mAP difference between two runs, from their saved
           detections (no inference); writes a results JSON with the D32 verdict
+  drift --scenario FILE
+          the subset clean and under each photometric drift of the scenario, with the paired
+          change against clean (task 9.2; vms.eval.detection.drift)
 """
 
 from __future__ import annotations
@@ -111,8 +114,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     comp.add_argument("base", type=Path, help="results JSON of the reference run")
     comp.add_argument("other", type=Path, help="results JSON of the run compared with it")
     comp.add_argument("--name", default=None, help="results name (default: detection-compare)")
+    drift = commands.add_parser("drift", help="mAP under each photometric drift of a scenario")
+    drift.add_argument("--scenario", type=Path, required=True)
     args = parser.parse_args(argv)
     configure_logging("eval-detection", args.log_level)
+    if args.command == "drift":
+        from vms.eval.detection.drift import load_scenario, resolve, run_drift
+
+        scenario = load_scenario(args.scenario)
+        path = run_drift(scenario, Path(), resolve(scenario))
+        sys.stdout.write(f"results: {path}\n")
+        return 0
     if args.command == "compare":
         from vms.eval.detection.compare import run_compare
 
