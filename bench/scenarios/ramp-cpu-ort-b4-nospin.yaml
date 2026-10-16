@@ -1,0 +1,23 @@
+name: ramp-cpu-ort-b4-nospin
+description: >
+  Task 5.5, one variable changed from ramp-cpu-ort-b4 (+ ramp-cpu-ort-b4-ext): ONNX Runtime's
+  intra-op threads sleep when idle instead of busy-waiting (detector.spin false). With
+  spinning the worker occupies ~9.2 cores even at 1 camera; a model-only check at 5 images/s
+  gave 9.1 cores spinning vs 1.3 not, with equal saturated throughput but batch-1 latency
+  19 vs 43 ms. This measures the end-to-end effect: worker cores below saturation, freshness,
+  and the ceiling. Same stack and worker otherwise (yolo11n, ONNX Runtime FP32, infer_batch 4,
+  data-mini at 5 FPS per camera, 1280x720 q85), steps of 1, 3, 5, 6 and 7 cameras, warmup
+  20 s, hold 90 s, 3 repetitions, no query load. Start the worker with
+  WORKER_BACKEND=onnxruntime WORKER_INFER_BATCH=4 WORKER_SPIN=false. Quiet host.
+kind: e2e
+repeats: 3
+warmup_s: 20
+hold_s: 90
+expect_worker:
+  backend: onnxruntime
+  precision: fp32
+  infer_batch: "4"
+  spin: "false"
+ingest:
+  cameras: [1, 3, 5, 6, 7]
+  fps: 5
