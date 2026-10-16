@@ -1,0 +1,5509 @@
+{
+  "schema_version": 1,
+  "run_id": "01M52J2GYHBMPAMRVCQW19GZPA",
+  "name": "drift-detect-cpu",
+  "kind": "drift.score",
+  "started_at": "2026-10-16T14:32:33.268754Z",
+  "ended_at": "2026-10-16T14:32:50.385676Z",
+  "seed": 0,
+  "git": {
+    "sha": "36adf56a3182f374b20bc6730f93d74ce2040a84",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "numpy": "2.5.3",
+    "matplotlib": "3.11.2"
+  },
+  "config": {
+    "name": "drift-detect-cpu",
+    "description": "Threshold vs CUSUM drift detection delay and false alarms on 7 drift scenarios x 3 reps",
+    "kind": "drift-score",
+    "runs": [
+      "bench/results/2026-10-16-drift-clean-01M5279Q6GKHEY0H4Q8167G4K6.json",
+      "bench/results/2026-10-16-drift-darken-01M528ASQ1FHEFP6RQX61XA5S1.json",
+      "bench/results/2026-10-16-drift-blur-01M529BW7NH1Y90XYKYWYE3WB2.json",
+      "bench/results/2026-10-16-drift-noise-01M52ACYGQJAQKGBD349YVPJJ7.json",
+      "bench/results/2026-10-16-drift-shift-01M52BE1GWQAMK34RCY29NPQJK.json",
+      "bench/results/2026-10-16-drift-occlusion-01M52CF3CEE5RNSFBS7H7VC655.json",
+      "bench/results/2026-10-16-drift-classmix-01M52DG5JAN3033X03G1HP6JGW.json"
+    ],
+    "monitor": {
+      "window_s": 30.0,
+      "reference_s": 60.0,
+      "update_every_s": 5.0,
+      "settle_s": 3.0,
+      "discover_every_s": 30.0,
+      "shutdown_grace_s": 5.0,
+      "detect_min_coverage": 0.9
+    },
+    "signals": {
+      "min_conf": 0.25,
+      "classes": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck"
+      ],
+      "min_frames": 20,
+      "min_detections": 20,
+      "psi_eps": 0.0001,
+      "min_std": {
+        "brightness": 1.0,
+        "contrast": 1.0,
+        "log_blur": 0.05,
+        "noise": 0.1,
+        "detections_per_frame": 0.5,
+        "confidence": 0.01
+      }
+    },
+    "min_std": {
+      "shift:brightness": 0.1,
+      "shift:contrast": 0.1,
+      "shift:log_blur": 0.1,
+      "shift:noise": 0.1,
+      "shift:detections_per_frame": 0.1,
+      "shift:confidence": 0.1,
+      "confidence_ks": 0.005,
+      "confidence_wasserstein": 0.002,
+      "class_psi": 0.002
+    },
+    "sweep": {
+      "threshold_h": [
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        8.0,
+        10.0,
+        12.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+        40.0,
+        50.0,
+        70.0,
+        100.0
+      ],
+      "cusum_k": [
+        0.5,
+        1.0,
+        2.0,
+        4.0
+      ],
+      "cusum_h": [
+        2.0,
+        3.0,
+        5.0,
+        8.0,
+        10.0,
+        15.0,
+        20.0,
+        30.0,
+        50.0,
+        80.0,
+        120.0,
+        200.0,
+        300.0
+      ]
+    },
+    "cache_dir": "data/drift/series",
+    "plot": "docs/images/drift-delay-vs-false-alarms.png"
+  },
+  "scenario": null,
+  "metrics": {
+    "streams": {
+      "total": 84,
+      "drifted": 36,
+      "clean_hours": 4.1608,
+      "updates": 4592,
+      "repetitions": [
+        0,
+        1,
+        2
+      ]
+    },
+    "calibration_all": {
+      "channels": {
+        "shift:brightness": {
+          "mean": 0.019201120972916742,
+          "std": 0.1337675415130787
+        },
+        "shift:contrast": {
+          "mean": 0.005363488464533126,
+          "std": 0.13431875104772933
+        },
+        "shift:log_blur": {
+          "mean": -0.009127159266313705,
+          "std": 0.10421480157386047
+        },
+        "shift:noise": {
+          "mean": -0.002249445248038072,
+          "std": 0.1
+        },
+        "shift:detections_per_frame": {
+          "mean": -0.05093242690473343,
+          "std": 0.13368772853536634
+        },
+        "shift:confidence": {
+          "mean": 0.008678137636190719,
+          "std": 0.1
+        },
+        "confidence_ks": {
+          "mean": 0.019801257419312105,
+          "std": 0.009686737275858762
+        },
+        "confidence_wasserstein": {
+          "mean": 0.0049463162911752125,
+          "std": 0.002316819625293709
+        },
+        "class_psi": {
+          "mean": 0.0015972109192127746,
+          "std": 0.002
+        }
+      }
+    },
+    "sweep": [
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 2.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=2",
+        "false_alarms": 489,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 117.52514206738795,
+        "fa_per_hour_upper_95": 126.50811297651043,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 3.137723500000007,
+        "delay_s_p90": 8.137478000000016,
+        "max_delay_s": 28.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 128,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 87.3298411873407,
+            "fa_per_hour_upper_95": 100.70976246865163,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 2.787681499999991,
+            "delay_s_p90": 4.004917000000006,
+            "max_delay_s": 4.005103999999989
+          },
+          "1": {
+            "false_alarms": 166,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 121.59497416816104,
+            "fa_per_hour_upper_95": 137.85232652642352,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 2.9435655000000054,
+            "delay_s_p90": 4.778887999999995,
+            "max_delay_s": 4.778919000000002
+          },
+          "2": {
+            "false_alarms": 195,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 146.62576321968106,
+            "fa_per_hour_upper_95": 164.6503366088063,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 3.137723500000007,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 28.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 3.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=3",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 18.137058999999994,
+        "max_delay_s": 33.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 31.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 4.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=4",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 18.137608999999998,
+        "max_delay_s": 36.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 5.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=5",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 21.570899999999995,
+        "max_delay_s": 36.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 6.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=6",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 38.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 21.10821200000001,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 8.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=8",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.178989000000001,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 41.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 10.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=10",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579450999999992,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 43.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 12.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=12",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579543499999986,
+        "delay_s_p90": 31.570899999999995,
+        "max_delay_s": 43.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 31.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 15.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=15",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 6.339679499999988,
+        "delay_s_p90": 36.570899999999995,
+        "max_delay_s": 46.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 36.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 46.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 6.858451000000002,
+            "delay_s_p90": 33.137609,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 20.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=20",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.004908499999999,
+        "delay_s_p90": 38.137609,
+        "max_delay_s": 51.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 36.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 36.10821200000001,
+            "max_delay_s": 51.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 38.137609,
+            "max_delay_s": 48.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 25.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=25",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 10.178932999999986,
+        "delay_s_p90": 46.10821200000001,
+        "max_delay_s": 53.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.287916999999993,
+            "delay_s_p90": 41.570899999999995,
+            "max_delay_s": 51.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.44344199999999,
+            "delay_s_p90": 46.10821200000001,
+            "max_delay_s": 51.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 43.137609,
+            "max_delay_s": 53.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 30.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=30",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 10.178932999999986,
+        "delay_s_p90": 51.57091699999998,
+        "max_delay_s": 56.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.287916999999993,
+            "delay_s_p90": 46.570899999999995,
+            "max_delay_s": 51.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.44344199999999,
+            "delay_s_p90": 51.10821200000001,
+            "max_delay_s": 56.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 53.137474999999995,
+            "max_delay_s": 53.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 40.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=40",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 14.391679499999995,
+        "delay_s_p90": 56.57091699999998,
+        "max_delay_s": 61.10821200000001,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 12.787916999999993,
+            "delay_s_p90": 51.570899999999995,
+            "max_delay_s": 56.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.44344199999999,
+            "delay_s_p90": 56.108699,
+            "max_delay_s": 61.10821200000001
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 14.358424,
+            "delay_s_p90": 58.137474999999995,
+            "max_delay_s": 58.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 50.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=50",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 16.33967949999999,
+        "delay_s_p90": 61.108699,
+        "max_delay_s": 66.10821200000001,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 17.787916999999993,
+            "delay_s_p90": 61.570899999999995,
+            "max_delay_s": 61.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.44344199999999,
+            "delay_s_p90": 61.108699,
+            "max_delay_s": 66.10821200000001
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 16.858424,
+            "delay_s_p90": 58.137474999999995,
+            "max_delay_s": 58.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 70.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=70",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 1,
+        "median_delay_s": 21.108441999999997,
+        "delay_s_p90": 66.57091699999998,
+        "max_delay_s": 81.10821200000001,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 22.787916999999993,
+            "delay_s_p90": 66.57091699999998,
+            "max_delay_s": 71.5709
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 20.44344199999999,
+            "delay_s_p90": 66.108699,
+            "max_delay_s": 81.10821200000001
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 1,
+            "median_delay_s": 20.57942399999999,
+            "delay_s_p90": 63.137474999999995,
+            "max_delay_s": 68.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "threshold",
+          "h": 100.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "threshold h=100",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 3,
+        "median_delay_s": 26.57091699999998,
+        "delay_s_p90": 76.10843400000002,
+        "max_delay_s": 103.137609,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 1,
+            "median_delay_s": 26.570103999999986,
+            "delay_s_p90": 71.57091699999998,
+            "max_delay_s": 91.57089999999997
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 1,
+            "median_delay_s": 29.778441999999984,
+            "delay_s_p90": 76.10843400000002,
+            "max_delay_s": 86.10821200000001
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 1,
+            "median_delay_s": 28.137058999999994,
+            "delay_s_p90": 73.13747800000002,
+            "max_delay_s": 103.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 2.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=2",
+        "false_alarms": 492,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 118.24615520890566,
+        "fa_per_hour_upper_95": 127.25590300521638,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 13.137058999999994,
+        "max_delay_s": 23.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 177,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 120.76079601686956,
+            "fa_per_hour_upper_95": 136.37462220446247,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 11.57091699999998,
+            "max_delay_s": 16.570899999999995
+          },
+          "1": {
+            "false_alarms": 179,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 131.1174721451857,
+            "fa_per_hour_upper_95": 147.97126808204408,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 11.108699000000001,
+            "max_delay_s": 11.108888000000007
+          },
+          "2": {
+            "false_alarms": 136,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 102.26207075834166,
+            "fa_per_hour_upper_95": 117.43883861834877,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 13.137608999999998,
+            "max_delay_s": 23.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 3.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=3",
+        "false_alarms": 204,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 49.02889362320479,
+        "fa_per_hour_upper_95": 54.91603791202978,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 13.137608999999998,
+        "max_delay_s": 23.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 35,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 23.879253449663473,
+            "fa_per_hour_upper_95": 31.201281556685668,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 11.57091699999998,
+            "max_delay_s": 16.570899999999995
+          },
+          "1": {
+            "false_alarms": 103,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 75.44748397181077,
+            "fa_per_hour_upper_95": 88.40901497074395,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 11.108699000000001,
+            "max_delay_s": 11.108888000000007
+          },
+          "2": {
+            "false_alarms": 66,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 49.62718139743051,
+            "fa_per_hour_upper_95": 60.42789315920813,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 23.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 5.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=5",
+        "false_alarms": 81,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 19.467354820978372,
+        "fa_per_hour_upper_95": 23.265892388207547,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 18.137608999999998,
+        "max_delay_s": 33.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 18,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 12.280758916969786,
+            "fa_per_hour_upper_95": 17.724644637633947,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 43,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 31.49749330862003,
+            "fa_per_hour_upper_95": 40.131458992245214,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 31.108699
+          },
+          "2": {
+            "false_alarms": 20,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 15.038539817403185,
+            "fa_per_hour_upper_95": 21.3221407664347,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 8.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=8",
+        "false_alarms": 24,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 5.76810513214174,
+        "fa_per_hour_upper_95": 7.945281522347924,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.178989000000001,
+        "delay_s_p90": 21.10821200000001,
+        "max_delay_s": 36.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 2,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 1.3645287685521985,
+            "fa_per_hour_upper_95": 4.298265620939425,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 12,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 8.789998132638148,
+            "fa_per_hour_upper_95": 13.69660963269985,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 21.10821200000001
+          },
+          "2": {
+            "false_alarms": 10,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 7.519269908701593,
+            "fa_per_hour_upper_95": 12.752681765157902,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 10.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=10",
+        "false_alarms": 23,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 5.5277674183025,
+        "fa_per_hour_upper_95": 7.664163690267755,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579450999999992,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 38.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 2,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 1.3645287685521985,
+            "fa_per_hour_upper_95": 4.298265620939425,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 11,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 8.057498288251635,
+            "fa_per_hour_upper_95": 12.786405782583264,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 21.108888000000007,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 10,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 7.519269908701593,
+            "fa_per_hour_upper_95": 12.752681765157902,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 15.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=15",
+        "false_alarms": 12,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 2.88405256607087,
+        "fa_per_hour_upper_95": 4.493942042033553,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 6.339679499999988,
+        "delay_s_p90": 26.570899999999995,
+        "max_delay_s": 41.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 1,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.6822643842760993,
+            "fa_per_hour_upper_95": 3.2339331814687107,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 10,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 7.324998443865123,
+            "fa_per_hour_upper_95": 12.42319736079525,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 1,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.7519269908701592,
+            "fa_per_hour_upper_95": 3.564133936724555,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 6.858451000000002,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 20.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=20",
+        "false_alarms": 2,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.4806754276784783,
+        "fa_per_hour_upper_95": 1.5141275971872066,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.004908499999999,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 43.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 1,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.6822643842760993,
+            "fa_per_hour_upper_95": 3.2339331814687107,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 1,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.7324998443865123,
+            "fa_per_hour_upper_95": 3.4720492623920682,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 30.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=30",
+        "false_alarms": 1,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.24033771383923916,
+        "fa_per_hour_upper_95": 1.1392007635979935,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.77832699999999,
+        "delay_s_p90": 33.137609,
+        "max_delay_s": 46.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.287916999999993,
+            "delay_s_p90": 31.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 1,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.7324998443865123,
+            "fa_per_hour_upper_95": 3.4720492623920682,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 46.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 33.137609,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 50.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=50",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 11.339679499999988,
+        "delay_s_p90": 38.137609,
+        "max_delay_s": 51.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 12.787908499999986,
+            "delay_s_p90": 36.570899999999995,
+            "max_delay_s": 51.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.44344199999999,
+            "delay_s_p90": 36.10821200000001,
+            "max_delay_s": 51.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 11.858424,
+            "delay_s_p90": 38.137609,
+            "max_delay_s": 48.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 80.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=80",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 15.178932999999986,
+        "delay_s_p90": 43.137609,
+        "max_delay_s": 56.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.287916999999993,
+            "delay_s_p90": 41.570899999999995,
+            "max_delay_s": 56.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.44344199999999,
+            "delay_s_p90": 41.10821200000001,
+            "max_delay_s": 56.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 14.358424,
+            "delay_s_p90": 43.137609,
+            "max_delay_s": 53.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 120.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=120",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 19.391679499999995,
+        "delay_s_p90": 51.570899999999995,
+        "max_delay_s": 61.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 17.787916999999993,
+            "delay_s_p90": 51.570899999999995,
+            "max_delay_s": 56.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 20.44344199999999,
+            "delay_s_p90": 51.10821200000001,
+            "max_delay_s": 61.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 19.358424,
+            "delay_s_p90": 48.137609,
+            "max_delay_s": 58.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 200.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=200",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 24.391679499999995,
+        "delay_s_p90": 63.137474999999995,
+        "max_delay_s": 66.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 22.787916999999993,
+            "delay_s_p90": 61.570899999999995,
+            "max_delay_s": 66.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 25.44344199999999,
+            "delay_s_p90": 61.10821200000001,
+            "max_delay_s": 66.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 24.358424,
+            "delay_s_p90": 63.137474999999995,
+            "max_delay_s": 63.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 300.0,
+          "k": 0.5,
+          "cap": 2.0
+        },
+        "label": "cusum k=0.5 h=300",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 29.391679499999995,
+        "delay_s_p90": 71.10821200000001,
+        "max_delay_s": 73.137609,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 27.787916999999993,
+            "delay_s_p90": 66.5709,
+            "max_delay_s": 71.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 30.44344199999999,
+            "delay_s_p90": 71.10821200000001,
+            "max_delay_s": 71.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 29.358424,
+            "delay_s_p90": 68.137475,
+            "max_delay_s": 73.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 2.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=2",
+        "false_alarms": 102,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 24.514446811602394,
+        "fa_per_hour_upper_95": 28.74767974666284,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.004917000000006,
+        "delay_s_p90": 16.570899999999995,
+        "max_delay_s": 31.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 53,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 38.82249175248515,
+            "fa_per_hour_upper_95": 48.32724914574083,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 2.9435655000000054,
+            "delay_s_p90": 4.778887999999995,
+            "max_delay_s": 4.778919000000002
+          },
+          "2": {
+            "false_alarms": 49,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 36.8444225526378,
+            "fa_per_hour_upper_95": 46.254788843377845,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 28.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 3.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=3",
+        "false_alarms": 2,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.4806754276784783,
+        "fa_per_hour_upper_95": 1.5141275971872066,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 18.137058999999994,
+        "max_delay_s": 33.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 2,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 1.4649996887730246,
+            "fa_per_hour_upper_95": 4.614749019635028,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 21.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 5.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=5",
+        "false_alarms": 1,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.24033771383923916,
+        "fa_per_hour_upper_95": 1.1392007635979935,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 21.570899999999995,
+        "max_delay_s": 33.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 1,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.7324998443865123,
+            "fa_per_hour_upper_95": 3.4720492623920682,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 31.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 8.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=8",
+        "false_alarms": 1,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.24033771383923916,
+        "fa_per_hour_upper_95": 1.1392007635979935,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579450999999992,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 38.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 1,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.7324998443865123,
+            "fa_per_hour_upper_95": 3.4720492623920682,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 21.108888000000007,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 10.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=10",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579543499999986,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 38.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 21.108888000000007,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 15.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=15",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 6.339679499999988,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 41.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 6.858451000000002,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 20.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=20",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.004908499999999,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 43.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 30.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=30",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.77832699999999,
+        "delay_s_p90": 33.137609,
+        "max_delay_s": 48.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.287916999999993,
+            "delay_s_p90": 31.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 46.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 33.137609,
+            "max_delay_s": 48.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 50.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=50",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 11.339679499999988,
+        "delay_s_p90": 38.137609,
+        "max_delay_s": 51.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 12.787908499999986,
+            "delay_s_p90": 36.570899999999995,
+            "max_delay_s": 51.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.44344199999999,
+            "delay_s_p90": 36.10821200000001,
+            "max_delay_s": 51.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 11.858424,
+            "delay_s_p90": 38.137609,
+            "max_delay_s": 48.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 80.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=80",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 15.178932999999986,
+        "delay_s_p90": 46.10821200000001,
+        "max_delay_s": 56.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.287916999999993,
+            "delay_s_p90": 41.570899999999995,
+            "max_delay_s": 56.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.44344199999999,
+            "delay_s_p90": 46.10821200000001,
+            "max_delay_s": 56.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 14.358424,
+            "delay_s_p90": 43.137609,
+            "max_delay_s": 53.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 120.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=120",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 19.391679499999995,
+        "delay_s_p90": 53.137609,
+        "max_delay_s": 61.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 17.787916999999993,
+            "delay_s_p90": 51.570899999999995,
+            "max_delay_s": 61.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 20.44344199999999,
+            "delay_s_p90": 51.10821200000001,
+            "max_delay_s": 61.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 19.358424,
+            "delay_s_p90": 53.137609,
+            "max_delay_s": 58.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 200.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=200",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 24.391679499999995,
+        "delay_s_p90": 63.137474999999995,
+        "max_delay_s": 66.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 22.787916999999993,
+            "delay_s_p90": 61.570899999999995,
+            "max_delay_s": 66.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 25.44344199999999,
+            "delay_s_p90": 61.10821200000001,
+            "max_delay_s": 66.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 24.358424,
+            "delay_s_p90": 63.137474999999995,
+            "max_delay_s": 63.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 300.0,
+          "k": 1.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=1 h=300",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 29.391679499999995,
+        "delay_s_p90": 71.10821200000001,
+        "max_delay_s": 73.137609,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 27.787916999999993,
+            "delay_s_p90": 66.5709,
+            "max_delay_s": 71.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 30.44344199999999,
+            "delay_s_p90": 71.10821200000001,
+            "max_delay_s": 71.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 29.358424,
+            "delay_s_p90": 68.137475,
+            "max_delay_s": 73.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 2.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=2",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 18.137608999999998,
+        "max_delay_s": 33.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 31.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 3.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=3",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 21.570899999999995,
+        "max_delay_s": 36.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 5.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=5",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 38.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 21.10821200000001,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 8.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=8",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579450999999992,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 41.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 21.108888000000007,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 10.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=10",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579543499999986,
+        "delay_s_p90": 26.570899999999995,
+        "max_delay_s": 41.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 15.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=15",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 6.339679499999988,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 43.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 6.858451000000002,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 20.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=20",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.004908499999999,
+        "delay_s_p90": 31.570899999999995,
+        "max_delay_s": 46.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 31.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 46.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 30.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=30",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 10.178932999999986,
+        "delay_s_p90": 33.137609,
+        "max_delay_s": 48.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.287916999999993,
+            "delay_s_p90": 31.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.44344199999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 46.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 33.137609,
+            "max_delay_s": 48.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 50.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=50",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 13.571162000000001,
+        "delay_s_p90": 41.570899999999995,
+        "max_delay_s": 53.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 12.787908499999986,
+            "delay_s_p90": 41.570899999999995,
+            "max_delay_s": 51.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 12.27832699999999,
+            "delay_s_p90": 41.10821200000001,
+            "max_delay_s": 51.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 14.358424,
+            "delay_s_p90": 38.137609,
+            "max_delay_s": 53.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 80.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=80",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 15.178932999999986,
+        "delay_s_p90": 46.570899999999995,
+        "max_delay_s": 58.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.287916999999993,
+            "delay_s_p90": 46.570899999999995,
+            "max_delay_s": 56.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.44344199999999,
+            "delay_s_p90": 46.10821200000001,
+            "max_delay_s": 56.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 14.358424,
+            "delay_s_p90": 43.137609,
+            "max_delay_s": 58.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 120.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=120",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 19.391679499999995,
+        "delay_s_p90": 53.137609,
+        "max_delay_s": 61.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 17.787916999999993,
+            "delay_s_p90": 51.570899999999995,
+            "max_delay_s": 61.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 20.44344199999999,
+            "delay_s_p90": 51.10821200000001,
+            "max_delay_s": 61.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 19.358424,
+            "delay_s_p90": 53.137609,
+            "max_delay_s": 58.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 200.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=200",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 24.391679499999995,
+        "delay_s_p90": 63.137609,
+        "max_delay_s": 68.137475,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 22.787916999999993,
+            "delay_s_p90": 61.570899999999995,
+            "max_delay_s": 66.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 25.44344199999999,
+            "delay_s_p90": 61.10821200000001,
+            "max_delay_s": 66.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 24.358424,
+            "delay_s_p90": 63.137609,
+            "max_delay_s": 68.137475
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 300.0,
+          "k": 2.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=2 h=300",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 29.391679499999995,
+        "delay_s_p90": 71.57091699999998,
+        "max_delay_s": 76.10821200000001,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 27.787916999999993,
+            "delay_s_p90": 71.5709,
+            "max_delay_s": 71.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 30.44344199999999,
+            "delay_s_p90": 71.108699,
+            "max_delay_s": 76.10821200000001
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 29.358424,
+            "delay_s_p90": 73.137475,
+            "max_delay_s": 73.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 2.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=2",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 38.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 21.10821200000001,
+            "max_delay_s": 36.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 3.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=3",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.778903499999998,
+        "delay_s_p90": 23.137608999999998,
+        "max_delay_s": 41.108699,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.005010499999997,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 36.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 21.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579450999999992,
+            "delay_s_p90": 23.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 5.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=5",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579450999999992,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 41.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 21.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 38.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 8.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=8",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 5.579543499999986,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 43.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.288010499999984,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.579543499999986,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 10.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=10",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 6.339679499999988,
+        "delay_s_p90": 28.137608999999998,
+        "max_delay_s": 43.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 26.570899999999995,
+            "max_delay_s": 41.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 5.443680499999999,
+            "delay_s_p90": 26.10821200000001,
+            "max_delay_s": 41.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 6.858451000000002,
+            "delay_s_p90": 28.137608999999998,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 15.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=15",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.004908499999999,
+        "delay_s_p90": 33.137609,
+        "max_delay_s": 46.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 7.787908499999986,
+            "delay_s_p90": 31.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 46.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 33.137609,
+            "max_delay_s": 43.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 20.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=20",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 9.391564500000001,
+        "delay_s_p90": 33.137609,
+        "max_delay_s": 48.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.004908499999999,
+            "delay_s_p90": 31.570899999999995,
+            "max_delay_s": 46.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.77832699999999,
+            "delay_s_p90": 31.10821200000001,
+            "max_delay_s": 46.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 33.137609,
+            "max_delay_s": 48.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 30.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=30",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 10.178932999999986,
+        "delay_s_p90": 38.137609,
+        "max_delay_s": 51.57091699999998,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.287916999999993,
+            "delay_s_p90": 36.570899999999995,
+            "max_delay_s": 51.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 10.44344199999999,
+            "delay_s_p90": 36.10821200000001,
+            "max_delay_s": 51.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 9.358424,
+            "delay_s_p90": 38.137609,
+            "max_delay_s": 48.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 50.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=50",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 14.004908499999999,
+        "delay_s_p90": 43.137609,
+        "max_delay_s": 53.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 12.787908499999986,
+            "delay_s_p90": 41.570899999999995,
+            "max_delay_s": 51.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 14.77832699999999,
+            "delay_s_p90": 41.10821200000001,
+            "max_delay_s": 51.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 14.358424,
+            "delay_s_p90": 43.137609,
+            "max_delay_s": 53.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 80.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=80",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 15.843932999999993,
+        "delay_s_p90": 48.137609,
+        "max_delay_s": 58.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.287916999999993,
+            "delay_s_p90": 46.570899999999995,
+            "max_delay_s": 56.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 15.44344199999999,
+            "delay_s_p90": 46.10821200000001,
+            "max_delay_s": 56.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 16.858424,
+            "delay_s_p90": 48.137609,
+            "max_delay_s": 58.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 120.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=120",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 20.178932999999986,
+        "delay_s_p90": 56.570899999999995,
+        "max_delay_s": 63.137474999999995,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 20.287916999999993,
+            "delay_s_p90": 56.570899999999995,
+            "max_delay_s": 61.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 20.44344199999999,
+            "delay_s_p90": 56.10821200000001,
+            "max_delay_s": 61.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 19.358424,
+            "delay_s_p90": 53.137609,
+            "max_delay_s": 63.137474999999995
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 200.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=200",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 24.391679499999995,
+        "delay_s_p90": 66.108699,
+        "max_delay_s": 68.137609,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 22.787916999999993,
+            "delay_s_p90": 61.570899999999995,
+            "max_delay_s": 66.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 25.44344199999999,
+            "delay_s_p90": 66.10821200000001,
+            "max_delay_s": 66.108699
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 24.358424,
+            "delay_s_p90": 68.137475,
+            "max_delay_s": 68.137609
+          }
+        }
+      },
+      {
+        "detector": {
+          "kind": "cusum",
+          "h": 300.0,
+          "k": 4.0,
+          "cap": 2.0
+        },
+        "label": "cusum k=4 h=300",
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 29.391679499999995,
+        "delay_s_p90": 71.57091699999998,
+        "max_delay_s": 76.10821200000001,
+        "per_rep": {
+          "0": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 27.787916999999993,
+            "delay_s_p90": 71.5709,
+            "max_delay_s": 71.57091699999998
+          },
+          "1": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 30.44344199999999,
+            "delay_s_p90": 71.108699,
+            "max_delay_s": 76.10821200000001
+          },
+          "2": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 29.358424,
+            "delay_s_p90": 73.137475,
+            "max_delay_s": 73.137609
+          }
+        }
+      }
+    ],
+    "folds": [
+      {
+        "held_out_rep": 0,
+        "calibration": {
+          "channels": {
+            "shift:brightness": {
+              "mean": 0.021195463079885967,
+              "std": 0.13853534421856645
+            },
+            "shift:contrast": {
+              "mean": -0.005972938889431412,
+              "std": 0.13123491050143582
+            },
+            "shift:log_blur": {
+              "mean": -0.02392342140821446,
+              "std": 0.10434824190154099
+            },
+            "shift:noise": {
+              "mean": -0.01058000554301925,
+              "std": 0.1
+            },
+            "shift:detections_per_frame": {
+              "mean": -0.07530144128695483,
+              "std": 0.13397717594605033
+            },
+            "shift:confidence": {
+              "mean": 0.0074755189418754244,
+              "std": 0.1
+            },
+            "confidence_ks": {
+              "mean": 0.020409952957072992,
+              "std": 0.009925352701508681
+            },
+            "confidence_wasserstein": {
+              "mean": 0.005043483591744942,
+              "std": 0.0022697067404573723
+            },
+            "class_psi": {
+              "mean": 0.001593361141649327,
+              "std": 0.002
+            }
+          }
+        },
+        "threshold": {
+          "detector": {
+            "kind": "threshold",
+            "h": 3.0,
+            "k": 1.0,
+            "cap": 2.0
+          },
+          "label": "threshold h=3",
+          "train": {
+            "false_alarms": 0,
+            "clean_hours": 2.6951,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 1.1131294397015679,
+            "drifted": 24,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 33.137474999999995
+          },
+          "test": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          }
+        },
+        "cusum": {
+          "detector": {
+            "kind": "cusum",
+            "h": 2.0,
+            "k": 2.0,
+            "cap": 2.0
+          },
+          "label": "cusum k=2 h=2",
+          "train": {
+            "false_alarms": 0,
+            "clean_hours": 2.6951,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 1.1131294397015679,
+            "drifted": 24,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 33.137474999999995
+          },
+          "test": {
+            "false_alarms": 0,
+            "clean_hours": 1.4657,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.0467931528282977,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          }
+        }
+      },
+      {
+        "held_out_rep": 1,
+        "calibration": {
+          "channels": {
+            "shift:brightness": {
+              "mean": 0.02473229765718635,
+              "std": 0.12685949630365345
+            },
+            "shift:contrast": {
+              "mean": 0.01600223945656735,
+              "std": 0.1367096847066406
+            },
+            "shift:log_blur": {
+              "mean": 0.0077609567965205095,
+              "std": 0.1
+            },
+            "shift:noise": {
+              "mean": 0.010056764141202743,
+              "std": 0.1
+            },
+            "shift:detections_per_frame": {
+              "mean": -0.0376567989910606,
+              "std": 0.1281195918942876
+            },
+            "shift:confidence": {
+              "mean": 0.011306600612563621,
+              "std": 0.1
+            },
+            "confidence_ks": {
+              "mean": 0.019524071467279303,
+              "std": 0.009600324269146551
+            },
+            "confidence_wasserstein": {
+              "mean": 0.00489116595234958,
+              "std": 0.002286270653324953
+            },
+            "class_psi": {
+              "mean": 0.001634968980446781,
+              "std": 0.002
+            }
+          }
+        },
+        "threshold": {
+          "detector": {
+            "kind": "threshold",
+            "h": 3.0,
+            "k": 1.0,
+            "cap": 2.0
+          },
+          "label": "threshold h=3",
+          "train": {
+            "false_alarms": 0,
+            "clean_hours": 2.7956,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 1.0731057535350728,
+            "drifted": 24,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 33.137474999999995
+          },
+          "test": {
+            "false_alarms": 0,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.197499533159537,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 31.108699
+          }
+        },
+        "cusum": {
+          "detector": {
+            "kind": "cusum",
+            "h": 3.0,
+            "k": 1.0,
+            "cap": 2.0
+          },
+          "label": "cusum k=1 h=3",
+          "train": {
+            "false_alarms": 0,
+            "clean_hours": 2.7956,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 1.0731057535350728,
+            "drifted": 24,
+            "missed": 0,
+            "median_delay_s": 4.004917000000006,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 33.137474999999995
+          },
+          "test": {
+            "false_alarms": 2,
+            "clean_hours": 1.3652,
+            "fa_per_hour": 1.4649996887730246,
+            "fa_per_hour_upper_95": 4.614749019635028,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.778903499999998,
+            "delay_s_p90": 16.108888000000007,
+            "max_delay_s": 21.108699
+          }
+        }
+      },
+      {
+        "held_out_rep": 2,
+        "calibration": {
+          "channels": {
+            "shift:brightness": {
+              "mean": 0.011744015988870985,
+              "std": 0.13532028954383732
+            },
+            "shift:contrast": {
+              "mean": 0.006054822314082252,
+              "std": 0.13409335681155568
+            },
+            "shift:log_blur": {
+              "mean": -0.011199996333420495,
+              "std": 0.10625108638709717
+            },
+            "shift:noise": {
+              "mean": -0.006188952077804441,
+              "std": 0.1
+            },
+            "shift:detections_per_frame": {
+              "mean": -0.03993988940408074,
+              "std": 0.13552080745435757
+            },
+            "shift:confidence": {
+              "mean": 0.007265255574879086,
+              "std": 0.1
+            },
+            "confidence_ks": {
+              "mean": 0.01947276155709064,
+              "std": 0.009505211106086117
+            },
+            "confidence_wasserstein": {
+              "mean": 0.004904681301810609,
+              "std": 0.002389571764287662
+            },
+            "class_psi": {
+              "mean": 0.0015636108926664937,
+              "std": 0.002
+            }
+          }
+        },
+        "threshold": {
+          "detector": {
+            "kind": "threshold",
+            "h": 3.0,
+            "k": 1.0,
+            "cap": 2.0
+          },
+          "label": "threshold h=3",
+          "train": {
+            "false_alarms": 0,
+            "clean_hours": 2.8309,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 1.059735350642407,
+            "drifted": 24,
+            "missed": 0,
+            "median_delay_s": 4.7785704999999865,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "test": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137058999999994,
+            "max_delay_s": 33.137474999999995
+          }
+        },
+        "cusum": {
+          "detector": {
+            "kind": "cusum",
+            "h": 2.0,
+            "k": 2.0,
+            "cap": 2.0
+          },
+          "label": "cusum k=2 h=2",
+          "train": {
+            "false_alarms": 0,
+            "clean_hours": 2.8309,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 1.059735350642407,
+            "drifted": 24,
+            "missed": 0,
+            "median_delay_s": 4.7785704999999865,
+            "delay_s_p90": 16.570899999999995,
+            "max_delay_s": 31.57091699999998
+          },
+          "test": {
+            "false_alarms": 0,
+            "clean_hours": 1.3299,
+            "fa_per_hour": 0.0,
+            "fa_per_hour_upper_95": 2.2557809726104776,
+            "drifted": 12,
+            "missed": 0,
+            "median_delay_s": 4.358723499999996,
+            "delay_s_p90": 18.137608999999998,
+            "max_delay_s": 33.137474999999995
+          }
+        }
+      }
+    ],
+    "out_of_sample": {
+      "threshold": {
+        "false_alarms": 0,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.0,
+        "fa_per_hour_upper_95": 0.7210131415177174,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 18.137058999999994,
+        "max_delay_s": 33.137474999999995,
+        "by_drift": {
+          "blur/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              0.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.005103999999989,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:contrast": 2,
+              "shift:noise": 2
+            }
+          },
+          "blur/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              16.6,
+              16.1,
+              18.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 16.570103999999986,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:noise": 1
+            }
+          },
+          "darken/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              0.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.0044460000000015,
+            "first_channels": {
+              "shift:contrast": 3,
+              "shift:log_blur": 3,
+              "shift:brightness": 2,
+              "shift:noise": 2
+            }
+          },
+          "darken/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              11.6,
+              11.1,
+              13.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 11.570446000000004,
+            "first_channels": {
+              "shift:contrast": 2,
+              "shift:brightness": 2
+            }
+          },
+          "noise/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              0.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.004917000000006,
+            "first_channels": {
+              "shift:noise": 3,
+              "shift:log_blur": 2
+            }
+          },
+          "noise/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              31.6,
+              31.1,
+              33.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 31.57091699999998,
+            "first_channels": {
+              "shift:noise": 3
+            }
+          },
+          "occlusion/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              5.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.778211999999996,
+            "first_channels": {
+              "shift:brightness": 3,
+              "shift:contrast": 3,
+              "shift:noise": 3,
+              "shift:log_blur": 2,
+              "confidence_wasserstein": 1
+            }
+          },
+          "occlusion/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              16.6,
+              16.1,
+              13.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 16.10821200000001,
+            "first_channels": {
+              "shift:contrast": 3,
+              "shift:brightness": 2
+            }
+          },
+          "shift/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              5.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.778441999999984,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:noise": 3
+            }
+          },
+          "shift/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              1.6,
+              6.1,
+              3.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 3.13742400000001,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:noise": 2
+            }
+          },
+          "switch_clip/abrupt": {
+            "streams": 6,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              1.6,
+              4.8,
+              1.1,
+              0.6,
+              3.1
+            ],
+            "seeds": [
+              1234,
+              1234,
+              1235,
+              1235,
+              1236,
+              1236
+            ],
+            "median_delay_s": 2.354402499999992,
+            "first_channels": {
+              "class_psi": 6,
+              "shift:brightness": 4,
+              "shift:noise": 3,
+              "shift:contrast": 3,
+              "shift:log_blur": 2,
+              "confidence_ks": 2,
+              "confidence_wasserstein": 2,
+              "shift:detections_per_frame": 1
+            }
+          }
+        }
+      },
+      "cusum": {
+        "false_alarms": 2,
+        "clean_hours": 4.1608,
+        "fa_per_hour": 0.4806754276784783,
+        "fa_per_hour_upper_95": 1.5141275971872066,
+        "drifted": 36,
+        "missed": 0,
+        "median_delay_s": 4.7785704999999865,
+        "delay_s_p90": 18.137608999999998,
+        "max_delay_s": 33.137474999999995,
+        "by_drift": {
+          "blur/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              0.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.005103999999989,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:contrast": 2,
+              "shift:noise": 2
+            }
+          },
+          "blur/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              16.6,
+              16.1,
+              18.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 16.570103999999986,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:noise": 1
+            }
+          },
+          "darken/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              0.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.0044460000000015,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:brightness": 2,
+              "shift:contrast": 2,
+              "shift:noise": 2
+            }
+          },
+          "darken/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              11.6,
+              11.1,
+              13.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 11.570446000000004,
+            "first_channels": {
+              "shift:brightness": 2,
+              "shift:contrast": 1
+            }
+          },
+          "noise/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              0.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.004917000000006,
+            "first_channels": {
+              "shift:noise": 3,
+              "shift:log_blur": 2
+            }
+          },
+          "noise/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              31.6,
+              21.1,
+              33.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 31.57091699999998,
+            "first_channels": {
+              "shift:noise": 2,
+              "class_psi": 1
+            }
+          },
+          "occlusion/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              5.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.778211999999996,
+            "first_channels": {
+              "shift:brightness": 3,
+              "shift:contrast": 3,
+              "shift:noise": 2,
+              "shift:log_blur": 1
+            }
+          },
+          "occlusion/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              16.6,
+              16.1,
+              18.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 16.570899999999995,
+            "first_channels": {
+              "shift:contrast": 3,
+              "shift:brightness": 1
+            }
+          },
+          "shift/abrupt": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              4.8,
+              5.6
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 4.778441999999984,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:noise": 3
+            }
+          },
+          "shift/gradual": {
+            "streams": 3,
+            "missed": 0,
+            "delays_s": [
+              1.6,
+              6.1,
+              3.1
+            ],
+            "seeds": [
+              1234,
+              1235,
+              1236
+            ],
+            "median_delay_s": 3.13742400000001,
+            "first_channels": {
+              "shift:log_blur": 3,
+              "shift:noise": 1
+            }
+          },
+          "switch_clip/abrupt": {
+            "streams": 6,
+            "missed": 0,
+            "delays_s": [
+              4.0,
+              1.6,
+              4.8,
+              1.1,
+              0.6,
+              3.1
+            ],
+            "seeds": [
+              1234,
+              1234,
+              1235,
+              1235,
+              1236,
+              1236
+            ],
+            "median_delay_s": 2.354402499999992,
+            "first_channels": {
+              "class_psi": 6,
+              "shift:brightness": 3,
+              "shift:log_blur": 2,
+              "shift:noise": 2,
+              "confidence_ks": 2,
+              "confidence_wasserstein": 2,
+              "shift:contrast": 2
+            }
+          }
+        }
+      }
+    },
+    "plot": "docs/images/drift-delay-vs-false-alarms.png",
+    "stream_list": [
+      {
+        "scenario": "drift-clean",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-clean-001",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-clean-002",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-clean-003",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-clean-004",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-clean-001",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-clean-002",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-clean-003",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-clean-004",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-clean-001",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-clean-002",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-clean-003",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-clean",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-clean-004",
+        "clip": "?",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-darken-001",
+        "clip": "mot17-09",
+        "kind": "darken",
+        "ramp_s": 0.0,
+        "onset_s": 161.018,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-darken-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-darken-003",
+        "clip": "mot17-02",
+        "kind": "darken",
+        "ramp_s": 120.0,
+        "onset_s": 178.436,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-darken-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-darken-001",
+        "clip": "mot17-09",
+        "kind": "darken",
+        "ramp_s": 0.0,
+        "onset_s": 145.328,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-darken-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-darken-003",
+        "clip": "mot17-02",
+        "kind": "darken",
+        "ramp_s": 120.0,
+        "onset_s": 134.035,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-darken-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-darken-001",
+        "clip": "mot17-09",
+        "kind": "darken",
+        "ramp_s": 0.0,
+        "onset_s": 134.568,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-darken-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-darken-003",
+        "clip": "mot17-02",
+        "kind": "darken",
+        "ramp_s": 120.0,
+        "onset_s": 136.969,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-darken",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-darken-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-blur-001",
+        "clip": "mot17-09",
+        "kind": "blur",
+        "ramp_s": 0.0,
+        "onset_s": 161.018,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-blur-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-blur-003",
+        "clip": "mot17-02",
+        "kind": "blur",
+        "ramp_s": 120.0,
+        "onset_s": 178.436,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-blur-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-blur-001",
+        "clip": "mot17-09",
+        "kind": "blur",
+        "ramp_s": 0.0,
+        "onset_s": 145.328,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-blur-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-blur-003",
+        "clip": "mot17-02",
+        "kind": "blur",
+        "ramp_s": 120.0,
+        "onset_s": 134.035,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-blur-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-blur-001",
+        "clip": "mot17-09",
+        "kind": "blur",
+        "ramp_s": 0.0,
+        "onset_s": 134.568,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-blur-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-blur-003",
+        "clip": "mot17-02",
+        "kind": "blur",
+        "ramp_s": 120.0,
+        "onset_s": 136.969,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-blur",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-blur-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-noise-001",
+        "clip": "mot17-09",
+        "kind": "noise",
+        "ramp_s": 0.0,
+        "onset_s": 161.018,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-noise-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-noise-003",
+        "clip": "mot17-02",
+        "kind": "noise",
+        "ramp_s": 120.0,
+        "onset_s": 178.436,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-noise-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-noise-001",
+        "clip": "mot17-09",
+        "kind": "noise",
+        "ramp_s": 0.0,
+        "onset_s": 145.328,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-noise-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-noise-003",
+        "clip": "mot17-02",
+        "kind": "noise",
+        "ramp_s": 120.0,
+        "onset_s": 134.035,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-noise-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-noise-001",
+        "clip": "mot17-09",
+        "kind": "noise",
+        "ramp_s": 0.0,
+        "onset_s": 134.568,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-noise-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-noise-003",
+        "clip": "mot17-02",
+        "kind": "noise",
+        "ramp_s": 120.0,
+        "onset_s": 136.969,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-noise",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-noise-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-shift-001",
+        "clip": "mot17-09",
+        "kind": "shift",
+        "ramp_s": 0.0,
+        "onset_s": 161.018,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-shift-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-shift-003",
+        "clip": "mot17-02",
+        "kind": "shift",
+        "ramp_s": 120.0,
+        "onset_s": 178.436,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-shift-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-shift-001",
+        "clip": "mot17-09",
+        "kind": "shift",
+        "ramp_s": 0.0,
+        "onset_s": 145.328,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-shift-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-shift-003",
+        "clip": "mot17-02",
+        "kind": "shift",
+        "ramp_s": 120.0,
+        "onset_s": 134.035,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-shift-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-shift-001",
+        "clip": "mot17-09",
+        "kind": "shift",
+        "ramp_s": 0.0,
+        "onset_s": 134.568,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-shift-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-shift-003",
+        "clip": "mot17-02",
+        "kind": "shift",
+        "ramp_s": 120.0,
+        "onset_s": 136.969,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-shift",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-shift-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-occlusion-001",
+        "clip": "mot17-09",
+        "kind": "occlusion",
+        "ramp_s": 0.0,
+        "onset_s": 161.018,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-occlusion-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-occlusion-003",
+        "clip": "mot17-02",
+        "kind": "occlusion",
+        "ramp_s": 120.0,
+        "onset_s": 178.436,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-occlusion-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-occlusion-001",
+        "clip": "mot17-09",
+        "kind": "occlusion",
+        "ramp_s": 0.0,
+        "onset_s": 145.328,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-occlusion-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-occlusion-003",
+        "clip": "mot17-02",
+        "kind": "occlusion",
+        "ramp_s": 120.0,
+        "onset_s": 134.035,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-occlusion-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-occlusion-001",
+        "clip": "mot17-09",
+        "kind": "occlusion",
+        "ramp_s": 0.0,
+        "onset_s": 134.568,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-occlusion-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-occlusion-003",
+        "clip": "mot17-02",
+        "kind": "occlusion",
+        "ramp_s": 120.0,
+        "onset_s": 136.969,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-occlusion",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-occlusion-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-classmix-001",
+        "clip": "mot17-09",
+        "kind": "switch_clip",
+        "ramp_s": 0.0,
+        "onset_s": 161.018,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-classmix-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-classmix-003",
+        "clip": "mot17-02",
+        "kind": "switch_clip",
+        "ramp_s": 0.0,
+        "onset_s": 178.436,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 0,
+        "seed": 1234,
+        "camera_id": "drift-classmix-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-classmix-001",
+        "clip": "mot17-09",
+        "kind": "switch_clip",
+        "ramp_s": 0.0,
+        "onset_s": 145.328,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-classmix-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-classmix-003",
+        "clip": "mot17-02",
+        "kind": "switch_clip",
+        "ramp_s": 0.0,
+        "onset_s": 134.035,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 1,
+        "seed": 1235,
+        "camera_id": "drift-classmix-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 55
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-classmix-001",
+        "clip": "mot17-09",
+        "kind": "switch_clip",
+        "ramp_s": 0.0,
+        "onset_s": 134.568,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-classmix-002",
+        "clip": "mot17-04",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-classmix-003",
+        "clip": "mot17-02",
+        "kind": "switch_clip",
+        "ramp_s": 0.0,
+        "onset_s": 136.969,
+        "updates": 54
+      },
+      {
+        "scenario": "drift-classmix",
+        "rep": 2,
+        "seed": 1236,
+        "camera_id": "drift-classmix-004",
+        "clip": "mot17-08",
+        "kind": null,
+        "ramp_s": 0.0,
+        "onset_s": null,
+        "updates": 54
+      }
+    ]
+  },
+  "cost_usd": 0.0,
+  "notes": "Detection delay is window end minus onset in capture time (the live monitor adds settle_s and the scrape interval). Operating points are chosen on the other repetitions (leave one repetition out); the sweep is in sample. Clips loop every 17 to 35 s, so clean windows are more alike than on a real camera and false-alarm rates are optimistic."
+}

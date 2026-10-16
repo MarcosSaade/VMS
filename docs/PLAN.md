@@ -95,7 +95,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: what is the reference window, and which statistic reacts to darkening vs a class-mix change?
 - [x] 9.2 Drift injection scenarios with known, seeded onsets, and mAP under each drift. Done 2026-10-16 (E-051, E-052: blur sigma 6 costs 17 points of MOT17 mAP@50-95, the largest drop; `bench/scenarios/drift-*.yaml`)
   - Understand it: why must onsets be known and seeded, and which drift hurt mAP most?
-- [ ] 9.3 Sequential change detection: CUSUM vs fixed threshold, detection delay vs false-alarm rate across seeds
+- [x] 9.3 Sequential change detection: CUSUM vs fixed threshold, detection delay vs false-alarm rate across seeds
   - Understand it: what does CUSUM accumulate, which knob trades delay for false alarms, and what did the curve show?
 - [ ] 9.4 Drift dashboard and runbook procedure
   - Understand it: an alert fires on one camera at 3 a.m.; what do you check, in order?

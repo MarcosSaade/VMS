@@ -26,7 +26,7 @@ One entry per environment used (CPU, RAM, GPU model, driver, CUDA, instance type
 
 ## Headline results
 
-Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity on a GPU, cost per camera-hour, drift detection delay.
+Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity on a GPU, cost per camera-hour.
 
 | Result | Number | Evidence |
 |---|---|---|
@@ -328,7 +328,51 @@ Self-measured on `laptop`, `make eval-drift` (`bench/scenarios/drift-map-cpu.yam
 - Noise hurts COCO about twice as much as MOT17: MOT frames are 1280x720 and the letterbox downscales them to 640, which averages noise down (sigma roughly halves), while COCO images enter at about their own size. Noise sigma is therefore not comparable across input resolutions; blur sigma is scaled with the width and is.
 - The clean run reproduces the PyTorch baseline exactly (37.9 and 40.3, E-034), as E-046 found for ONNX Runtime FP32.
 
-_Detection delay and false alarms: placeholder (task 9.3). Fine-tune: placeholder (task 9.5)._
+### Detection delay and false alarms (task 9.3; E-053 to E-055, D34)
+
+Self-measured on `laptop`, `make drift-score` (`bench/scenarios/drift-detect-cpu.yaml`): 7 live loadgen runs against the compose CPU stack (clean, darken, blur, noise, shift, occlusion, class mix), each 4 cameras x 5 FPS x 360 s x 3 repetitions (seeds differ per repetition), MOT17 full-length clips. In every drift run camera 0 drifts abruptly and camera 2 ramps linearly over 120 s, both from a seeded onset at 120 to 180 s; cameras 1 and 3 stay clean (class mix: cameras 0 and 2 switch to another scene). **Synthetic drift**, injected by loadgen (`vms.loadgen.drift`): darken gain 0.3, blur sigma 4 px, noise sigma 15, shift (view cropped to 85% of each side and rescaled, as if the camera turned), occlusion (black box over 30% of the frame). Each camera's stored frames and detections are replayed through the monitor's windows (reference = first 60 s, 30 s window every 5 s); delay = window end (capture time) of the first alarm minus the onset; any alarm on a clean camera, or before the onset, is a false alarm. 84 streams, 36 drifted, **4.16 clean camera-hours**. Results: [`2026-10-16-drift-detect-cpu-01M52J2GYHBMPAMRVCQW19GZPA`](../bench/results/2026-10-16-drift-detect-cpu-01M52J2GYHBMPAMRVCQW19GZPA.json).
+
+Out of sample (leave one repetition out: calibrate on the other two repetitions' clean streams, pick the operating point by the fixed rule "no false alarm on them, fewest misses, then lowest median delay", score the held-out one):
+
+| Detector | Chosen in the 3 folds | False alarms (per camera-hour, 95% upper) | Missed | Delay median | p90 | max |
+|---|---|---|---|---|---|---|
+| Fixed threshold on z | h=3, 3, 3 | **0** (< 0.72) | 0 / 36 | 4.8 s | 18.1 s | 33.1 s |
+| CUSUM on z | k=2 h=2, k=1 h=3, k=2 h=2 | 2 (0.48; < 1.51) | 0 / 36 | 4.8 s | 18.1 s | 33.1 s |
+
+Delay by drift (fixed threshold, out of sample; one value per repetition; the channels that fired first, with how many streams):
+
+| Drift | Abrupt delay (s) | Gradual (120 s ramp) delay (s) | Signals that caught it |
+|---|---|---|---|
+| darken x0.3 | 4.0, 4.8, 0.6 | 11.6, 11.1, 13.1 | contrast, brightness, blur (abrupt: all 4 input signals) |
+| blur 4 px | 4.0, 4.8, 0.6 | 16.6, 16.1, 18.1 | blur 3/3, contrast, noise |
+| noise 15 | 4.0, 4.8, 0.6 | 31.6, 31.1, 33.1 | noise 3/3 (abrupt: also blur) |
+| shift 0.15 | 4.0, 4.8, 5.6 | 1.6, 6.1, 3.1 | blur 3/3, noise (the rescale softens the image) |
+| occlusion 30% | 4.0, 4.8, 5.6 | 16.6, 16.1, 13.1 | brightness, contrast (abrupt: also noise, blur, confidence W1) |
+| class mix (new scene) | 4.0, 1.6, 4.8, 1.1, 0.6, 3.1 | | class PSI 6/6, plus brightness, contrast, noise, confidence KS and W1 |
+
+Sweep, in sample (calibrated on all clean streams); the curve is `docs/images/drift-delay-vs-false-alarms.png`:
+
+| Setting | False alarms | per camera-hour (95% upper) | Missed | Delay median | p90 | max |
+|---|---|---|---|---|---|---|
+| threshold h=2 | 489 | 117.5 (126.5) | 0 | 3.1 s | 8.1 s | 28.1 s |
+| threshold h=3 | 0 | 0 (0.72) | 0 | 4.8 s | 18.1 s | 33.1 s |
+| **threshold h=10 (deployed)** | 0 | 0 (0.72) | 0 | 5.6 s | 28.1 s | 43.1 s |
+| threshold h=20 | 0 | 0 (0.72) | 0 | 9.0 s | 38.1 s | 51.1 s |
+| threshold h=70 | 0 | 0 (0.72) | 1 | 21.1 s | 66.6 s | 81.1 s |
+| CUSUM k=0.5 h=10 | 23 | 5.5 (7.7) | 0 | 5.6 s | 23.1 s | 38.1 s |
+| CUSUM k=0.5 h=50 | 0 | 0 (0.72) | 0 | 11.3 s | 38.1 s | 51.6 s |
+| CUSUM k=1 h=3 | 2 | 0.48 (1.51) | 0 | 4.8 s | 18.1 s | 33.1 s |
+| CUSUM k=1 h=10 | 0 | 0 (0.72) | 0 | 5.6 s | 23.1 s | 38.1 s |
+| CUSUM k=2 h=2 | 0 | 0 (0.72) | 0 | 4.8 s | 18.1 s | 33.1 s |
+
+![Drift detection delay vs false alarms](images/drift-delay-vs-false-alarms.png)
+
+- **Every injected drift is caught, and abrupt ones at the first update after the onset**: the abrupt delays are the same 4.0 / 4.8 / 0.6 s for every photometric kind because they are the gap from each repetition's seeded onset to the next 5 s update. The floor is the update cadence, not the statistic. The live alert adds `settle_s` (3 s), the scrape and the rule evaluation (E-055).
+- **CUSUM gains nothing here.** These drifts move their signal by tens of clean standard deviations (clean std of a shift is about 0.13; darkening moves brightness by about -20), so a one-update threshold already fires; CUSUM's advantage, accumulating a small persistent shift (unit test `test_cusum_catches_a_small_persistent_shift_long_before_a_threshold`), needs drifts below about h clean stds, which these scenarios (strengths picked in 9.2 for their mAP impact) do not contain. Out of sample, CUSUM's rule picked its most sensitive zero-false-alarm setting and paid 2 false alarms in one fold.
+- **Signals are not one-to-one with drift kinds**: blur is the most general input signal (blur, shift, darken, and noise all move it), and darkening also lowers the noise estimate (E-052). Only the class-mix change fires an output statistic first (PSI); occlusion only once (confidence W1). Alerts therefore name the channel, not a cause.
+- **False-alarm caveat**: the clean streams loop clips of 17 to 35 s, so a 30 s window keeps resembling the 60 s reference, and all clean data come from 4 scenes on one afternoon. Real cameras (lighting over a day, weather, traffic) vary far more: 0 in 4.16 camera-hours (< 0.72 per camera-hour) is a lower bound on the real rate, and the calibration must be redone per site on clean video (RUNBOOK, "Drift alerts").
+
+_Fine-tune: placeholder (task 9.5)._
 
 ## Cost
 
@@ -341,6 +385,7 @@ One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/s
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
 - Detection quality under drift: `make models`, `make onnx`, `make eval-detection-data`, then `make eval-drift` (~13 min).
+- Drift detection delay and false alarms: the 7 `bench/scenarios/drift-{clean,darken,blur,noise,shift,occlusion,classmix}.yaml` runs against `make demo`'s stack (`uv run python -m vms.loadgen run --scenario ...`, ~18 min each; `make data` for the full clips), then list their results in `drift-detect-cpu.yaml` and `make drift-score` (~15 s; series cached in `data/drift/series/`).
 - CPU baseline: `make up`, `make data-mini`, `make models`, then start the app containers with the canned planner (`LLM_MODEL= docker compose --env-file .env -f deploy/compose/docker-compose.yml --profile app up -d --wait ingest worker query` after `make app`), stop other CPU-heavy work, and run `make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` (~45 min), `query-load-cpu.yaml` (~20 min), `profile-worker-cpu.yaml` and `profile-query-cpu.yaml` (~2 min each).
 - Optimized worker ramps (5.5): as the CPU baseline, but start the worker each scenario's `expect_worker` names (commands in RUNBOOK, Benchmarks), then `make bench SCENARIO=bench/scenarios/ramp-cpu-pt.yaml`, `ramp-cpu-ort.yaml`, `ramp-cpu-ort-b4.yaml`, `ramp-cpu-ort-b4-ext.yaml`, `ramp-cpu-ort-b4-nospin.yaml` (~35 to 45 min each). The compose defaults are the D5 worker; the E-039 `ramp-cpu.yaml` now needs `WORKER_BACKEND=ultralytics WORKER_INFER_BATCH=1`.
 - ONNX parity: `make models`, `make eval-detection-data`, `make data-mini`, `make onnx`, then `make onnx-parity` and `make onnx-parity WEIGHTS=yolo11s` (~25 min each); ONNX mAP: `VMS_DETECTOR__BACKEND=onnxruntime make eval SUITE=detection` (and `WEIGHTS=yolo11n`).

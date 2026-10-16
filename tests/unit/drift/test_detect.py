@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from vms.drift.detect import (
+    CHANNELS,
     Calibration,
     CameraDetector,
     ChannelCalibration,
@@ -99,3 +100,13 @@ def test_camera_alarms_when_any_channel_does() -> None:
     # A channel without calibration is not watched.
     only = CameraDetector(DetectorSettings(kind="threshold", h=3, channels=["shift:noise"]), cal)
     assert only.channels == {}
+
+
+def test_shipped_config_calibrates_every_channel_of_the_deployed_detector() -> None:
+    from vms.common.settings import load_settings
+    from vms.drift.settings import DriftSettings
+
+    settings = load_settings(DriftSettings, "drift")
+    assert settings.calibration is not None  # alarms on (task 9.3, D34)
+    assert set(settings.detector.channels) == set(CHANNELS)
+    assert set(settings.calibration.channels) == set(CHANNELS)

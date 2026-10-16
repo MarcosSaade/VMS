@@ -1,0 +1,324 @@
+{
+  "schema_version": 1,
+  "run_id": "01M52HKEBGAMHHYCZ2R3KD8GX9",
+  "name": "drift-darken",
+  "kind": "loadgen.run",
+  "started_at": "2026-10-16T14:24:36.208308Z",
+  "ended_at": "2026-10-16T14:30:36.215103Z",
+  "seed": 1234,
+  "git": {
+    "sha": "fec2e94530ae282598a977cac6645eb349086341",
+    "dirty": true
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "ram_bytes": 16439492608,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0"
+  },
+  "config": {
+    "service": "loadgen",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 0.01
+    },
+    "target_url": "http://127.0.0.1:8080",
+    "mode": "paced",
+    "cameras": 4,
+    "fps": 5.0,
+    "duration_s": 360.0,
+    "warmup_s": 10.0,
+    "camera_prefix": "drift-darken-",
+    "max_schedule_lag_p99_ms": 10.0,
+    "frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "clips": {
+      "data_dir": "data",
+      "ids": [
+        "mot17-09",
+        "mot17-04",
+        "mot17-02",
+        "mot17-08"
+      ],
+      "assignment": "round_robin",
+      "max_frames": null
+    },
+    "http": {
+      "request_timeout_s": 5.0,
+      "connect_timeout_s": 2.0,
+      "max_in_flight_per_camera": 4,
+      "max_retries": 0,
+      "retry_base_s": 0.05,
+      "retry_max_s": 1.0
+    },
+    "stub": {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "latency_ms": 0.0,
+      "reject_ratio": 0.0,
+      "workers": 1
+    },
+    "drift": {
+      "events": [
+        {
+          "kind": "darken",
+          "cameras": [
+            0
+          ],
+          "onset_s": 120.0,
+          "onset_jitter_s": 60.0,
+          "ramp_s": 0.0,
+          "strength": 0.3,
+          "clip": null
+        },
+        {
+          "kind": "darken",
+          "cameras": [
+            2
+          ],
+          "onset_s": 120.0,
+          "onset_jitter_s": 60.0,
+          "ramp_s": 120.0,
+          "strength": 0.3,
+          "clip": null
+        }
+      ],
+      "render_workers": 2
+    },
+    "metrics_port": 9105,
+    "results_dir": "bench/results"
+  },
+  "scenario": {
+    "name": "drift-darken",
+    "description": "Task 9.2 drift scenario (vms.loadgen.drift), run against the containerized pipeline with the drift monitor (make demo stack): `python -m vms.loadgen run --scenario bench/scenarios/drift-darken.yaml`. 4 cameras x 5 FPS for 360 s on four full-length clips (make data; the data-mini clips loop every 10 s, E-050). The monitor's reference is each camera's first 60 s; onsets are at 120 s plus a seeded jitter in [0, 60) s per camera and repetition, recorded in the results (repetitions[].drift.events). Darkening to gain 0.3: camera 0 abrupt, camera 2 gradual over 120 s; cameras 1 and 3 stay clean (controls).\n",
+    "kind": "run",
+    "repeats": 3,
+    "config": {
+      "cameras": 4,
+      "fps": 5,
+      "duration_s": 360,
+      "warmup_s": 10,
+      "camera_prefix": "drift-darken-",
+      "clips": {
+        "ids": [
+          "mot17-09",
+          "mot17-04",
+          "mot17-02",
+          "mot17-08"
+        ]
+      },
+      "drift": {
+        "events": [
+          {
+            "kind": "darken",
+            "strength": 0.3,
+            "cameras": [
+              0
+            ],
+            "onset_s": 120,
+            "onset_jitter_s": 60
+          },
+          {
+            "kind": "darken",
+            "strength": 0.3,
+            "cameras": [
+              2
+            ],
+            "onset_s": 120,
+            "onset_jitter_s": 60,
+            "ramp_s": 120
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "transport": "http",
+    "repetitions": [
+      {
+        "steady_s": 349.984,
+        "offered_fps": 20.0,
+        "sent_fps": 20.0,
+        "accepted_fps": 20.0,
+        "sent_fps_per_second_std": 0.0,
+        "frames": {
+          "sent": 7000,
+          "accepted": 7000,
+          "rejected": 0,
+          "failed": 0,
+          "dropped": 0,
+          "incomplete": 0,
+          "retries": 0
+        },
+        "failure_reasons": {},
+        "error_rate": 0.0,
+        "send_latency_ms": {
+          "p50": 11.442,
+          "p95": 20.123,
+          "p99": 27.829,
+          "mean": 12.59,
+          "max": 216.176
+        },
+        "schedule_lag_ms": {
+          "p50": 0.785,
+          "p95": 1.988,
+          "p99": 2.888,
+          "mean": 0.889,
+          "max": 11.178
+        },
+        "seed": 1234,
+        "started_at": "2026-10-16T14:24:36.209198+00:00",
+        "elapsed_s": 359.984,
+        "drain_s": 0.01,
+        "cpu": {
+          "seconds": 30.532,
+          "utilization_cores": 0.085,
+          "us_per_frame": 4240.6
+        },
+        "drift": {
+          "events": [
+            {
+              "camera_id": "drift-darken-001",
+              "kind": "darken",
+              "onset_s": 161.018,
+              "onset_at": "2026-10-16T14:27:17.226755+00:00",
+              "ramp_s": 0.0,
+              "strength": 0.3,
+              "clip": null
+            },
+            {
+              "camera_id": "drift-darken-003",
+              "kind": "darken",
+              "onset_s": 178.436,
+              "onset_at": "2026-10-16T14:27:34.645459+00:00",
+              "ramp_s": 120.0,
+              "strength": 0.3,
+              "clip": null
+            }
+          ],
+          "rendered_frames": 1902,
+          "render_ms": {
+            "p50": 9.796,
+            "p95": 19.134,
+            "p99": 26.591,
+            "mean": 10.785,
+            "max": 42.59
+          }
+        },
+        "cameras": {
+          "drift-darken-001": "mot17-09",
+          "drift-darken-002": "mot17-04",
+          "drift-darken-003": "mot17-02",
+          "drift-darken-004": "mot17-08"
+        },
+        "generator_ok": true
+      }
+    ],
+    "aggregate": {
+      "sent_fps": {
+        "mean": 20.0,
+        "std": null,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "accepted_fps": {
+        "mean": 20.0,
+        "std": null,
+        "min": 20.0,
+        "max": 20.0
+      },
+      "send_latency_ms.p50": {
+        "mean": 11.442,
+        "std": null,
+        "min": 11.442,
+        "max": 11.442
+      },
+      "send_latency_ms.p95": {
+        "mean": 20.123,
+        "std": null,
+        "min": 20.123,
+        "max": 20.123
+      },
+      "send_latency_ms.p99": {
+        "mean": 27.829,
+        "std": null,
+        "min": 27.829,
+        "max": 27.829
+      },
+      "schedule_lag_ms.p99": {
+        "mean": 2.888,
+        "std": null,
+        "min": 2.888,
+        "max": 2.888
+      },
+      "cpu.utilization_cores": {
+        "mean": 0.085,
+        "std": null,
+        "min": 0.085,
+        "max": 0.085
+      },
+      "cpu.us_per_frame": {
+        "mean": 4240.6,
+        "std": null,
+        "min": 4240.6,
+        "max": 4240.6
+      }
+    },
+    "clips": {
+      "mot17-09": {
+        "frames": 525,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-04": {
+        "frames": 1050,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-02": {
+        "frames": 600,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      },
+      "mot17-08": {
+        "frames": 625,
+        "size": [
+          1280,
+          720
+        ],
+        "fps": 30.0
+      }
+    }
+  },
+  "cost_usd": 0.0,
+  "notes": ""
+}

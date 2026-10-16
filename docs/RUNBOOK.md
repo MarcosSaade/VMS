@@ -165,6 +165,22 @@ uv run python -m vms.drift recalibrate cam-001 --start 2026-10-16T09:00:00+00:00
 - NaN means undefined, not "no drift": fewer than `signals.min_frames` frames in the window (camera stopped, backlog), or fewer than `signals.min_detections` detections (empty scene) for the confidence and class-mix statistics.
 - The data-mini clips loop every 10 s, so a 30 s window of a 300-frame clip holds the same frames as the reference and its input shifts are exactly 0 (E-050); expect clean values to vary more on real cameras.
 
+### Drift alerts
+
+The monitor runs the detector chosen in task 9.3 (D34): per camera and channel, z = (statistic - clean mean) / clean std from `calibration` in `configs/drift.yaml`, alarm while |z| > `detector.h` (10; one-sided channels: z > h). Gauges `vms_drift_z_value{camera_id,channel}`, `vms_drift_alarm_value` (1 while alarming), `vms_drift_alarms_total`; rules in `deploy/compose/prometheus/rules/drift.yml` (Prometheus, Alerts tab; there is no Alertmanager in the stack, so nothing is sent anywhere).
+
+| Alert | Means | Confirm |
+|---|---|---|
+| `VmsCameraDrift` (warning) | A channel of the camera is more than h clean standard deviations from its reference. `channel` says which statistic moved (`shift:brightness`, `shift:log_blur`, `class_psi`, ...), not why: darkening also moves noise, a camera shift reads as blur (BENCHMARKS, "Detection delay and false alarms"). | `vms_drift_shift_value{camera_id="..."}` and `vms_drift_z_value` over the last hour; look at the camera in the UI (camera wall) for fog, a dirty lens, a moved mount, night, a new scene. |
+| `VmsDriftNoData` (info) | The camera's windows have fewer than 20 processed frames for 2 minutes: it stopped sending or the worker is behind. Drift is undetectable meanwhile. | `vms_worker_backlog_frames`, the Pipeline dashboard; loadgen or the camera itself. |
+| `VmsDriftMonitorDown` (warning) | Prometheus cannot scrape the drift service. | `docker compose ps drift`, its logs. |
+
+Responses:
+- An intended change (camera re-aimed, new lighting): `uv run python -m vms.drift recalibrate CAMERA` (new reference from now; or `--start/--end` on a known-clean period). The alarm clears at the next update.
+- A fault (dirty or fogged lens, failing sensor): fix the camera; the alarm clears by itself once the window is back near the reference.
+- A real domain change that hurts detection (night, weather): measure its mAP cost (`make eval-drift` style, task 9.2) and consider the fine-tuned model (task 9.5).
+- Too many alarms on a healthy site: the shipped calibration comes from four looping MOT17 clips on one afternoon (E-054), so it understates normal variation. Recalibrate on that site's clean video (a day, to include its lighting and traffic): record it, list its runs in a `drift-score` scenario, `make drift-score SCENARIO=...`, then copy `calibration_all` from the results into `configs/drift.yaml` and restart the monitor. Raising `detector.h` trades delay for fewer alarms (the sweep table shows the cost). Removing `calibration` turns alarms off.
+
 ### Query service
 
 ```bash
@@ -332,6 +348,17 @@ make eval-drift SCENARIO=bench/scenarios/<other>.yaml
 
 - Needs `make models`, `make onnx`, `make eval-detection-data`. Writes one `eval.detection` results JSON per condition (`metrics.drift` names the transform) and a summary `eval/results/*-drift-map-cpu-*.json` (`kind: eval.detection.drift`) with each condition's mAP and its paired change against the clean run.
 - Only photometric drift (darken, blur, noise) is scored: it keeps every box valid. Noise is seeded per image (`drift.seed`), so reruns give the same pixels.
+
+### Drift detector scoring (task 9.3)
+
+```bash
+make drift-score                                  # bench/scenarios/drift-detect-cpu.yaml (~15 s once series are cached)
+make drift-score SCENARIO=bench/scenarios/<other>.yaml
+```
+
+- Needs the listed loadgen runs' frames and detections still in Postgres (the stack that recorded them): each camera is replayed from the database by its recorded camera ids and start time. Series are cached per run and repetition in `data/drift/series/` (delete to recompute). A camera with no processed frames stops the run with an error (frames still pending, or the worker never leased the camera: check `SELECT status, count(*) FROM frames GROUP BY 1`).
+- Writes `bench/results/*-drift-detect-cpu-*.json` (`kind: drift.score`: calibration, the full sweep with per-repetition summaries, the leave-one-repetition-out folds, delays and first channels by drift) and the plot `docs/images/drift-delay-vs-false-alarms.png`.
+- Recording the 7 runs takes about 2 h on the laptop (`uv run python -m vms.loadgen run --scenario bench/scenarios/drift-<kind>.yaml`, 18 min each). Camera ids repeat across reruns of a scenario; the monitor keeps their first reference, the scorer does not use it.
 
 ### Precision ladder (task 5.2)
 

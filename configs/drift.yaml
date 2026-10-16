@@ -14,6 +14,7 @@ monitor:                       # windows in capture time (vms.drift.monitor)
   settle_s: 3                  # window ends this long before now (frames still in the queue)
   discover_every_s: 30
   shutdown_grace_s: 5
+  detect_min_coverage: 0.9     # detector skips windows whose frames span less (start, resume, stop)
 
 signals:                       # vms.drift.signals
   min_conf: 0.25               # = tracker.store_min_conf (configs/worker.yaml)
@@ -28,6 +29,27 @@ signals:                       # vms.drift.signals
     noise: 0.1
     detections_per_frame: 0.5
     confidence: 0.01
+
+# Alerting (task 9.3, D34). Fixed threshold on each channel's z = (statistic - mean) / std,
+# both from the clean streams of bench/results/2026-10-16-drift-detect-cpu-01M52J2GYHBMPAMRVCQW19GZPA.json
+# (calibration_all; laptop, MOT17 clips that loop every 17-35 s). The leave-one-repetition-out
+# rule picked h=3 in every fold; h=10 is deployed for margin: clean data from looping clips
+# understates clean variation, and h=2 already gave 489 false alarms. h=10 still caught all
+# 36 drifted streams (median delay 5.6 s vs 4.8 s). Remove `calibration` to turn alarms off.
+detector:
+  kind: threshold              # threshold | cusum (vms.drift.detect)
+  h: 10
+calibration:                   # `make drift-score`; recalibrate on each site's clean video
+  channels:
+    shift:brightness: {mean: 0.0192, std: 0.1338}
+    shift:contrast: {mean: 0.0054, std: 0.1343}
+    shift:log_blur: {mean: -0.0091, std: 0.1042}
+    shift:noise: {mean: -0.0022, std: 0.1}
+    shift:detections_per_frame: {mean: -0.0509, std: 0.1337}
+    shift:confidence: {mean: 0.0087, std: 0.1}
+    confidence_ks: {mean: 0.0198, std: 0.00969}
+    confidence_wasserstein: {mean: 0.00495, std: 0.00232}
+    class_psi: {mean: 0.0016, std: 0.002}
 
 db:
   min_size: 1
