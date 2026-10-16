@@ -216,6 +216,7 @@ uv run python -m vms.loadgen run --cameras 50 --fps 5 --duration 120 --target-ur
 - Live metrics on `http://localhost:9105/metrics` while a run is going (`metrics_port`). Prometheus in the stack does not scrape it yet (task 2.1).
 - Trust check before reading any number: `generator_ok` must be true (schedule lag p99 within `max_schedule_lag_p99_ms`) and `cpu.utilization_cores` well below 1.0. Near 1.0 the single event loop is saturated and the offered load is lower than configured. The measured ceiling is in E-010.
 - Ctrl-C stops scheduling, waits for in-flight sends and writes partial results.
+- Drift injection (task 9.2): a scenario's `config.drift.events` changes what some cameras send from a known onset on (`vms.loadgen.drift`: darken, blur, noise, shift, occlusion with a `strength`, or `switch_clip` to another clip; `ramp_s` 0 is abrupt, otherwise linear over `ramp_s`; `onset_jitter_s` adds a seeded per-camera delay). One scenario per kind plus a clean control, all on full-length clips (`make data` first): `make loadgen SCENARIO=bench/scenarios/drift-darken.yaml` (also `drift-blur`, `drift-noise`, `drift-shift`, `drift-occlusion`, `drift-classmix`, `drift-clean`; 6 min per repetition, 3 repetitions) against the demo stack with the drift monitor. Each repetition's results list the resolved onsets (`repetitions[].drift.events`: camera, kind, `onset_s`, `onset_at`, ramp, strength) and the render time of drifted frames (`render_ms`). Each scenario uses its own camera prefix, so its cameras get their own drift references; the first repetition's first 60 s is the reference for all three.
 
 ### Traces and metrics
 
@@ -321,6 +322,16 @@ uv run python -m vms.eval.detection check   # offline: spec and list match the m
 - Each run writes `eval/results/<date>-detection-<weights>-<run_id>.json` (mAP@50 and mAP@50-95 per source with interval, bootstrap std and mean, per-class AP) and the raw detections to `data/eval/detection/predictions/<run_id>.jsonl.gz`. A smoke run on a few images (`VMS_MAX_IMAGES=20`) is marked `partial` and is never a reported number.
 - Licenses: COCO annotations are CC BY 4.0 and its images keep their Flickr licenses; MOT17 is CC BY-NC-SA 3.0. Neither is redistributed; never commit or publish the images.
 - The subset is frozen. Changing `configs/eval/detection.v1.yaml` or the list fails a unit test; a new selection is v2 (`detection.v2.yaml`, then `uv run python -m vms.eval.detection build` with the v2 paths, which writes the list and manifest once and on later runs only checks that a rebuild is identical). Images used to calibrate INT8 (5.2) or fine-tune (9.5) must not be in the list.
+
+### Detection quality under drift (task 9.2)
+
+```bash
+make eval-drift          # bench/scenarios/drift-map-cpu.yaml: yolo11n ORT FP32, clean + 6 conditions (~20 min on the laptop)
+make eval-drift SCENARIO=bench/scenarios/<other>.yaml
+```
+
+- Needs `make models`, `make onnx`, `make eval-detection-data`. Writes one `eval.detection` results JSON per condition (`metrics.drift` names the transform) and a summary `eval/results/*-drift-map-cpu-*.json` (`kind: eval.detection.drift`) with each condition's mAP and its paired change against the clean run.
+- Only photometric drift (darken, blur, noise) is scored: it keeps every box valid. Noise is seeded per image (`drift.seed`), so reruns give the same pixels.
 
 ### Precision ladder (task 5.2)
 
