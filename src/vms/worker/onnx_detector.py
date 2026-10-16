@@ -248,7 +248,7 @@ def _ort() -> Any:
     return importlib.import_module("onnxruntime")
 
 
-def onnx_session_options(threads: int | None) -> Any:
+def onnx_session_options(threads: int | None, spin: bool = True) -> Any:
     ort = _ort()
 
     opts = ort.SessionOptions()
@@ -256,6 +256,7 @@ def onnx_session_options(threads: int | None) -> Any:
     opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
     if threads is not None:
         opts.intra_op_num_threads = threads
+    opts.add_session_config_entry("session.intra_op.allow_spinning", "1" if spin else "0")
     return opts
 
 
@@ -278,7 +279,9 @@ class OnnxDetector:
             providers.insert(0, "CUDAExecutionProvider")
         self._settings = settings
         self._session: Any = ort.InferenceSession(
-            str(model_path), onnx_session_options(settings.threads), providers=providers
+            str(model_path),
+            onnx_session_options(settings.threads, settings.spin),
+            providers=providers,
         )
         meta = self._session.get_modelmeta().custom_metadata_map
         self._names: dict[int, str] = {

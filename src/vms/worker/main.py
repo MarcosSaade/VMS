@@ -76,13 +76,14 @@ def build_app(settings: WorkerSettings, obs: Observability, detector: Detector) 
         "model",
         "info",
         "Model served by this worker (value 1)",
-        ["model_version", "backend", "precision", "device", "infer_batch"],
+        ["model_version", "backend", "precision", "device", "infer_batch", "spin"],
     ).labels(
         model_version=detector.model_version,
         backend=settings.detector.backend,
         precision=settings.detector.precision,
         device=settings.detector.device,
         infer_batch=str(settings.queue.infer_batch),
+        spin=str(settings.detector.spin).lower(),
     ).set(1)
     stop = asyncio.Event()
     task: asyncio.Task[None] | None = None

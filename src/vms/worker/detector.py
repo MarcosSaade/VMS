@@ -77,6 +77,9 @@ class DetectorSettings(BaseModel):
     max_det: int = Field(default=300, ge=1)
     # Intra-op threads of the backend; None: its default (one per physical core for both).
     threads: int | None = Field(default=None, ge=1)
+    # onnxruntime only: intra-op threads busy-wait between runs (ORT's default). Off, idle
+    # threads sleep: far less CPU below saturation, at the cost of a wake-up per run.
+    spin: bool = True
 
     @model_validator(mode="after")
     def _int8_needs_onnxruntime(self) -> DetectorSettings:

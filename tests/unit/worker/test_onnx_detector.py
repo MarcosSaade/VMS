@@ -27,6 +27,7 @@ from vms.worker.onnx_detector import (
     letterbox,
     nms,
     onnx_paths,
+    onnx_session_options,
     postprocess,
     preprocess,
     scale_boxes,
@@ -225,6 +226,13 @@ def test_onnx_detector_reports_its_backend_in_the_model_version(
     onnx = OnnxDetector(model, sha, DetectorSettings(weights="rand"))
     assert onnx.model_version == f"rand@{sha[:12]}+onnx"
     assert len(onnx.names) == 80  # from the export metadata (generic names for a YAML model)
+
+
+@pytest.mark.parametrize(("spin", "entry"), [(True, "1"), (False, "0")])
+def test_session_options_set_intra_op_spinning(spin: bool, entry: str) -> None:
+    opts = onnx_session_options(2, spin)
+    assert opts.intra_op_num_threads == 2
+    assert opts.get_session_config_entry("session.intra_op.allow_spinning") == entry
 
 
 def test_build_detector_needs_an_export_for_onnxruntime(tmp_path: Path) -> None:

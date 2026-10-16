@@ -219,6 +219,7 @@ services:
       # Backend and frames per forward pass (D5, task 5.5); onnxruntime needs `make onnx`.
       VMS_DETECTOR__BACKEND: ${WORKER_BACKEND:-ultralytics}
       VMS_QUEUE__INFER_BATCH: ${WORKER_INFER_BATCH:-1}
+      VMS_DETECTOR__SPIN: ${WORKER_SPIN:-true}
     volumes:
       # Fetched, verified and exported on the host (make models, make onnx); read-only here.
       - ../../models/weights:/app/models/weights:ro

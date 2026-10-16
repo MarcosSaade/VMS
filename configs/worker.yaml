@@ -28,6 +28,7 @@ detector:                      # in-process, batch size 1 (Phase 1 baseline)
   iou: 0.7
   max_det: 300
   threads: null                # intra-op threads; null: backend default (one per physical core)
+  spin: true                   # onnxruntime: idle intra-op threads busy-wait (ORT default)
 
 tracker:                       # ByteTrack per camera (vms.worker.tracking)
   fps: 5.0                     # cameras' analysis rate; turns buffer_s into frames
