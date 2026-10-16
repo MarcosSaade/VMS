@@ -459,13 +459,23 @@ def score(streams: list[Stream], scenario: ScoreScenario) -> dict[str, Any]:
 # --- 3. Plot and results --------------------------------------------------------------------
 
 
+def _front(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    """The configurations no other one beats on both false alarms and `key` (a delay)."""
+    out: list[dict[str, Any]] = []
+    for r in sorted(rows, key=lambda r: (r["fa_per_hour"], r[key])):
+        if not out or r[key] < out[-1][key]:
+            out.append(r)
+    return out
+
+
 def plot(metrics: dict[str, Any], path: Path) -> None:
+    """Delay against false alarms, one Pareto front per detector family: median delay (spread:
+    the per-repetition medians) and p90 delay (dominated by gradual drift)."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(7.5, 4.6), dpi=110)
     families = [("threshold", None, "Fixed threshold", "#d1495b")] + [
         ("cusum", k, f"CUSUM k={k:g}", c)
         for k, c in zip(
@@ -476,38 +486,68 @@ def plot(metrics: dict[str, Any], path: Path) -> None:
             strict=False,
         )
     ]
-    for kind, k, label, color in families:
-        rows = [
-            r
-            for r in metrics["sweep"]
-            if r["detector"]["kind"] == kind
-            and (k is None or r["detector"]["k"] == k)
-            and r["median_delay_s"] is not None
-            and r["missed"] == 0
-        ]
-        if not rows:
-            continue
-        rows.sort(key=lambda r: r["fa_per_hour"])
-        xs = [r["fa_per_hour"] for r in rows]
-        ys = [r["median_delay_s"] for r in rows]
-        lo, hi = [], []
-        for r in rows:
-            meds = [
-                p["median_delay_s"]
-                for p in r["per_rep"].values()
-                if p["median_delay_s"] is not None
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.4), dpi=110, sharex=True)
+    for ax, key, title in [
+        (axes[0], "median_delay_s", "Median delay (bars: range of per-repetition medians)"),
+        (axes[1], "delay_s_p90", "p90 delay (mostly gradual drift)"),
+    ]:
+        for kind, k, label, color in families:
+            rows = [
+                r
+                for r in metrics["sweep"]
+                if r["detector"]["kind"] == kind
+                and (k is None or r["detector"]["k"] == k)
+                and r[key] is not None
+                and r["missed"] == 0
             ]
-            lo.append(r["median_delay_s"] - min(meds) if meds else 0)
-            hi.append(max(meds) - r["median_delay_s"] if meds else 0)
-        ax.errorbar(
-            xs, ys, yerr=[lo, hi], marker="o", ms=4, lw=1.5, capsize=2, label=label, color=color
-        )
-    ax.set_xscale("symlog", linthresh=1.0)
-    ax.set_xlabel("False alarms per camera-hour (clean streams)")
-    ax.set_ylabel("Median detection delay (s)")
-    ax.set_title("Drift detection: delay vs false alarms (configs with no missed drift)")
-    ax.grid(True, alpha=0.3)
-    ax.legend(frameon=False, fontsize=8)
+            rows = _front(rows, key)
+            if not rows:
+                continue
+            if rows[0]["false_alarms"] == 0:  # name the setting at the zero false-alarm end
+                setting = rows[0]["label"].split(" ", 1)[1]
+                label = f"{label} ({setting.split()[-1]} at 0 FA)"
+            xs = [r["fa_per_hour"] for r in rows]
+            ys = [r[key] for r in rows]
+            if key == "median_delay_s":
+                lo, hi = [], []
+                for r in rows:
+                    meds = [p[key] for p in r["per_rep"].values() if p[key] is not None] or [r[key]]
+                    lo.append(r[key] - min(meds))
+                    hi.append(max(meds) - r[key])
+                ax.errorbar(
+                    xs,
+                    ys,
+                    yerr=[lo, hi],
+                    marker="o",
+                    ms=4,
+                    lw=1.5,
+                    capsize=2,
+                    label=label,
+                    color=color,
+                    drawstyle="steps-post",
+                )
+            else:
+                ax.plot(
+                    xs,
+                    ys,
+                    marker="o",
+                    ms=4,
+                    lw=1.5,
+                    label=label,
+                    color=color,
+                    drawstyle="steps-post",
+                )
+        ax.set_xscale("symlog", linthresh=1.0)
+        ax.set_xlabel("False alarms per camera-hour (clean streams)")
+        ax.set_ylabel("Delay after onset (s)")
+        ax.set_title(title, fontsize=9)
+        ax.grid(True, alpha=0.3)
+    for ax in axes:
+        ax.legend(frameon=False, fontsize=7)
+    fig.suptitle(
+        "Drift detection: delay vs false alarms (Pareto front per detector, no missed drift)",
+        fontsize=10,
+    )
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path)
