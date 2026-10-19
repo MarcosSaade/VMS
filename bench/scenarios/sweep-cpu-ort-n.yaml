@@ -1,0 +1,25 @@
+name: sweep-cpu-ort-n
+description: >
+  Task 5.3, batch-size sweep for the best CPU backend from 5.2 (ONNX Runtime FP32, E-043 to
+  E-046) on YOLO11n, as the worker runs it (D5): idle intra-op threads sleep (detector.spin
+  false, E-049), one intra-op thread per physical core. Model-only, in-process (vms.worker
+  ladder harness): detect_batch (letterbox, forward, NMS) on decoded data-mini frames
+  (1280x720, as loadgen sends them) at batch sizes 1, 2, 4, 8, 16 and 32; one variable, the
+  batch size. 160 frames per clip (480 frames: 15 batches at 32, 2 discarded as warmup),
+  3 repetitions. Throughput against batch latency picks the operating point that meets the
+  freshness SLO (ARCHITECTURE 2) with headroom. Quiet host.
+kind: ladder
+repeats: 3
+bench:
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  frames_per_clip: 160
+  batch_sizes: [1, 2, 4, 8, 16, 32]
+  warmup_batches: 2
+  cooldown_s: 15
+config:
+  detector:
+    weights: yolo11n
+    device: cpu
+steps:
+  - name: ort-fp32
+    detector: {backend: onnxruntime, spin: false}

@@ -10,6 +10,9 @@ quantize [NAME ...]         (make quantize) static INT8 quantization of the ONNX
 ladder --scenario FILE      precision ladder: latency and throughput per backend and batch size
                             (bench/scenarios/ladder-*.yaml; each step in its own process)
 bench --scenario FILE       model-only latency (bench/scenarios/worker-model-*.yaml)
+sweep-plot FILE ... --out PNG
+                            batch-size sweep (5.3): operating point per ladder result and the
+                            throughput vs latency plot (--label per file)
 render CLIP:CAMERA ... --out FILE.mp4
                             review video: detections, tracks, zones and events on clips
 """
@@ -48,6 +51,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     step.add_argument("--scenario", type=Path, required=True)
     step.add_argument("--step", required=True)
     step.add_argument("--out", type=Path, required=True)
+    sweep = commands.add_parser("sweep-plot", help="batch-size sweep plot and operating point")
+    sweep.add_argument("files", type=Path, nargs="+", help="ladder results of sweep scenarios")
+    sweep.add_argument("--out", type=Path, required=True)
+    sweep.add_argument("--label", action="append", default=[], help="one per file, in order")
     bench = commands.add_parser("bench", help="model-only latency benchmark")
     bench.add_argument("--scenario", type=Path, required=True)
     render = commands.add_parser("render", help="draw detections, tracks and zones on clips")
@@ -117,6 +124,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_ladder(args.scenario)
         return 0
 
+    if args.command == "sweep-plot":
+        return _sweep_plot(args.files, args.out, args.label)
+
     if args.command == "ladder-step":
         from vms.worker.ladder import run_step_main
 
@@ -154,6 +164,40 @@ def _calibration(action: str) -> int:
     n = cal.fetch(spec, images, UrllibTransport(), RetryPolicy(), p.images_dir, p.fetch_workers)
     sys.stdout.write(f"{len(images)} calibration images verified under {p.images_dir} ")
     sys.stdout.write(f"({n} downloaded)\n")
+    return 0
+
+
+def _sweep_plot(files: list[Path], out: Path, labels: list[str]) -> int:
+    import sys
+
+    from vms.bench.results import RunResult
+    from vms.bench.settings import SERVICE as BENCH
+    from vms.bench.settings import BenchSettings
+    from vms.common.settings import load_settings
+    from vms.worker.sweep import operating_point, plot_sweep, sweep_points
+
+    if labels and len(labels) != len(files):
+        raise SystemExit("give one --label per file, or none")
+    slo_s = load_settings(BenchSettings, BENCH).slo.freshness_p95_s
+    series = []
+    for k, path in enumerate(files):
+        result = RunResult.model_validate_json(path.read_text(encoding="utf-8"))
+        points = sweep_points(result)
+        label = labels[k] if labels else f"{result.hardware.cpu} ({result.hardware.logical_cpus})"
+        op = operating_point(points, slo_s)
+        sys.stdout.write(
+            f"{label}: operating point batch {op.batch}, {op.images_per_s:.1f} images/s, "
+            f"batch p95 {op.latency_ms_p95:.0f} ms\n"
+        )
+        for p in points:
+            sys.stdout.write(
+                f"  batch {p.batch:>2}: {p.images_per_s:6.1f} ({p.images_per_s_std:.1f}) img/s, "
+                f"p50/p95 {p.latency_ms_p50:.0f}/{p.latency_ms_p95:.0f} ms, "
+                f"{p.cpu_cores:.1f} cores\n"
+            )
+        series.append((label, points))
+    plot_sweep(series, slo_s, out)
+    sys.stdout.write(f"plot written to {out}\n")
     return 0
 
 
