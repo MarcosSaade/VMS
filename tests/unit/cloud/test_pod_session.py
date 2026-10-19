@@ -31,6 +31,7 @@ class FakePods:
     availability: str = "LOW"
     delete_fails: bool = False
     create_raises: bool = False  # the create times out after making the pod
+    no_public_ip: bool = False  # the pod runs but 22/tcp never gets a public port
     pods: dict[str, Pod] = field(default_factory=dict)
     created: list[PodSpec] = field(default_factory=list)
     calls: list[str] = field(default_factory=list)
@@ -63,8 +64,9 @@ class FakePods:
                 hourly_usd=0.59,
                 data_center="EU-RO-1",
                 cuda_version="13.2",
-                ssh=SshEndpoint("203.0.113.9", 40122, "root"),
+                ssh=None if self.no_public_ip else SshEndpoint("203.0.113.9", 40122, "root"),
                 created_at=pod.created_at,
+                ports=("22->None:None/tcp",),
             )
         return pod
 
@@ -303,3 +305,15 @@ def test_preflight_lists_old_project_pods(make) -> None:  # type: ignore[no-unty
     pre = h.session.preflight()
     assert [p.id for p in pre.existing] == ["pod-9"]
     assert pre.max_cost_usd == pytest.approx(pre.hourly_usd * 150 / 60)
+
+
+def test_a_pod_without_a_public_port_gives_up_early_and_is_deleted(make) -> None:  # type: ignore[no-untyped-def]
+    h = make(FakePods(FakeClock(T0), no_public_ip=True))
+    assert h.run() == 1
+    rec = h.record()
+    assert "no direct SSH" in rec.metrics["error"]
+    assert "22->None:None/tcp" in rec.metrics["error"]
+    assert rec.metrics["data_center"] == "EU-RO-1"  # recorded once RUNNING
+    assert rec.metrics["billed_s"] < h.session.settings.timeouts.running_s
+    assert h.pods.pods == {}
+    assert h.connects == []
