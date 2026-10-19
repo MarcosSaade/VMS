@@ -85,7 +85,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: what tolerance did parity use and why, and where do ONNX and PyTorch outputs differ?
 - [ ] 5.2 Precision ladder: PyTorch, ORT, TensorRT FP16, TensorRT INT8, each with mAP (CI) and latency (CPU ladder as fallback). CPU part done 2026-10-15 (E-043 to E-046: ORT FP32 1.65x (yolo11s) and 1.84x (yolo11n) PyTorch at equal mAP; ORT INT8 faster still but fails D32 for both); the TensorRT rungs run on Runpod (D37)
   - Understand it: why does INT8 need calibration, what did it cost in mAP, and is that drop inside the CI?
-- [ ] 5.3 Batch-size sweep in-process: throughput against latency (SHRINK: no Triton dynamic batching)
+- [ ] 5.3 Batch-size sweep in-process: throughput against latency (SHRINK: no Triton dynamic batching). CPU part done 2026-10-19 (E-057, E-059: operating point batch 4 on the laptop, 8 on AWS c7i.2xlarge; config keeps 4; plot in BENCHMARKS); the GPU sweep comes from the Runpod session (D37)
   - Understand it: why do throughput and latency both rise with batch size, and which point meets the freshness SLO?
 - [ ] 5.5 Worker on the best backend in-process; re-run ramp; decide D5 (SHRINK: no Triton). CPU part done 2026-10-16 (E-047 to E-049: ONNX Runtime FP32, cross-camera batch 4, no thread spinning: rated 2 -> 5 cameras, ceiling 1.8x; D5 accepted for CPU); the GPU ramp is deferred (D37) and D5's GPU part is decided model-level from 5.2 and 5.3 on Runpod
   - Understand it: how much of the model-only speedup survived end to end, and why not all of it?
@@ -99,7 +99,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: what does CUSUM accumulate, which knob trades delay for false alarms, and what did the curve show?
 - [x] 9.4 Drift dashboard and runbook procedure. Done 2026-10-16 (E-056: per-camera rows with alarm bands, detector vs h, alarm and injected-onset annotations; RUNBOOK "Drift alerts" procedure)
   - Understand it: an alert fires on one camera at 3 a.m.; what do you check, in order?
-- [ ] 9.5 Detector fine-tune on drifted data: before/after mAP on drifted and clean sets (SHRINK: no sweep, no W&B)
+- [x] 9.5 Detector fine-tune on drifted data: before/after mAP on drifted and clean sets (SHRINK: no sweep, no W&B). Done 2026-10-19 on AWS CPU (E-060, E-061, D36): negative, blur augmentation +4.4 MOT17 mAP at blur 6 over a no-blur control but the recipe loses 2 to 7 points elsewhere; not deployed
   - Understand it: did fine-tuning help the drifted set without hurting the clean set, and why is augmentation not real domain shift?
 
 ## Phase 11: Packaging

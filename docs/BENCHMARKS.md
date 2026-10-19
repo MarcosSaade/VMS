@@ -23,12 +23,13 @@ One entry per environment used (CPU, RAM, GPU model, driver, CUDA, instance type
 | ID | Machine | Notes |
 |---|---|---|
 | laptop | Intel i7-1355U (2 performance + 8 efficiency cores, 12 threads), 15 GiB RAM, no GPU, Linux 6.8 | Development laptop. Runs before 2026-10-14 had other work running and are indicative. The 2.5/2.6 runs (E-039 to E-042) stopped the unrelated containers; a browser and desktop stayed open, so it is quieter, not a dedicated host. |
-
+| aws-c7i-2xl | AWS c7i.2xlarge on-demand, us-east-2: Intel Xeon Platinum 8488C, 4 cores / 8 vCPU, 16 GiB, no GPU, Ubuntu 24.04 (kernel 7.0 aws) | CPU sessions (D35): a dedicated VM running the whole compose stack, loadgen and the bench client, as the laptop does. $0.369/h with volume and IPv4. |
+| aws-c7i-4xl | AWS c7i.4xlarge, same, 8 cores / 16 vCPU, 32 GiB | The 9.5 fine-tune session. $0.726/h. |
 | runpod-a40 | Runpod pod, secure cloud: 1x NVIDIA A40 48 GB (driver 580.159.04, host CUDA 13.0), Intel Xeon Gold 6342 host (the pod gets a share of its 96 threads), data center EU-SE-1 on 2026-10-19 | GPU sessions (D37). A container, not a VM: model-level scenarios only. Data center and host vary per session and are recorded in each session file. |
 
 ## Headline results
 
-Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity on a GPU, cost per camera-hour.
+Self-measured on `laptop` unless a row names another host; 95% bootstrap intervals. Still to come: GPU model-level numbers (Runpod, D37), cost per camera-hour at scale.
 
 | Result | Number | Evidence |
 |---|---|---|
@@ -36,6 +37,8 @@ Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacit
 | Rated capacity, CPU, one yolo11n worker (D5: ONNX Runtime FP32, cross-camera batch 4, no thread spinning) | **5 cameras at 5 FPS** (3/3 repetitions; freshness p95 0.40 s, 0 lost), up from **2** with PyTorch at batch 1; worker ceiling 26.3 vs 14.5 frames/s (**1.8x**) at 1.3 to 4.0 worker cores | E-047 to E-049 (Ingest and pipeline capacity, optimized worker) |
 | Structured-query latency under ingest, CPU, canned planner (LLM excluded) | p95 39 ms at 1 client, 98 ms at 8 (159 q/s, one core saturated) | E-040, [`query-load-cpu`](../bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json) |
 | Detection quality, yolo11s (PyTorch CPU) | COCO-500 mAP@50-95 45.8 [44.1, 49.6]; MOT17 person mAP@50-95 45.0 [43.1, 47.0] | E-034 (Evaluation, detection quality) |
+| Rated capacity on a cloud CPU server (AWS c7i.2xlarge, 8 vCPU, same worker) | **3 cameras at 5 FPS**, worker ceiling 23.8 frames/s; **$0.12 per camera-hour** of compute (on-demand, us-east-2) | E-059 (Ingest and pipeline capacity, AWS) |
+| Detector fine-tune against blur (9.5), yolo11n, CPU, 10 epochs on 1,567 images | **Negative**: on the camera scenes under blur sigma 6, +4.4 [+3.7, +5.3] mAP@50-95 over a no-blur control but only +1.6 [+0.7, +2.7] over the untouched model, and -2.6 (MOT17) / -7.0 (COCO) points clean; not deployed | E-060, E-061 (Drift detection, fine-tune) |
 | Precision ladder, CPU, model-only (`detect_batch`, batch 1) | ONNX Runtime FP32 **1.84x** PyTorch for yolo11n (48.8 vs 26.5 images/s) and **1.65x** for yolo11s (21.3 vs 12.9), identical mAP; INT8 is faster still (65.8 and 38.2) but fails D32 for both models (COCO mAP@50-95 -1.30 and -1.07 points), so not kept | E-044 to E-046 (Inference, precision ladder) |
 
 ## Ingest and pipeline capacity
@@ -79,6 +82,20 @@ Model-only vs end to end, against PyTorch at batch 1:
 - **Spinning**: ONNX Runtime's default keeps its intra-op threads busy-waiting between runs, so the worker shows ~9.2 cores at any load. With it off the same capacity costs 1.3 cores at 1 camera; each call pays a wake-up (infer p95 49 vs 25 ms), which adds 0.12 s to freshness p95 at 5 cameras, far inside the 2 s SLO.
 - The PyTorch rerun reproduces E-039 (ceiling 14.5 vs 14.2, same rated capacity), so the batched worker loop costs nothing at batch 1. 0 frames lost in every step of every run; loadgen under 0.06 cores and `harness_ok` everywhere. Per-step stage p95s are in the results files.
 
+### Optimized worker ramp on AWS (D35, E-059)
+
+The `ramp-cpu-ort-b4-nospin` scenario unchanged (D5 worker, data-mini at 5 FPS per camera, warmup 20 s, hold 90 s, 3 repetitions) on `aws-c7i-2xl`, launched by `make cpu-session` (clean commit b349c1b); the whole stack, loadgen and the bench client share the instance's 8 vCPUs.
+
+| Cameras | Worker done fps | Freshness p50 / p95 s | Backlog slope fps | Lost | Worker cores | Ingest SLO |
+|---|---|---|---|---|---|---|
+| 1 | 5.0 | 0.13 / 0.24 | 0.00 | 0 | 0.43 | 3/3 |
+| **3** | 15.0 | 0.12 / 0.24 | 0.00 | 0 | 1.23 | **3/3** |
+| 5 | 23.9 | 3.52 / 6.29 | +1.11 (0.52) | 0 | 1.80 | 0/3 |
+| 6 | 23.8 | 12.6 / 24.0 | +6.14 (0.41) | 0 | 1.80 | 0/3 |
+| 7 | 24.3 | 20.2 / 39.3 | +10.7 (0.61) | 0 | 1.80 | 0/3 |
+
+**Rated capacity on aws-c7i-2xl: 3 cameras** (laptop: 5), worker ceiling 23.8 frames/s (laptop 26.3, so 4.8 cameras of throughput; whole-camera steps of 1, 3, 5 round it down to 3). At $0.369 per hour that is **$0.12 per camera-hour** of on-demand compute for the full pipeline (storage, network and the query path's LLM excluded). Infer p95 per 4-frame call 122 ms (laptop 117); the worker reaches its ceiling at 1.8 cores, against 4.0 on the laptop, because ONNX Runtime runs one intra-op thread per physical core (4 here) and the frame stages between calls are serial. Harness ok in every step (loadgen 0.05 cores). Evidence: [`ramp-cpu-ort-b4-nospin` on AWS](../bench/results/2026-10-19-ramp-cpu-ort-b4-nospin-01M5A488HBYMH8CPJAFX5XQZVJ.json).
+
 ### Load generator ceiling (harness, not the system)
 
 Self-measured on `laptop`, 1280x720 JPEG q85 frames from `make data-mini`, 3 repetitions each, warmup excluded. These say how much load one loadgen process can offer before it, rather than the system under test, becomes the limit.
@@ -107,6 +124,8 @@ One process should offer at most ~70% of 1,250 frames/s (~175 cameras at 5 FPS) 
 What this measures: everything a question costs except the LLM call (plan lookup, validation, compile, SQL validation, execution as the read-only login, answer, `query_log`), with ingest running. It does not include the planner: with the hosted LLM, the call alone has p50 1.9 s and p95 5.1 s (E-036), so the 1.5 s p95 SLO fails on the LLM, not on this path. From 4 clients the service pins one core (one Python process), so latency then grows with the queue; query load did not disturb ingest.
 
 Evidence: [`bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json`](../bench/results/2026-10-14-query-load-cpu-01M4XW866TFS51PVHPXJW25EA0.json).
+
+On `aws-c7i-2xl` (E-059, same scenario, so ingest at 7 frames/s is about 47% of that host's rated 3 cameras): p50 / p95 14 / 30, 18 / 36, 27 / 53 and 52 / 129 ms at 1, 2, 4 and 8 clients; 69, 110, 139 and 141 q/s; freshness p95 0.24 to 0.38 s, SLO met everywhere. One query process saturates at about 140 q/s on either host. Evidence: [`query-load-cpu` on AWS](../bench/results/2026-10-19-query-load-cpu-01M5A64TVCB1TDDT4QPVBSCWHB.json).
 
 ### Baseline bottlenecks, CPU (task 2.6, E-041, E-042)
 
@@ -214,7 +233,27 @@ Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch 
 - **Batching does not help ONNX Runtime on this CPU** (batch 4 is +5%, inside the repetition std): one image already uses all 10 cores. PyTorch gains 17% at batch 4.
 - Calibration: 64 COCO train2017 images and 64 frames of MOT17-05/10/11/13 (`configs/calibration.v1.lock.jsonl`, sha256 35018eeb...), disjoint from the eval subset (unit test). MinMax ranges, per-channel weights.
 - **yolo11n:** ONNX Runtime FP32 is 1.84x PyTorch at batch 1 with identical mAP; INT8 loses 1.3 to 1.4 points on both sources with intervals that exclude 0, so it fails D32 clearly. Here batch 4 adds 16% for ONNX Runtime (smaller convolutions leave cores idle at batch 1), which the batch sweep (5.3) will pin down.
+- **yolo11n on aws-c7i-2xl** (`ladder-cpu-n`, E-059, 4 cores): PyTorch 31.6 / 48.1 / 53.8 images/s at batch 1 / 4 / 8, ONNX Runtime FP32 49.4 / 60.2 / 59.6, INT8 54.7 / 67.2 / 68.7 (std up to 9: the noisiest step). ONNX Runtime FP32 is 1.56x PyTorch at batch 1 here (laptop 1.84x); INT8 gains only 1.1x at batch 1 on this Xeon (laptop 1.35x) and still fails D32, so the server changes no decision. [`ladder-cpu-n` on AWS](../bench/results/2026-10-19-ladder-cpu-n-01M5A751S20KDY1WDHSB0K8YQ6.json).
 - Not measured: the GPU rungs (TensorRT FP16 and INT8, next on a Runpod GPU session, D37). End to end: "Optimized worker ramp, CPU".
+
+### Batch-size sweep, CPU (task 5.3; E-057, E-059)
+
+`make bench SCENARIO=bench/scenarios/sweep-cpu-ort-n.yaml`: yolo11n, ONNX Runtime FP32 as the worker runs it (idle threads sleep, one intra-op thread per physical core), `detect_batch` on 480 decoded data-mini frames, batch sizes 1 to 32, 3 repetitions; model-only. Operating point (`python -m vms.worker sweep-plot`): the smallest batch within 5% of the best throughput whose p95 batch latency is at most 25% of the 2 s freshness SLO.
+
+| Batch | laptop images/s (std) | laptop p50 / p95 ms | aws-c7i-2xl images/s (std) | aws-c7i-2xl p50 / p95 ms |
+|---|---|---|---|---|
+| 1 | 44.0 (1.1) | 22 / 32 | 34.3 (3.3) | 31 / 32 |
+| 2 | 47.5 (4.2) | 41 / 59 | 41.4 (5.5) | 46 / 58 |
+| 4 | **50.3 (2.5)** | 77 / 101 | 51.0 (2.1) | 75 / 107 |
+| 8 | 47.9 (2.9) | 168 / 190 | **54.8 (0.3)** | 144 / 159 |
+| 16 | 47.4 (1.3) | 330 / 372 | 53.7 (0.5) | 296 / 318 |
+| 32 | 44.4 (0.8) | 719 / 757 | 51.1 (0.3) | 618 / 656 |
+
+![Batch sweep, laptop vs AWS](images/batch-sweep-cpu.png)
+
+- **Operating point: batch 4 on the laptop, 8 on the 4-core server.** With 10 cores one image keeps most of them busy, so batching adds 14% and then cache pressure takes it back; with 4 cores and threads that sleep between calls, a batch amortizes the wake-up and the per-call overhead for longer (batch 1 is 30% slower than with spinning on the same host, E-059), so throughput keeps rising to 8 (+60% over batch 1).
+- **Committed config: `infer_batch` 4** (compose default, `.env.example`): the laptop's operating point and the end-to-end evidence of E-048. On a c7i deployment set `WORKER_INFER_BATCH=8` (+7% model-only; not ramp-tested). Batches up to 16 stay inside the 500 ms latency budget on both hosts (32 does not), so the choice is about throughput, not freshness.
+- Evidence: [laptop](../bench/results/2026-10-19-sweep-cpu-ort-n-01M5A24RZY0Q3Z01S0BAXY3JKZ.json), [aws-c7i-2xl](../bench/results/2026-10-19-sweep-cpu-ort-n-01M5A7P0RP7ASGPVFVB5V0QB0R.json). Not compared across hosts in one ratio (different CPUs); the shape is the result.
 
 ## Evaluation
 
@@ -384,7 +423,25 @@ Sweep, in sample (calibrated on all clean streams); the curve is `docs/images/dr
 - **Signals are not one-to-one with drift kinds**: blur is the most general input signal (blur, shift, darken, and noise all move it), and darkening also lowers the noise estimate (E-052). Only the class-mix change fires an output statistic first (PSI); occlusion only once (confidence W1). Alerts therefore name the channel, not a cause.
 - **False-alarm caveat**: the clean streams loop clips of 17 to 35 s, so a 30 s window keeps resembling the 60 s reference, and all clean data come from 4 scenes on one afternoon. Real cameras (lighting over a day, weather, traffic) vary far more: 0 in 4.16 camera-hours (< 0.72 per camera-hour) is a lower bound on the real rate, and the calibration must be redone per site on clean video (RUNBOOK, "Drift alerts").
 
-_Fine-tune: placeholder (task 9.5)._
+### Detector fine-tune against blur (task 9.5; E-060, E-061, D36)
+
+Trained on `aws-c7i-4xl` (`bench/scenarios/finetune-blur-cpu.yaml`, clean commit b440130), scored on the frozen detection subset v1 (yolo11n, PyTorch; every mAP reproduced to the last digit when the same weights were re-scored on `laptop`). Training list v1: 800 COCO train2017 images and 767 frames of MOT17-05/10/11/13, disjoint from the eval subset and the INT8 calibration set (unit test). Both runs: 10 epochs, batch 16, imgsz 640, Ultralytics' automatic optimizer (AdamW, lr 1.2e-4), no mosaic, last epoch kept, seed 20261019; about 16 minutes and $0.20 each. **blur-mix** blurs a seeded half of the images (787, sigma 1 to 8 px at 1280 width, mean 4.5) with the same transform loadgen injects; **control** blurs none. **Synthetic drift**: a Gaussian blur is not real defocus, fog or a dirty lens.
+
+mAP@50-95 in points; change against the untouched model (paired bootstrap over images, 2,000 resamples, 95% intervals):
+
+| Condition | Base COCO / MOT17 | blur-mix COCO | change | blur-mix MOT17 | change | control COCO | change | control MOT17 | change |
+|---|---|---|---|---|---|---|---|---|---|
+| clean | 37.9 / 40.3 | 30.9 | -7.0 [-8.2, -5.6] | 37.7 | -2.6 [-3.6, -1.6] | 32.3 | -5.6 [-6.9, -4.5] | 37.1 | -3.2 [-4.3, -2.0] |
+| blur 3 | 33.3 / 35.1 | 29.8 | -3.6 [-5.3, -2.1] | 32.3 | -2.7 [-3.7, -1.6] | 28.2 | -5.2 [-6.8, -4.1] | 33.5 | -1.6 [-2.4, -0.6] |
+| blur 6 (target) | 26.1 / 23.2 | 24.5 | -1.5 [-2.9, -0.4] | 24.8 | **+1.6 [+0.7, +2.7]** | 21.4 | -4.7 [-6.2, -3.3] | 20.4 | -2.8 [-3.6, -2.0] |
+| noise 25 (untargeted) | 24.9 / 34.3 | 16.2 | -8.7 [-10.9, -7.6] | 30.9 | -3.4 [-4.6, -2.1] | 18.6 | -6.3 [-8.2, -5.1] | 32.4 | -1.9 [-2.9, -1.0] |
+
+blur-mix against the control (the effect of the blur augmentation alone), COCO / MOT17: clean -1.4 [-2.2, -0.2] / +0.6 [+0.2, +1.0]; blur 3 +1.6 [+0.3, +3.1] / -1.2 [-1.6, -0.7]; **blur 6 +3.2 [+1.6, +4.6] / +4.4 [+3.7, +5.3]**; noise 25 -2.3 / -1.5.
+
+- **Negative result: the fine-tuned model is not deployed.** The recipe itself loses 2 to 7 points everywhere (the control, without any blur, is worse than the untouched model on every condition, including clean MOT17, where training on MOT's own box convention was expected to help). Blur augmentation then recovers 4.4 points of the camera scenes' mAP at blur sigma 6 against that control, which leaves blur-mix +1.6 above the untouched model on the target drift and below it on everything else.
+- **What the control shows**: without it, blur-mix's +1.6 on MOT17 blur 6 would read as "fine-tuning recovers blur"; with it, the blur augmentation is worth +4.4 and the recipe costs -2.8 on the same condition. The gain is specific to strong blur: at blur 3 the augmentation helps COCO and hurts MOT17, and it makes noise worse (-2.3 / -1.5).
+- **Likely causes (untested)**: 800 COCO images for 80 classes in a fine-tune of every layer (forgetting the rest of COCO), and Ultralytics' default 3-epoch warmup (bias lr 0.1) applied to an already trained head. A follow-up would change one thing at a time against this control (frozen backbone; no warmup), not sweep.
+- CPU limits the set to 1,567 images and 10 epochs; the result is about this recipe, not an upper bound on what fine-tuning can recover. Weights: `models/finetune/*.pt` (DVC). Evidence: [summary](../bench/results/2026-10-19-finetune-blur-cpu-01M5ADGCCBWNYCCAZ5RMPVKG17.json), [blur-mix training](../bench/results/2026-10-19-finetune-blur-cpu-blur-mix-01M5A9CNW3HAERH1M2GSB1EBH9.json), [control training](../bench/results/2026-10-19-finetune-blur-cpu-control-01M5AACJBSVWAPRAK2XSZZTRW9.json).
 
 ## Cost
 
@@ -392,9 +449,11 @@ Per-session cost, estimated as the live catalog price x billed seconds (Runpod) 
 
 | Session | Machine | Billed | Cost | Evidence |
 |---|---|---|---|---|
+| AWS CPU session 1: ramp, query load, ladder, sweep (E-059) | aws-c7i-2xl, $0.369/h | 4,242 s | $0.434 | `bench/results/2026-10-19-cpu-session-01M5A3X28Z8AS5SBWATZZ3HJR5.json` |
+| AWS CPU session 2: 9.5 fine-tune, two trainings and 12 evals (E-060; stopped by the scenario timeout before its summary) | aws-c7i-4xl, $0.726/h | 3,979 s | $0.802 | `bench/results/2026-10-19-cpu-session-01M5A809RPZ20Q13MT08V0EEPX.json` |
 | GPU session 1, worker-model-gpu-n (E-058) | runpod-a40, $0.595/h | 199 s | $0.033 | `bench/results/2026-10-19-gpu-session-01M5A8JBB6JEE5V6PA674W0CRT.json` |
 
-Cost per camera-hour at full scale: placeholder (task 10.3).
+Cost per camera-hour at full scale: placeholder (task 10.3). Measured so far: $0.12 per camera-hour of on-demand CPU compute on aws-c7i-2xl (3 rated cameras, E-059).
 
 ## How to reproduce
 
@@ -408,5 +467,7 @@ One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/s
 - Optimized worker ramps (5.5): as the CPU baseline, but start the worker each scenario's `expect_worker` names (commands in RUNBOOK, Benchmarks), then `make bench SCENARIO=bench/scenarios/ramp-cpu-pt.yaml`, `ramp-cpu-ort.yaml`, `ramp-cpu-ort-b4.yaml`, `ramp-cpu-ort-b4-ext.yaml`, `ramp-cpu-ort-b4-nospin.yaml` (~35 to 45 min each). The compose defaults are the D5 worker; the E-039 `ramp-cpu.yaml` now needs `WORKER_BACKEND=ultralytics WORKER_INFER_BATCH=1`.
 - ONNX parity: `make models`, `make eval-detection-data`, `make data-mini`, `make onnx`, then `make onnx-parity` and `make onnx-parity WEIGHTS=yolo11s` (~25 min each); ONNX mAP: `VMS_DETECTOR__BACKEND=onnxruntime make eval SUITE=detection` (and `WEIGHTS=yolo11n`).
 - Precision ladder, CPU: `make models`, `make data-mini`, `make eval-detection-data`, `make onnx`, `make calibration-data`, `make quantize WEIGHTS=yolo11s`; then `make eval SUITE=detection NAME=detection-yolo11s`, `... BACKEND=onnxruntime NAME=detection-yolo11s-onnx`, `... BACKEND=onnxruntime PRECISION=int8 NAME=detection-yolo11s-int8` (~1.5 min each), `make eval-detection-compare BASE=<onnx run> OTHER=<int8 run>` (~2 min), and with the compose stack stopped `make bench SCENARIO=bench/scenarios/ladder-cpu.yaml` (~15 min). The whole-graph INT8 of E-043: `VMS_INT8__EXCLUDE_NODES='[]' make quantize WEIGHTS=yolo11s`.
+- AWS CPU numbers (D35): `aws login`, then `make cpu-preflight` and `make cpu-session` (ramp, query load, ladder and sweep on c7i.2xlarge, ~70 min, ~$0.45; asks first). Batch sweep: `make bench SCENARIO=bench/scenarios/sweep-cpu-ort-n.yaml` (~4 min, app containers paused), then `uv run python -m vms.worker sweep-plot <laptop results> <aws results> --label ... --label ... --out docs/images/batch-sweep-cpu.png`.
+- Detector fine-tune (9.5): `make finetune-data`, `make eval-detection-data`, `make models`, then `make finetune` (~2 h on c7i.4xlarge, longer on a laptop), or on AWS: `VMS_TIMEOUTS__SCENARIO_S=10800 VMS_MAX_SESSION_MINUTES=240 make cpu-session INSTANCE=c7i.4xlarge CPU_SCENARIOS=bench/scenarios/finetune-blur-cpu.yaml`. With weights already trained (`dvc pull`): `uv run python -m vms.finetune evaluate --scenario bench/scenarios/finetune-blur-cpu.yaml` (~25 min on the laptop).
 - Structured eval set: `make up`, `make eval-db` (pulls or regenerates the snapshot and checks its hashes), `make eval-build` (re-runs every gold; the split files must come out unchanged), `make eval-check`.
 - Load generator ceiling: `make data-mini`, then `make loadgen-selftest`; `make loadgen-stub STUB_WORKERS=6` in one shell and `make loadgen SCENARIO=bench/scenarios/loadgen-stub-max.yaml` in another; restart the stub with `STUB_WORKERS=1` and run `make loadgen SCENARIO=bench/scenarios/loadgen-stub-20x5.yaml`. Check that port 8080 is free before starting each stub.

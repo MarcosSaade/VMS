@@ -294,6 +294,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Status:** shrunk (2026-10-06 re-scope).
 **Prompt:** In the same harness, sweep batch size (1, 2, 4, 8, 16, 32) for the best backend from 5.2 and plot throughput against latency. Choose an operating point that meets the freshness SLO with headroom.
 **Done when:** plot saved and summarized in `BENCHMARKS.md`; chosen batch size committed in config.
+**CPU part as built (2026-10-19, E-057, E-059):** `bench/scenarios/sweep-cpu-ort-n.yaml` (the 5.2 ladder harness, one step, batches 1 to 32) and `python -m vms.worker sweep-plot` (operating point: smallest batch within 5% of the best throughput with p95 under 25% of the SLO; `docs/images/batch-sweep-cpu.png`). Laptop picks 4 (the committed `infer_batch`), AWS c7i.2xlarge picks 8. The GPU sweep runs on Runpod (D37).
 
 ### 5.4 Pre- and post-processing
 
@@ -477,6 +478,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Prompt:** Using the mAP-under-drift table from 9.2, take the worst photometric drift (darkening, blur or noise). Photometric transforms keep bounding boxes valid, so apply them to a labeled set disjoint from the eval subsets. Fine-tune YOLO11n for a few epochs on a clean plus drifted mix with one fixed configuration. Report mAP before and after, with CIs, on the drifted held-out eval and on the clean eval (forgetting check), plus training time and cost. Store weights with DVC. Runs on the GPU session; on CPU, use a smaller subset and say so.
 **Done when:** before/after table in `BENCHMARKS.md`; weights tracked with DVC; limitation stated that augmentation-based drift is not real domain shift.
 **Considerations:** no sweep and no experiment tracker in this plan. Geometric drifts (camera shift) need box adjustment, so skip them.
+**As built (2026-10-19, D36, E-060, E-061):** `vms.finetune` with a frozen training list v1 (800 COCO train2017 + 767 MOT17 frames, disjoint from the eval and calibration sets), blur as the target (worst for the camera scenes, E-051), a blur-mix run and a no-blur control with one fixed configuration, trained on an AWS c7i.4xlarge (D35, $0.80) and scored on detection subset v1 clean, blur 3/6 and noise 25. Negative: the augmentation is worth +4.4 MOT17 mAP@50-95 at blur 6 over the control, but the recipe loses 2 to 7 points elsewhere; not deployed. Weights DVC-tracked; limitation (synthetic blur) stated with every number.
 
 ---
 
