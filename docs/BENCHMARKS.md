@@ -164,7 +164,7 @@ _Placeholder (tasks 4.3, 4.4)._
 
 ## Inference
 
-_Batch sweep (5.3), the GPU rungs of the ladder (TensorRT FP16 and INT8) and the optimized worker end to end (5.5) are still to come._ Model-only and end-to-end numbers are reported separately, with mAP next to speed.
+_Still to come: GPU batch columns and sweep free of the pod's CPU limits (re-run of E-064); the GPU worker end to end is deferred (D37)._ Model-only and end-to-end numbers are reported separately, with mAP next to speed.
 
 ### Worker model-only latency, CPU baseline
 
@@ -234,7 +234,7 @@ Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch 
 - Calibration: 64 COCO train2017 images and 64 frames of MOT17-05/10/11/13 (`configs/calibration.v1.lock.jsonl`, sha256 35018eeb...), disjoint from the eval subset (unit test). MinMax ranges, per-channel weights.
 - **yolo11n:** ONNX Runtime FP32 is 1.84x PyTorch at batch 1 with identical mAP; INT8 loses 1.3 to 1.4 points on both sources with intervals that exclude 0, so it fails D32 clearly. Here batch 4 adds 16% for ONNX Runtime (smaller convolutions leave cores idle at batch 1), which the batch sweep (5.3) will pin down.
 - **yolo11n on aws-c7i-2xl** (`ladder-cpu-n`, E-059, 4 cores): PyTorch 31.6 / 48.1 / 53.8 images/s at batch 1 / 4 / 8, ONNX Runtime FP32 49.4 / 60.2 / 59.6, INT8 54.7 / 67.2 / 68.7 (std up to 9: the noisiest step). ONNX Runtime FP32 is 1.56x PyTorch at batch 1 here (laptop 1.84x); INT8 gains only 1.1x at batch 1 on this Xeon (laptop 1.35x) and still fails D32, so the server changes no decision. [`ladder-cpu-n` on AWS](../bench/results/2026-10-19-ladder-cpu-n-01M5A751S20KDY1WDHSB0K8YQ6.json).
-- Not measured: the GPU rungs (TensorRT FP16 and INT8, next on a Runpod GPU session, D37). End to end: "Optimized worker ramp, CPU".
+- GPU rungs: "Precision ladder, GPU" below. End to end: "Optimized worker ramp, CPU".
 
 ### Batch-size sweep, CPU (task 5.3; E-057, E-059)
 
@@ -254,6 +254,39 @@ Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch 
 - **Operating point: batch 4 on the laptop, 8 on the 4-core server.** With 10 cores one image keeps most of them busy, so batching adds 14% and then cache pressure takes it back; with 4 cores and threads that sleep between calls, a batch amortizes the wake-up and the per-call overhead for longer (batch 1 is 30% slower than with spinning on the same host, E-059), so throughput keeps rising to 8 (+60% over batch 1).
 - **Committed config: `infer_batch` 4** (compose default, `.env.example`): the laptop's operating point and the end-to-end evidence of E-048. On a c7i deployment set `WORKER_INFER_BATCH=8` (+7% model-only; not ramp-tested). Batches up to 16 stay inside the 500 ms latency budget on both hosts (32 does not), so the choice is about throughput, not freshness.
 - Evidence: [laptop](../bench/results/2026-10-19-sweep-cpu-ort-n-01M5A24RZY0Q3Z01S0BAXY3JKZ.json), [aws-c7i-2xl](../bench/results/2026-10-19-sweep-cpu-ort-n-01M5A7P0RP7ASGPVFVB5V0QB0R.json). Not compared across hosts in one ratio (different CPUs); the shape is the result.
+
+### Precision ladder, GPU (task 5.2; E-064, D38)
+
+`runpod-a40` (EU-SE-1, driver 595.91.07), clean commit d0d75d9, `ladder-gpu-n`: yolo11n, `detect_batch` (letterbox and NMS in numpy on the CPU, forward on the GPU; PyTorch does its pre/post in torch on the GPU) on 300 decoded data-mini frames, batch 1 / 4 / 8, 5 repetitions with rotated order, 5 warmup batches. Torch 2.14.1+cu130, onnxruntime-gpu 1.31.0, TensorRT 11.3.0.99. Quality: the detection subset per rung, scored on the pod right after the speed runs; deltas are paired bootstraps.
+
+| Backend | Batch 1 images/s (std) | Batch 1 p50 / p95 ms | Batch 4 images/s (std) | Batch 8 images/s (std) | COCO mAP@50-95 | MOT17 mAP@50-95 |
+|---|---|---|---|---|---|---|
+| PyTorch FP32 (CUDA) | 120.0 (8.5) | 8.5 / 10.0 | 287.3 (20.7) | **386.2 (11.9)** | 37.9 | 40.3 |
+| ONNX Runtime FP32 (CUDA provider) | 172.7 (18.9) | 5.7 / 7.3 | 270.1 (21.3) | 271.2 (11.7) | 37.9 (vs PyTorch +0.01 [-0.04, +0.06]) | 40.3 (-0.02 [-0.02, +0.03]) |
+| TensorRT FP16 | **248.6 (16.7)** | 3.9 / 4.9 | 229.2 (63.5) | 281.0 (55.4) | 37.8 (vs ORT -0.06 [-0.23, +0.04]) | 40.2 (-0.03 [-0.19, +0.05]) |
+| TensorRT INT8 (Q/DQ convs, rest FP32) | 183.7 (12.0) | 5.2 / 6.6 | 178.4 (20.4) | 308.5 (6.2) | 35.6, vs FP16 **-2.15 [-2.91, -1.18]** | 37.7, **-2.48 [-2.99, -1.88]** |
+
+- **FP16 costs nothing in quality**: TensorRT FP16 vs ONNX Runtime FP32 is within 0.1 point on both sources with intervals that include 0 (passes D32's terms too).
+- **TensorRT INT8 fails D32 clearly** (drops of 2.2 and 2.5 points, both intervals exclude 0) and is slower than FP16 at batch 1: only the convs are INT8 (E-062) and the rest of the graph runs in FP32. It also returns fewer boxes (19.8 vs 24.0 per image). Not kept.
+- **At batch 1 TensorRT FP16 is 2.1x PyTorch and 1.4x ONNX Runtime** (3.9 vs 8.5 and 5.7 ms per image including letterbox and NMS).
+- **Batches above 1 are not trustworthy yet for the numpy rungs**: batch 4 is slower than batch 1 or 2 for ONNX Runtime and both TensorRT rungs, with stds up to 64 images/s, while PyTorch, whose pre- and post-processing run on the GPU, scales smoothly to 386 images/s at batch 8. Most likely the pod's CPU quota: OpenCV and NumPy size their thread pools to the host's 96 threads, not the pod's share (not recorded). So the ladder's batch columns and the GPU sweep below measure the host's CPU limits as much as the GPU; a re-run with thread pools sized to the pod is next (E-064).
+- Evidence: [`ladder-gpu-n`](../bench/results/2026-10-19-ladder-gpu-n-01M5AE3XVVKDKNGBWASF8NFQJF.json), [`PyTorch mAP`](../eval/results/2026-10-19-ladder-gpu-n-pytorch-fp32-01M5AEDDR4XWFHT9XV8JWHGMP0.json), [`ORT mAP`](../eval/results/2026-10-19-ladder-gpu-n-ort-fp32-01M5AEF9E8J5RMFEZTN42ER9A9.json), [`TRT FP16 mAP`](../eval/results/2026-10-19-ladder-gpu-n-trt-fp16-01M5AEJFYKVSVCF9VN8H0QT8DN.json), [`TRT INT8 mAP`](../eval/results/2026-10-19-ladder-gpu-n-trt-int8-01M5AEM7G2XQ29TCKB8DBJ8CSM.json), [`ORT vs PyTorch`](../eval/results/2026-10-19-ladder-gpu-n-ort-fp32-vs-pytorch-fp32-01M5AERP3JPBFR2GZSYTMKYJMJ.json), [`FP16 vs ORT`](../eval/results/2026-10-19-ladder-gpu-n-trt-fp16-vs-ort-fp32-01M5AEVMA3Z1W5EBFFAG6RMPHH.json), [`INT8 vs FP16`](../eval/results/2026-10-19-ladder-gpu-n-trt-int8-vs-trt-fp16-01M5AEYDZJETQRD1R68DXAMSAC.json).
+
+### Batch-size sweep, GPU (task 5.3; E-064; provisional)
+
+`sweep-gpu-trt-fp16-n` and `sweep-gpu-trt-int8-n` on `runpod-a40`, same session and harness as the CPU sweep (480 frames, batches 1 to 32, 3 repetitions). Images/s (std) and batch p50 / p95 ms:
+
+| Batch | TensorRT FP16 | TensorRT INT8 |
+|---|---|---|
+| 1 | 196.8 (6.1), 5 / 6 | 169.9 (23.3), 6 / 8 |
+| 2 | **316.6 (6.9)**, 6 / 7 | 254.9 (27.8), 7 / 10 |
+| 4 | 205.5 (0.8), 19 / 21 | 199.9 (15.3), 20 / 23 |
+| 8 | 291.4 (67.3), 25 / 38 | **311.0 (5.3)**, 25 / 29 |
+| 16 | 293.0 (4.2), 54 / 60 | 279.6 (7.8), 57 / 63 |
+| 32 | 204.9 (15.4), 153 / 179 | 208.9 (23.8), 155 / 180 |
+
+- The operating-point rule picks batch 2 for FP16 (317 images/s, p95 7 ms), but the curve is not monotonic (batch 4 slower than 2 and 8) and batch 1 differs from the ladder's (197 vs 249 images/s): the same CPU-quota suspicion as above. **Not used for a decision** until the re-run; INT8 is out anyway (D32).
+- Evidence: [FP16](../bench/results/2026-10-19-sweep-gpu-trt-fp16-n-01M5AEYG19BXE9F9D2VPKFDN14.json), [INT8](../bench/results/2026-10-19-sweep-gpu-trt-int8-n-01M5AF0S3BSPXAK43X1R0KW6VS.json).
 
 ## Evaluation
 
@@ -452,6 +485,9 @@ Per-session cost, estimated as the live catalog price x billed seconds (Runpod) 
 | AWS CPU session 1: ramp, query load, ladder, sweep (E-059) | aws-c7i-2xl, $0.369/h | 4,242 s | $0.434 | `bench/results/2026-10-19-cpu-session-01M5A3X28Z8AS5SBWATZZ3HJR5.json` |
 | AWS CPU session 2: 9.5 fine-tune, two trainings and 12 evals (E-060; stopped by the scenario timeout before its summary) | aws-c7i-4xl, $0.726/h | 3,979 s | $0.802 | `bench/results/2026-10-19-cpu-session-01M5A809RPZ20Q13MT08V0EEPX.json` |
 | GPU session 1, worker-model-gpu-n (E-058) | runpod-a40, $0.595/h | 199 s | $0.033 | `bench/results/2026-10-19-gpu-session-01M5A8JBB6JEE5V6PA674W0CRT.json` |
+| GPU session 2, attempt 1: INT8 engine parse error, nothing ran (E-062) | runpod-a40, $0.595/h | 410 s | $0.069 | `bench/results/2026-10-19-gpu-session-01M5ABS2E4B4PXXTTC3585PWQ1.json` |
+| GPU session 2, attempt 2: no public SSH port, nothing ran (E-063) | runpod-a40, $0.595/h | 905 s | $0.150 | `bench/results/2026-10-19-gpu-session-01M5ACHRPBFSA4CFTHBP2RHJB0.json` |
+| GPU session 2: ladder with mAP, two TensorRT sweeps (E-064) | runpod-a40, $0.595/h | 1,540 s | $0.255 | `bench/results/2026-10-19-gpu-session-01M5ADM7DVEKN4CGVGW2Q6RDRK.json` |
 
 Cost per camera-hour at full scale: placeholder (task 10.3). Measured so far: $0.12 per camera-hour of on-demand CPU compute on aws-c7i-2xl (3 rated cameras, E-059).
 

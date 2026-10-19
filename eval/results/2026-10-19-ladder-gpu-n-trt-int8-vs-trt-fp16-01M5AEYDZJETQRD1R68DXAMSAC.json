@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5AEYDZJETQRD1R68DXAMSAC",
+  "name": "ladder-gpu-n-trt-int8-vs-trt-fp16",
+  "kind": "eval.detection.compare",
+  "started_at": "2026-10-19T16:12:06.002609Z",
+  "ended_at": "2026-10-19T16:12:06.002710Z",
+  "seed": 20261014,
+  "git": {
+    "sha": "d0d75d99eca317f5afd94e31ea8c1e392e7dc2ba",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "logical_cpus": 96,
+    "ram_bytes": 540644044800,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39",
+    "gpus": [
+      "NVIDIA A40, 595.91.07"
+    ]
+  },
+  "packages": {
+    "python": "3.12.3",
+    "numpy": "2.5.3"
+  },
+  "config": {
+    "service": "eval-detection",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": false,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 1.0
+    },
+    "paths": {
+      "spec": "configs/eval/detection.v1.yaml",
+      "subset": "eval/detection/subset.v1.jsonl",
+      "manifest": "eval/detection/subset.v1.json",
+      "images_dir": "data/eval/detection/v1",
+      "fetch_workers": 8
+    },
+    "results_dir": "eval/results",
+    "predictions_dir": "data/eval/detection/predictions",
+    "sources": [
+      "coco",
+      "mot17"
+    ],
+    "detector": {
+      "weights": "yolo11s",
+      "backend": "ultralytics",
+      "precision": "fp32",
+      "device": "cpu",
+      "imgsz": 640,
+      "conf": 0.001,
+      "iou": 0.7,
+      "max_det": 300,
+      "threads": null,
+      "spin": true
+    },
+    "max_dets_per_class": 100,
+    "mot_frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "bootstrap": {
+      "seed": 20261014,
+      "resamples": 2000,
+      "confidence": 0.95
+    },
+    "drift": null,
+    "max_images": null
+  },
+  "scenario": null,
+  "metrics": {
+    "base": {
+      "run_id": "01M5AEJFYKVSVCF9VN8H0QT8DN",
+      "model_version": "yolo11n@0ebbc80d4a76+trt-fp16@59529c2a"
+    },
+    "other": {
+      "run_id": "01M5AEM7G2XQ29TCKB8DBJ8CSM",
+      "model_version": "yolo11n@0ebbc80d4a76+trt-int8@45b4ba47"
+    },
+    "sources": {
+      "coco": {
+        "images": 500,
+        "base": {
+          "map50": {
+            "value": 0.525033809119227,
+            "ci_lo": 0.5052143065556975,
+            "ci_hi": 0.5732780732410981,
+            "boot_std": 0.01733143922741335,
+            "boot_mean": 0.5398419924422043
+          },
+          "map50_95": {
+            "value": 0.37799575435858185,
+            "ci_lo": 0.3606471357932102,
+            "ci_hi": 0.42105353247692123,
+            "boot_std": 0.015348553374202809,
+            "boot_mean": 0.3910916660368558
+          }
+        },
+        "other": {
+          "map50": {
+            "value": 0.4947982771837285,
+            "ci_lo": 0.4777776980402019,
+            "ci_hi": 0.547319521587411,
+            "boot_std": 0.017512181355953272,
+            "boot_mean": 0.5120727913160328
+          },
+          "map50_95": {
+            "value": 0.35653317795705863,
+            "ci_lo": 0.3411435512703358,
+            "ci_hi": 0.40238357085226917,
+            "boot_std": 0.015330581821891827,
+            "boot_mean": 0.3710710840188074
+          }
+        },
+        "runs_reported_map50_95": {
+          "base": 0.37798971632135697,
+          "other": 0.35646123733545226
+        },
+        "delta_map50": {
+          "value": -0.03023553193549855,
+          "ci_lo": -0.04069419406501994,
+          "ci_hi": -0.016091424402412912,
+          "boot_std": 0.006423987990523634,
+          "boot_mean": -0.027769201126171636
+        },
+        "delta_map50_95": {
+          "value": -0.021462576401523215,
+          "ci_lo": -0.029120853694234356,
+          "ci_hi": -0.011822393958422477,
+          "boot_std": 0.0045074738405614465,
+          "boot_mean": -0.020020582018048464
+        },
+        "d32": {
+          "drop_map50_95": 0.021462576401523215,
+          "drop_upper": 0.029120853694234356,
+          "pass": false
+        }
+      },
+      "mot17": {
+        "images": 73,
+        "base": {
+          "map50": {
+            "value": 0.6660132798090543,
+            "ci_lo": 0.6442256138013185,
+            "ci_hi": 0.68501466315016,
+            "boot_std": 0.010304605639749581,
+            "boot_mean": 0.6659174891324706
+          },
+          "map50_95": {
+            "value": 0.4021972872023672,
+            "ci_lo": 0.38545841869516184,
+            "ci_hi": 0.41874382566630713,
+            "boot_std": 0.00834618431182097,
+            "boot_mean": 0.40288598624860494
+          }
+        },
+        "other": {
+          "map50": {
+            "value": 0.6360561106301856,
+            "ci_lo": 0.6157795120297046,
+            "ci_hi": 0.6575235302440365,
+            "boot_std": 0.010672084430625698,
+            "boot_mean": 0.6374510599909224
+          },
+          "map50_95": {
+            "value": 0.37740829844554646,
+            "ci_lo": 0.3613697020345616,
+            "ci_hi": 0.39522154641378066,
+            "boot_std": 0.00889275489944633,
+            "boot_mean": 0.3783621439216499
+          }
+        },
+        "runs_reported_map50_95": {
+          "base": 0.4023832341737196,
+          "other": 0.3774436751511384
+        },
+        "delta_map50": {
+          "value": -0.029957169178868703,
+          "ci_lo": -0.036687853870992285,
+          "ci_hi": -0.02009489420216016,
+          "boot_std": 0.0042408547683695135,
+          "boot_mean": -0.028466429141548264
+        },
+        "delta_map50_95": {
+          "value": -0.02478898875682073,
+          "ci_lo": -0.029948132324573117,
+          "ci_hi": -0.018792767061243876,
+          "boot_std": 0.00291774635328625,
+          "boot_mean": -0.024523842326955
+        },
+        "d32": {
+          "drop_map50_95": 0.02478898875682073,
+          "drop_upper": 0.029948132324573117,
+          "pass": false
+        }
+      }
+    },
+    "d32_pass": false
+  },
+  "cost_usd": 0.0,
+  "notes": "delta = other - base, paired percentile bootstrap over images (same resamples for both). D32 drop = base - other on mAP@50-95; pass needs drop <= 1.0 point and the upper end of its 95% interval <= 2.0 points on every source.; GPU session 01M5ADM7DVEKN4CGVGW2Q6RDRK (Runpod A40, SECURE); git from the session"
+}

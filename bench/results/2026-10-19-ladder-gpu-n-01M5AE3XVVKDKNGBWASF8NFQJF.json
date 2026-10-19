@@ -1,0 +1,730 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5AE3XVVKDKNGBWASF8NFQJF",
+  "name": "ladder-gpu-n",
+  "kind": "worker.ladder",
+  "started_at": "2026-10-19T15:57:37.531308Z",
+  "ended_at": "2026-10-19T16:12:06.411829Z",
+  "seed": 1234,
+  "git": {
+    "sha": "d0d75d99eca317f5afd94e31ea8c1e392e7dc2ba",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "logical_cpus": 96,
+    "ram_bytes": 540644044800,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39",
+    "gpus": [
+      "NVIDIA A40, 595.91.07"
+    ]
+  },
+  "packages": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.1+cu130",
+    "torchvision": "0.29.1+cu130",
+    "ultralytics": "8.4.175",
+    "onnx": "1.23.2",
+    "onnxruntime": null,
+    "onnxruntime-gpu": "1.31.0",
+    "tensorrt-cu13": "11.3.0.99",
+    "opencv-python": null
+  },
+  "config": {
+    "worker": {
+      "service": "worker",
+      "env": "local",
+      "seed": 1234,
+      "log": {
+        "level": "INFO"
+      },
+      "telemetry": {
+        "enabled": true,
+        "otlp_endpoint": null,
+        "otlp_insecure": true,
+        "export_timeout_s": 10.0,
+        "sample_ratio": 0.01
+      },
+      "http": {
+        "host": "127.0.0.1",
+        "port": 8090
+      },
+      "queue": {
+        "max_cameras": 16,
+        "lease_ttl_s": 30.0,
+        "renew_every_s": 5.0,
+        "idle_release_s": 60.0,
+        "claim_batch": 4,
+        "infer_batch": 1,
+        "max_attempts": 3,
+        "poll_min_s": 0.05,
+        "poll_max_s": 1.0,
+        "backlog_every_s": 5.0,
+        "shutdown_grace_s": 10.0
+      },
+      "detector": {
+        "weights": "yolo11n",
+        "backend": "ultralytics",
+        "precision": "fp32",
+        "device": "cuda",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      },
+      "tracker": {
+        "fps": 5.0,
+        "high_thresh": 0.25,
+        "low_thresh": 0.1,
+        "new_track_thresh": 0.25,
+        "match_thresh": 0.8,
+        "fuse_score": true,
+        "buffer_s": 2.0,
+        "classes": [
+          "person",
+          "bicycle",
+          "car",
+          "motorcycle",
+          "bus",
+          "truck"
+        ],
+        "store_min_conf": 0.25
+      },
+      "zones": {
+        "min_frames": 2,
+        "loiter_s": 30.0,
+        "refresh_s": 60.0
+      },
+      "db": {
+        "min_size": 1,
+        "max_size": 4,
+        "connect_timeout_s": 5.0,
+        "acquire_timeout_s": 2.0,
+        "statement_timeout_ms": 5000
+      },
+      "objects": {
+        "max_concurrency": 4,
+        "connect_timeout_s": 2.0,
+        "read_timeout_s": 5.0,
+        "max_attempts": 3
+      }
+    },
+    "steps": {
+      "pytorch-fp32": {
+        "weights": "yolo11n",
+        "backend": "ultralytics",
+        "precision": "fp32",
+        "device": "cuda",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      },
+      "ort-fp32": {
+        "weights": "yolo11n",
+        "backend": "onnxruntime",
+        "precision": "fp32",
+        "device": "cuda",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      },
+      "trt-fp16": {
+        "weights": "yolo11n",
+        "backend": "tensorrt",
+        "precision": "fp16",
+        "device": "cuda",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      },
+      "trt-int8": {
+        "weights": "yolo11n",
+        "backend": "tensorrt",
+        "precision": "int8",
+        "device": "cuda",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      }
+    }
+  },
+  "scenario": {
+    "name": "ladder-gpu-n",
+    "description": "Task 5.2 GPU rungs on the Runpod A40 (D37, D38): YOLO11n with PyTorch FP32 on CUDA (the GPU baseline), ONNX Runtime FP32 with the CUDA provider, TensorRT FP16 (engine from the FP16 export) and TensorRT INT8 (engine from the symmetric Q/DQ model, calibration set v1, head decode in FP32), each in its own process. Model-only: detect_batch (letterbox, forward, NMS; pre- and post-processing on the CPU, as the worker runs them) on decoded data-mini frames (1280x720, as loadgen sends them) at batch sizes 1, 4 and 8, rotated step order. After the speed runs every step is scored on the detection subset and the pairs below are compared (paired bootstrap; D32 verdict for INT8 against TensorRT FP16).\n",
+    "kind": "ladder",
+    "repeats": 5,
+    "bench": {
+      "clips": [
+        "mot17-09-mini",
+        "mot17-04-mini",
+        "commons-roncesvalles"
+      ],
+      "frames_per_clip": 100,
+      "batch_sizes": [
+        1,
+        4,
+        8
+      ],
+      "warmup_batches": 5,
+      "cooldown_s": 5
+    },
+    "config": {
+      "detector": {
+        "weights": "yolo11n",
+        "device": "cuda"
+      }
+    },
+    "steps": [
+      {
+        "name": "pytorch-fp32",
+        "detector": {
+          "backend": "ultralytics"
+        }
+      },
+      {
+        "name": "ort-fp32",
+        "detector": {
+          "backend": "onnxruntime"
+        }
+      },
+      {
+        "name": "trt-fp16",
+        "detector": {
+          "backend": "tensorrt",
+          "precision": "fp16"
+        }
+      },
+      {
+        "name": "trt-int8",
+        "detector": {
+          "backend": "tensorrt",
+          "precision": "int8"
+        }
+      }
+    ],
+    "quality": {
+      "compare": [
+        [
+          "pytorch-fp32",
+          "ort-fp32"
+        ],
+        [
+          "ort-fp32",
+          "trt-fp16"
+        ],
+        [
+          "trt-fp16",
+          "trt-int8"
+        ]
+      ]
+    }
+  },
+  "metrics": {
+    "steps": {
+      "pytorch-fp32": {
+        "model_version": "yolo11n@0ebbc80d4a76",
+        "detector": {
+          "weights": "yolo11n",
+          "backend": "ultralytics",
+          "precision": "fp32",
+          "device": "cuda",
+          "imgsz": 640,
+          "conf": 0.1,
+          "iou": 0.7,
+          "max_det": 300,
+          "threads": null,
+          "spin": true
+        },
+        "repetitions": 5,
+        "peak_rss_mb_max": 2355.91015625,
+        "load_s_mean": 1.5674284453998553,
+        "batch": {
+          "1": {
+            "timed_batches": 1475,
+            "batch_latency_ms": {
+              "p50": 8.546483993995935,
+              "p95": 10.026297099830117,
+              "p99": 12.162253942806274,
+              "mean": 8.363170753197618,
+              "std": 1.0733237337869839
+            },
+            "per_image_ms_p50": 8.546483993995935,
+            "images_per_s_mean": 120.01112772012948,
+            "images_per_s_std": 8.456769611151529,
+            "images_per_s_reps": [
+              130.6041319913663,
+              117.22812100283082,
+              115.01252271739294,
+              126.8871259309715,
+              110.32373695808589
+            ],
+            "rep_p50_ms": [
+              7.308954998734407,
+              8.613156998762861,
+              8.800921001238748,
+              7.339364005019888,
+              9.09234800201375
+            ],
+            "cpu_cores_mean": 1.0007334916604023,
+            "detections_per_image": 24.0135593220339
+          },
+          "4": {
+            "timed_batches": 350,
+            "batch_latency_ms": {
+              "p50": 13.266895497508813,
+              "p95": 16.98652855193359,
+              "p99": 18.80827873639646,
+              "mean": 13.982540508441161,
+              "std": 1.4329291805032505
+            },
+            "per_image_ms_p50": 3.316723874377203,
+            "images_per_s_mean": 287.2730386027605,
+            "images_per_s_std": 20.699649965660743,
+            "images_per_s_reps": [
+              311.1347978033307,
+              254.08335038364626,
+              290.19196821626474,
+              287.84075126420043,
+              293.11432534636054
+            ],
+            "rep_p50_ms": [
+              12.806339502276387,
+              15.3063085017493,
+              13.188456003263127,
+              14.221184494090267,
+              13.266586996905971
+            ],
+            "cpu_cores_mean": 1.0007902227997145,
+            "detections_per_image": 24.207142857142856
+          },
+          "8": {
+            "timed_batches": 160,
+            "batch_latency_ms": {
+              "p50": 20.545526502246503,
+              "p95": 22.440558694506763,
+              "p99": 23.888587434630608,
+              "mean": 20.726676956473966,
+              "std": 0.9796222002561448
+            },
+            "per_image_ms_p50": 2.568190812780813,
+            "images_per_s_mean": 386.2036136850365,
+            "images_per_s_std": 11.882837353762147,
+            "images_per_s_reps": [
+              390.18707489778325,
+              372.8475681050269,
+              381.45739365093726,
+              404.406589236781,
+              382.1194425346541
+            ],
+            "rep_p50_ms": [
+              20.413434998772573,
+              21.288493007887155,
+              20.275937997212168,
+              19.687327003339306,
+              20.905568002490327
+            ],
+            "cpu_cores_mean": 1.000678624335149,
+            "detections_per_image": 24.9453125
+          }
+        }
+      },
+      "ort-fp32": {
+        "model_version": "yolo11n@0ebbc80d4a76+onnx",
+        "detector": {
+          "weights": "yolo11n",
+          "backend": "onnxruntime",
+          "precision": "fp32",
+          "device": "cuda",
+          "imgsz": 640,
+          "conf": 0.1,
+          "iou": 0.7,
+          "max_det": 300,
+          "threads": null,
+          "spin": true
+        },
+        "repetitions": 5,
+        "peak_rss_mb_max": 2351.03125,
+        "load_s_mean": 0.845841358002508,
+        "batch": {
+          "1": {
+            "timed_batches": 1475,
+            "batch_latency_ms": {
+              "p50": 5.725777009502053,
+              "p95": 7.283236502553335,
+              "p99": 9.50662784598535,
+              "mean": 5.840903854814469,
+              "std": 0.9058658991693197
+            },
+            "per_image_ms_p50": 5.725777009502053,
+            "images_per_s_mean": 172.66343828492978,
+            "images_per_s_std": 18.931143980267464,
+            "images_per_s_reps": [
+              161.74627445070504,
+              176.38165997884622,
+              166.75423280012618,
+              154.93055330973755,
+              203.5044708852339
+            ],
+            "rep_p50_ms": [
+              6.228753991308622,
+              5.521215993212536,
+              5.741496992413886,
+              6.1834820080548525,
+              4.767264996189624
+            ],
+            "cpu_cores_mean": 2.1034194423928785,
+            "detections_per_image": 24.00677966101695
+          },
+          "4": {
+            "timed_batches": 350,
+            "batch_latency_ms": {
+              "p50": 14.4925820059143,
+              "p95": 19.141448001755634,
+              "p99": 21.570052549795946,
+              "mean": 14.877098168737055,
+              "std": 1.9433932241875551
+            },
+            "per_image_ms_p50": 3.623145501478575,
+            "images_per_s_mean": 270.14638266252115,
+            "images_per_s_std": 21.25937424364666,
+            "images_per_s_reps": [
+              283.38095842101256,
+              241.9726458365197,
+              297.45247265215926,
+              266.8644276942012,
+              261.0614087087129
+            ],
+            "rep_p50_ms": [
+              13.922372003435157,
+              15.572719494230114,
+              13.184630995965563,
+              14.607929995690938,
+              14.486478503386024
+            ],
+            "cpu_cores_mean": 1.7863722235889146,
+            "detections_per_image": 24.210714285714285
+          },
+          "8": {
+            "timed_batches": 160,
+            "batch_latency_ms": {
+              "p50": 29.321116497158073,
+              "p95": 33.96936324788839,
+              "p99": 35.863449657917954,
+              "mean": 29.536081330570596,
+              "std": 2.3661872591644943
+            },
+            "per_image_ms_p50": 3.665139562144759,
+            "images_per_s_mean": 271.21086545163405,
+            "images_per_s_std": 11.718391158301875,
+            "images_per_s_reps": [
+              279.2284026591892,
+              259.0383389069248,
+              287.38948769564735,
+              264.01588203074937,
+              266.38221596565967
+            ],
+            "rep_p50_ms": [
+              28.841799998190254,
+              30.681016003654804,
+              27.194531001441646,
+              30.34728798957076,
+              29.25881299597677
+            ],
+            "cpu_cores_mean": 1.5648684272495883,
+            "detections_per_image": 24.953125
+          }
+        }
+      },
+      "trt-fp16": {
+        "model_version": "yolo11n@0ebbc80d4a76+trt-fp16@59529c2a",
+        "detector": {
+          "weights": "yolo11n",
+          "backend": "tensorrt",
+          "precision": "fp16",
+          "device": "cuda",
+          "imgsz": 640,
+          "conf": 0.1,
+          "iou": 0.7,
+          "max_det": 300,
+          "threads": null,
+          "spin": true
+        },
+        "repetitions": 5,
+        "peak_rss_mb_max": 2310.390625,
+        "load_s_mean": 1.9875730854022549,
+        "batch": {
+          "1": {
+            "timed_batches": 1475,
+            "batch_latency_ms": {
+              "p50": 3.9421499968739226,
+              "p95": 4.892023708089255,
+              "p99": 6.405629562505053,
+              "mean": 4.034299278617994,
+              "std": 0.6413252714857467
+            },
+            "per_image_ms_p50": 3.9421499968739226,
+            "images_per_s_mean": 248.61996283194694,
+            "images_per_s_std": 16.652260043666214,
+            "images_per_s_reps": [
+              226.427395134923,
+              253.538691295392,
+              238.71909200368188,
+              254.29443498326052,
+              270.1202007424774
+            ],
+            "rep_p50_ms": [
+              4.279884000425227,
+              3.8878129998920485,
+              4.032322991406545,
+              3.8580370019190013,
+              3.4930569963762537
+            ],
+            "cpu_cores_mean": 2.2828635517554803,
+            "detections_per_image": 24.03728813559322
+          },
+          "4": {
+            "timed_batches": 350,
+            "batch_latency_ms": {
+              "p50": 18.64247050252743,
+              "p95": 27.617912052664906,
+              "p99": 28.334653954661917,
+              "mean": 18.451732874257555,
+              "std": 4.759010131043154
+            },
+            "per_image_ms_p50": 4.660617625631858,
+            "images_per_s_mean": 229.18192434280226,
+            "images_per_s_std": 63.485411726644486,
+            "images_per_s_reps": [
+              159.5610701987812,
+              218.16400364532575,
+              232.79867083354344,
+              203.76385742296728,
+              331.62201961339366
+            ],
+            "rep_p50_ms": [
+              27.0018834999064,
+              18.19152349344222,
+              18.869100502342917,
+              19.24561999476282,
+              11.750568999559619
+            ],
+            "cpu_cores_mean": 1.814261407819306,
+            "detections_per_image": 24.242857142857144
+          },
+          "8": {
+            "timed_batches": 160,
+            "batch_latency_ms": {
+              "p50": 26.891736502875574,
+              "p95": 37.17131329613039,
+              "p99": 38.67514878991642,
+              "mean": 29.42223537420432,
+              "std": 5.647164479343814
+            },
+            "per_image_ms_p50": 3.3614670628594467,
+            "images_per_s_mean": 281.0196556141085,
+            "images_per_s_std": 55.4176091894963,
+            "images_per_s_reps": [
+              302.71111623123403,
+              225.50189476624055,
+              316.21966896318224,
+              219.12936812083214,
+              341.5362299890534
+            ],
+            "rep_p50_ms": [
+              25.939612001820933,
+              35.49634449882433,
+              25.04902500368189,
+              36.422518496692646,
+              23.198248505650554
+            ],
+            "cpu_cores_mean": 1.5799102157805396,
+            "detections_per_image": 24.984375
+          }
+        }
+      },
+      "trt-int8": {
+        "model_version": "yolo11n@0ebbc80d4a76+trt-int8@45b4ba47",
+        "detector": {
+          "weights": "yolo11n",
+          "backend": "tensorrt",
+          "precision": "int8",
+          "device": "cuda",
+          "imgsz": 640,
+          "conf": 0.1,
+          "iou": 0.7,
+          "max_det": 300,
+          "threads": null,
+          "spin": true
+        },
+        "repetitions": 5,
+        "peak_rss_mb_max": 2244.67578125,
+        "load_s_mean": 2.3627882258064345,
+        "batch": {
+          "1": {
+            "timed_batches": 1475,
+            "batch_latency_ms": {
+              "p50": 5.224976994213648,
+              "p95": 6.6415872002835386,
+              "p99": 8.951585839386098,
+              "mean": 5.462016439898003,
+              "std": 0.8044193865155596
+            },
+            "per_image_ms_p50": 5.224976994213648,
+            "images_per_s_mean": 183.65289638890036,
+            "images_per_s_std": 12.002704362872109,
+            "images_per_s_reps": [
+              164.06208768560714,
+              184.05711415267862,
+              196.81994465939368,
+              186.02711154538054,
+              187.29822390144184
+            ],
+            "rep_p50_ms": [
+              5.833550007082522,
+              5.2055589912924916,
+              5.003913989639841,
+              5.280030993162654,
+              5.050456995377317
+            ],
+            "cpu_cores_mean": 2.0242147814338862,
+            "detections_per_image": 19.810169491525425
+          },
+          "4": {
+            "timed_batches": 350,
+            "batch_latency_ms": {
+              "p50": 20.80058849969646,
+              "p95": 28.457759349839762,
+              "p99": 29.770491495582974,
+              "mean": 22.644030465494975,
+              "std": 3.536560542603593
+            },
+            "per_image_ms_p50": 5.200147124924115,
+            "images_per_s_mean": 178.43465054161356,
+            "images_per_s_std": 20.441216180178124,
+            "images_per_s_reps": [
+              167.6863721882901,
+              157.0798217567129,
+              197.68399935790774,
+              166.87998229481215,
+              202.84307711034498
+            ],
+            "rep_p50_ms": [
+              24.59274500142783,
+              27.579947003687266,
+              20.232797505741473,
+              24.644041499414016,
+              19.54076299443841
+            ],
+            "cpu_cores_mean": 1.6831063539574,
+            "detections_per_image": 19.95
+          },
+          "8": {
+            "timed_batches": 160,
+            "batch_latency_ms": {
+              "p50": 25.77325750462478,
+              "p95": 28.798501448181923,
+              "p99": 29.9409347512119,
+              "mean": 25.938202044471836,
+              "std": 1.3200092473695357
+            },
+            "per_image_ms_p50": 3.2216571880780975,
+            "images_per_s_mean": 308.47351197392067,
+            "images_per_s_std": 6.230119010757777,
+            "images_per_s_reps": [
+              312.40647865103597,
+              311.5184594065058,
+              305.49672038448824,
+              298.93465445653123,
+              314.01124697104206
+            ],
+            "rep_p50_ms": [
+              24.934449000284076,
+              25.2008330062381,
+              25.89445999910822,
+              26.495391000935342,
+              25.274887499108445
+            ],
+            "cpu_cores_mean": 1.6127051658260876,
+            "detections_per_image": 20.53125
+          }
+        }
+      }
+    },
+    "orders": [
+      [
+        "pytorch-fp32",
+        "ort-fp32",
+        "trt-fp16",
+        "trt-int8"
+      ],
+      [
+        "ort-fp32",
+        "trt-fp16",
+        "trt-int8",
+        "pytorch-fp32"
+      ],
+      [
+        "trt-fp16",
+        "trt-int8",
+        "pytorch-fp32",
+        "ort-fp32"
+      ],
+      [
+        "trt-int8",
+        "pytorch-fp32",
+        "ort-fp32",
+        "trt-fp16"
+      ],
+      [
+        "pytorch-fp32",
+        "ort-fp32",
+        "trt-fp16",
+        "trt-int8"
+      ]
+    ],
+    "quality": {
+      "eval": {
+        "pytorch-fp32": "eval/results/2026-10-19-ladder-gpu-n-pytorch-fp32-01M5AEDDR4XWFHT9XV8JWHGMP0.json",
+        "ort-fp32": "eval/results/2026-10-19-ladder-gpu-n-ort-fp32-01M5AEF9E8J5RMFEZTN42ER9A9.json",
+        "trt-fp16": "eval/results/2026-10-19-ladder-gpu-n-trt-fp16-01M5AEJFYKVSVCF9VN8H0QT8DN.json",
+        "trt-int8": "eval/results/2026-10-19-ladder-gpu-n-trt-int8-01M5AEM7G2XQ29TCKB8DBJ8CSM.json"
+      },
+      "compare": [
+        {
+          "base": "pytorch-fp32",
+          "other": "ort-fp32",
+          "results": "eval/results/2026-10-19-ladder-gpu-n-ort-fp32-vs-pytorch-fp32-01M5AERP3JPBFR2GZSYTMKYJMJ.json"
+        },
+        {
+          "base": "ort-fp32",
+          "other": "trt-fp16",
+          "results": "eval/results/2026-10-19-ladder-gpu-n-trt-fp16-vs-ort-fp32-01M5AEVMA3Z1W5EBFFAG6RMPHH.json"
+        },
+        {
+          "base": "trt-fp16",
+          "other": "trt-int8",
+          "results": "eval/results/2026-10-19-ladder-gpu-n-trt-int8-vs-trt-fp16-01M5AEYDZJETQRD1R68DXAMSAC.json"
+        }
+      ],
+      "errors": {}
+    },
+    "failed": []
+  },
+  "cost_usd": 0.1437,
+  "notes": "Model-only: detect_batch (letterbox, forward, NMS) on decoded frames; JPEG decode excluded. Latency percentiles pool every timed batch of every repetition; throughput is the mean and std of per-repetition values. Each step ran in its own process, step order rotated per repetition.; GPU session 01M5ADM7DVEKN4CGVGW2Q6RDRK (Runpod A40, SECURE); git from the session"
+}
