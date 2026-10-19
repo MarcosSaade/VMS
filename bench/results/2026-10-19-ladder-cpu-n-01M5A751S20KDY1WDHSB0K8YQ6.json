@@ -1,0 +1,552 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5A751S20KDY1WDHSB0K8YQ6",
+  "name": "ladder-cpu-n",
+  "kind": "worker.ladder",
+  "started_at": "2026-10-19T13:55:54.274852Z",
+  "ended_at": "2026-10-19T14:05:07.581545Z",
+  "seed": 1234,
+  "git": {
+    "sha": "b349c1b14ff1d731233da2973875db0b47fe51b6",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Platinum 8488C",
+    "logical_cpus": 8,
+    "ram_bytes": 16462835712,
+    "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.1+cpu",
+    "torchvision": "0.29.1+cpu",
+    "ultralytics": "8.4.175",
+    "onnx": "1.23.2",
+    "onnxruntime": "1.31.0",
+    "opencv-python": null
+  },
+  "config": {
+    "worker": {
+      "service": "worker",
+      "env": "local",
+      "seed": 1234,
+      "log": {
+        "level": "INFO"
+      },
+      "telemetry": {
+        "enabled": true,
+        "otlp_endpoint": null,
+        "otlp_insecure": true,
+        "export_timeout_s": 10.0,
+        "sample_ratio": 0.01
+      },
+      "http": {
+        "host": "127.0.0.1",
+        "port": 8090
+      },
+      "queue": {
+        "max_cameras": 16,
+        "lease_ttl_s": 30.0,
+        "renew_every_s": 5.0,
+        "idle_release_s": 60.0,
+        "claim_batch": 4,
+        "infer_batch": 1,
+        "max_attempts": 3,
+        "poll_min_s": 0.05,
+        "poll_max_s": 1.0,
+        "backlog_every_s": 5.0,
+        "shutdown_grace_s": 10.0
+      },
+      "detector": {
+        "weights": "yolo11n",
+        "backend": "ultralytics",
+        "precision": "fp32",
+        "device": "cpu",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      },
+      "tracker": {
+        "fps": 5.0,
+        "high_thresh": 0.25,
+        "low_thresh": 0.1,
+        "new_track_thresh": 0.25,
+        "match_thresh": 0.8,
+        "fuse_score": true,
+        "buffer_s": 2.0,
+        "classes": [
+          "person",
+          "bicycle",
+          "car",
+          "motorcycle",
+          "bus",
+          "truck"
+        ],
+        "store_min_conf": 0.25
+      },
+      "zones": {
+        "min_frames": 2,
+        "loiter_s": 30.0,
+        "refresh_s": 60.0
+      },
+      "db": {
+        "min_size": 1,
+        "max_size": 4,
+        "connect_timeout_s": 5.0,
+        "acquire_timeout_s": 2.0,
+        "statement_timeout_ms": 5000
+      },
+      "objects": {
+        "max_concurrency": 4,
+        "connect_timeout_s": 2.0,
+        "read_timeout_s": 5.0,
+        "max_attempts": 3
+      }
+    },
+    "steps": {
+      "pytorch-fp32": {
+        "weights": "yolo11n",
+        "backend": "ultralytics",
+        "precision": "fp32",
+        "device": "cpu",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      },
+      "ort-fp32": {
+        "weights": "yolo11n",
+        "backend": "onnxruntime",
+        "precision": "fp32",
+        "device": "cpu",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      },
+      "ort-int8": {
+        "weights": "yolo11n",
+        "backend": "onnxruntime",
+        "precision": "int8",
+        "device": "cpu",
+        "imgsz": 640,
+        "conf": 0.1,
+        "iou": 0.7,
+        "max_det": 300,
+        "threads": null,
+        "spin": true
+      }
+    }
+  },
+  "scenario": {
+    "name": "ladder-cpu-n",
+    "description": "Precision ladder on CPU for YOLO11n, the model the containerized worker and the E-039 ramp run (task 5.2, CPU fallback; D5, D32; input to 5.5): YOLO11n with PyTorch (the Phase 1 baseline), ONNX Runtime FP32 and ONNX Runtime INT8 (static, QDQ, calibration set v1), each in its own process. Model-only: detect_batch (letterbox, forward, NMS) on decoded data-mini frames (1280x720, as loadgen sends them) at batch sizes 1, 4 and 8. Same thread defaults as the worker (one intra-op thread per physical core). Quality for each step comes from `make eval SUITE=detection` and `python -m vms.eval.detection compare`.\n",
+    "kind": "ladder",
+    "repeats": 5,
+    "bench": {
+      "clips": [
+        "mot17-09-mini",
+        "mot17-04-mini",
+        "commons-roncesvalles"
+      ],
+      "frames_per_clip": 100,
+      "batch_sizes": [
+        1,
+        4,
+        8
+      ],
+      "warmup_batches": 2,
+      "cooldown_s": 15
+    },
+    "config": {
+      "detector": {
+        "weights": "yolo11n",
+        "device": "cpu"
+      }
+    },
+    "steps": [
+      {
+        "name": "pytorch-fp32",
+        "detector": {
+          "backend": "ultralytics"
+        }
+      },
+      {
+        "name": "ort-fp32",
+        "detector": {
+          "backend": "onnxruntime"
+        }
+      },
+      {
+        "name": "ort-int8",
+        "detector": {
+          "backend": "onnxruntime",
+          "precision": "int8"
+        }
+      }
+    ]
+  },
+  "metrics": {
+    "steps": {
+      "pytorch-fp32": {
+        "model_version": "yolo11n@0ebbc80d4a76",
+        "detector": {
+          "weights": "yolo11n",
+          "backend": "ultralytics",
+          "precision": "fp32",
+          "device": "cpu",
+          "imgsz": 640,
+          "conf": 0.1,
+          "iou": 0.7,
+          "max_det": 300,
+          "threads": null,
+          "spin": true
+        },
+        "repetitions": 5,
+        "peak_rss_mb_max": 1494.8515625,
+        "load_s_mean": 1.804212942200047,
+        "batch": {
+          "1": {
+            "timed_batches": 1490,
+            "batch_latency_ms": {
+              "p50": 30.83099149989721,
+              "p95": 36.298014900035014,
+              "p99": 57.5179783599149,
+              "mean": 31.679123896645663,
+              "std": 5.305373801802629
+            },
+            "per_image_ms_p50": 30.83099149989721,
+            "images_per_s_mean": 31.5689269705551,
+            "images_per_s_std": 0.5130566004916671,
+            "images_per_s_reps": [
+              30.791313736709352,
+              31.33212694579125,
+              31.860632179494715,
+              31.77877799772887,
+              32.0817839930513
+            ],
+            "rep_p50_ms": [
+              31.508348999750524,
+              30.98061199989388,
+              30.15029550010695,
+              30.8591364998847,
+              30.832048500087694
+            ],
+            "cpu_cores_mean": 6.9419310903565075,
+            "detections_per_image": 23.93959731543624
+          },
+          "4": {
+            "timed_batches": 365,
+            "batch_latency_ms": {
+              "p50": 81.77634000003309,
+              "p95": 94.61032720009825,
+              "p99": 134.14522983986933,
+              "mean": 83.26171401643117,
+              "std": 14.509197079034141
+            },
+            "per_image_ms_p50": 20.444085000008272,
+            "images_per_s_mean": 48.14254427116206,
+            "images_per_s_std": 2.490910338170349,
+            "images_per_s_reps": [
+              44.619998384811694,
+              47.63693231176219,
+              51.489286100446655,
+              47.88253624387871,
+              49.083968314911026
+            ],
+            "rep_p50_ms": [
+              82.08487000001696,
+              81.88791900010983,
+              75.52511400035655,
+              82.86287400005676,
+              79.1932590000215
+            ],
+            "cpu_cores_mean": 6.770235262907138,
+            "detections_per_image": 24.034246575342465
+          },
+          "8": {
+            "timed_batches": 175,
+            "batch_latency_ms": {
+              "p50": 147.19762799995806,
+              "p95": 172.94683640006932,
+              "p99": 236.8144691997619,
+              "mean": 148.91660061710354,
+              "std": 18.046329181332823
+            },
+            "per_image_ms_p50": 18.399703499994757,
+            "images_per_s_mean": 53.79337154365775,
+            "images_per_s_std": 2.277481236390825,
+            "images_per_s_reps": [
+              52.32753821601952,
+              52.56217793232954,
+              57.711463149562384,
+              52.48061532040137,
+              53.88506309997593
+            ],
+            "rep_p50_ms": [
+              148.420815999998,
+              148.90234199992847,
+              137.24481200006267,
+              139.2463030001636,
+              146.11745600041104
+            ],
+            "cpu_cores_mean": 6.653457702215787,
+            "detections_per_image": 24.135714285714286
+          }
+        }
+      },
+      "ort-fp32": {
+        "model_version": "yolo11n@0ebbc80d4a76+onnx",
+        "detector": {
+          "weights": "yolo11n",
+          "backend": "onnxruntime",
+          "precision": "fp32",
+          "device": "cpu",
+          "imgsz": 640,
+          "conf": 0.1,
+          "iou": 0.7,
+          "max_det": 300,
+          "threads": null,
+          "spin": true
+        },
+        "repetitions": 5,
+        "peak_rss_mb_max": 1255.36328125,
+        "load_s_mean": 0.27370247539993214,
+        "batch": {
+          "1": {
+            "timed_batches": 1490,
+            "batch_latency_ms": {
+              "p50": 19.798337999873183,
+              "p95": 23.179756500053372,
+              "p99": 25.84717977001219,
+              "mean": 20.243972613420034,
+              "std": 1.345946172798595
+            },
+            "per_image_ms_p50": 19.798337999873183,
+            "images_per_s_mean": 49.38738739546036,
+            "images_per_s_std": 0.4231635709066549,
+            "images_per_s_reps": [
+              48.87253885981589,
+              49.81668667109196,
+              49.768850818650364,
+              49.43641484250357,
+              49.04244578524001
+            ],
+            "rep_p50_ms": [
+              19.941654000149356,
+              19.666410999889194,
+              19.73075149999204,
+              19.76502499974231,
+              19.876030999967043
+            ],
+            "cpu_cores_mean": 4.105734422145318,
+            "detections_per_image": 23.93959731543624
+          },
+          "4": {
+            "timed_batches": 365,
+            "batch_latency_ms": {
+              "p50": 64.62728800033801,
+              "p95": 77.10140080007477,
+              "p99": 83.28989988009204,
+              "mean": 66.49769533699215,
+              "std": 4.656560262559077
+            },
+            "per_image_ms_p50": 16.156822000084503,
+            "images_per_s_mean": 60.151129212669936,
+            "images_per_s_std": 0.5039914661911349,
+            "images_per_s_reps": [
+              59.541692883891336,
+              60.723518455663836,
+              60.622265121234214,
+              59.91406093709351,
+              59.9541086654668
+            ],
+            "rep_p50_ms": [
+              64.969850000125,
+              64.27260800001022,
+              64.29089599987492,
+              64.77029099960419,
+              64.84413599991967
+            ],
+            "cpu_cores_mean": 4.078150449274723,
+            "detections_per_image": 24.034246575342465
+          },
+          "8": {
+            "timed_batches": 175,
+            "batch_latency_ms": {
+              "p50": 130.56073799998558,
+              "p95": 154.02616209998993,
+              "p99": 166.9970063599612,
+              "mean": 134.13363251999337,
+              "std": 8.92081938608192
+            },
+            "per_image_ms_p50": 16.320092249998197,
+            "images_per_s_mean": 59.64048281957455,
+            "images_per_s_std": 0.245957198063509,
+            "images_per_s_reps": [
+              59.583570565766664,
+              59.57847321628166,
+              59.87747107148455,
+              59.874504488404895,
+              59.28839475593496
+            ],
+            "rep_p50_ms": [
+              131.35178300035477,
+              130.21661199991286,
+              129.60967600020012,
+              130.4699580000488,
+              130.8073179998246
+            ],
+            "cpu_cores_mean": 4.065380003485727,
+            "detections_per_image": 24.135714285714286
+          }
+        }
+      },
+      "ort-int8": {
+        "model_version": "yolo11n@0ebbc80d4a76+onnx-int8@397ecb71",
+        "detector": {
+          "weights": "yolo11n",
+          "backend": "onnxruntime",
+          "precision": "int8",
+          "device": "cpu",
+          "imgsz": 640,
+          "conf": 0.1,
+          "iou": 0.7,
+          "max_det": 300,
+          "threads": null,
+          "spin": true
+        },
+        "repetitions": 5,
+        "peak_rss_mb_max": 1143.734375,
+        "load_s_mean": 0.30224586999993336,
+        "batch": {
+          "1": {
+            "timed_batches": 1490,
+            "batch_latency_ms": {
+              "p50": 19.559882000066864,
+              "p95": 20.258705600099347,
+              "p99": 20.530803570127315,
+              "mean": 18.428664167780294,
+              "std": 1.8466836195728484
+            },
+            "per_image_ms_p50": 19.559882000066864,
+            "images_per_s_mean": 54.744590567361584,
+            "images_per_s_std": 5.9562659454026745,
+            "images_per_s_reps": [
+              60.28555002111345,
+              50.52698325252818,
+              62.17033552408838,
+              50.331735608011606,
+              50.40834843106627
+            ],
+            "rep_p50_ms": [
+              16.432575999942856,
+              19.81081300027654,
+              15.961773499839182,
+              19.867344000203957,
+              19.821412500050428
+            ],
+            "cpu_cores_mean": 4.111124921413355,
+            "detections_per_image": 25.996644295302012
+          },
+          "4": {
+            "timed_batches": 365,
+            "batch_latency_ms": {
+              "p50": 64.89303300031679,
+              "p95": 66.9602156001929,
+              "p99": 67.61805739995907,
+              "mean": 60.26840604383747,
+              "std": 6.894075744046315
+            },
+            "per_image_ms_p50": 16.223258250079198,
+            "images_per_s_mean": 67.20652748553849,
+            "images_per_s_std": 8.610530037228871,
+            "images_per_s_reps": [
+              76.10104270180256,
+              61.38155105805434,
+              77.14284687500484,
+              61.03188355384059,
+              60.375313238990145
+            ],
+            "rep_p50_ms": [
+              51.432983000267996,
+              65.08438299988484,
+              51.36466500016468,
+              65.34021500010567,
+              66.17611899991971
+            ],
+            "cpu_cores_mean": 4.08463542907779,
+            "detections_per_image": 26.15753424657534
+          },
+          "8": {
+            "timed_batches": 175,
+            "batch_latency_ms": {
+              "p50": 127.70898200005831,
+              "p95": 131.19191360001423,
+              "p99": 132.6117530199008,
+              "mean": 118.02711342286004,
+              "std": 13.735095174891258
+            },
+            "per_image_ms_p50": 15.96362275000729,
+            "images_per_s_mean": 68.71018610615074,
+            "images_per_s_std": 9.163565614181136,
+            "images_per_s_reps": [
+              78.55201237757858,
+              62.39048949717572,
+              78.93246942783597,
+              62.09692847687,
+              61.57903075129342
+            ],
+            "rep_p50_ms": [
+              100.43706899978133,
+              128.0253370000537,
+              100.19276699995316,
+              128.63860700008445,
+              129.6268470000541
+            ],
+            "cpu_cores_mean": 4.075857847584963,
+            "detections_per_image": 26.353571428571428
+          }
+        }
+      }
+    },
+    "orders": [
+      [
+        "pytorch-fp32",
+        "ort-fp32",
+        "ort-int8"
+      ],
+      [
+        "ort-fp32",
+        "ort-int8",
+        "pytorch-fp32"
+      ],
+      [
+        "ort-int8",
+        "pytorch-fp32",
+        "ort-fp32"
+      ],
+      [
+        "pytorch-fp32",
+        "ort-fp32",
+        "ort-int8"
+      ],
+      [
+        "ort-fp32",
+        "ort-int8",
+        "pytorch-fp32"
+      ]
+    ]
+  },
+  "cost_usd": 0.0566,
+  "notes": "Model-only: detect_batch (letterbox, forward, NMS) on decoded frames; JPEG decode excluded. Latency percentiles pool every timed batch of every repetition; throughput is the mean and std of per-repetition values. Each step ran in its own process, step order rotated per repetition.; CPU session 01M5A3X28Z8AS5SBWATZZ3HJR5 (c7i.2xlarge)"
+}
