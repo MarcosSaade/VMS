@@ -413,6 +413,16 @@ While it runs, to look at the instance yourself: `ssh -i .gpu-sessions/<id>/id_e
 
 After a session: check the session file's `metrics.teardown_verified` is true, log the run in `EXPERIMENTS.md` with its cost, and commit the results files behind any reported number.
 
+### CPU sessions (D35)
+
+The same driver on a CPU instance: `machines.cpu` in `configs/cloud.yaml` (c7i.2xlarge, Ubuntu 24.04 from Canonical's SSM parameter, 60 GB gp3; Docker, Compose and buildx from the Ubuntu archive, installed by `host_setup` before anything else). It needs the on-demand **standard** vCPU quota (`L-1216C47A`, "Running On-Demand Standard (A, C, D, H, I, M, R, T, Z) instances"), not the G and VT one. Cost: c7i.2xlarge about **$0.37 per hour** with volume and IPv4, c7i.4xlarge (`INSTANCE=c7i.4xlarge`) about $0.72; the 150-minute cap holds (raise it for one session with `VMS_MAX_SESSION_MINUTES=240`).
+```bash
+make cpu-preflight                              # INSTANCE=c7i.4xlarge for another priced type
+make cpu-session                                # CPU_SCENARIOS: ramp, query load, ladder, batch sweep
+make cpu-session INSTANCE=c7i.4xlarge CPU_SCENARIOS="bench/scenarios/finetune-blur-cpu.yaml"
+```
+On a CPU machine `scripts/gpu_remote.sh` (with `VMS_ACCELERATOR=cpu`) brings up the same images and services as a laptop, runs `make onnx`, `make calibration-data` and `make quantize WEIGHTS=yolo11n` (the worker's ONNX Runtime backend and the ladder's INT8 step), runs every scenario on the host through `make bench`, and fetches the training and eval images before a `kind: finetune` scenario. Besides `bench/results/`, the session copies back `eval/results/` and `models/finetune/` (`remote.collect`); after it, `dvc add models/finetune/*.pt` and commit the `.dvc` files.
+
 ## Deployment
 
 _Placeholder (tasks 6.4, 10.1, 10.2)._ Helm chart, kind smoke test, Terraform for the AWS environment, and the CD pipeline with its eval gate.

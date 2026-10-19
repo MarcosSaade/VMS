@@ -130,8 +130,11 @@ def select_coco_ids(image_ids: list[int], n: int, seed: int) -> list[int]:
     return sorted(ordered[int(i)] for i in picks)
 
 
-def coco_ground_truth(annotations: dict[str, Any], image_ids: list[int]) -> list[GtImage]:
-    """Ground truth for `image_ids` from a COCO instances file. sha256 is filled in later."""
+def coco_ground_truth(
+    annotations: dict[str, Any], image_ids: list[int], member_prefix: str = "val2017/"
+) -> list[GtImage]:
+    """Ground truth for `image_ids` from a COCO instances file. sha256 is filled in later.
+    `member_prefix` is the images archive's folder (train2017/ for the fine-tune set, 9.5)."""
     names = {c["id"]: c["name"] for c in annotations["categories"]}
     by_image: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for ann in annotations["annotations"]:
@@ -150,7 +153,7 @@ def coco_ground_truth(annotations: dict[str, Any], image_ids: list[int]) -> list
             GtImage(
                 id=f"coco-{image_id:012d}",
                 source="coco",
-                member=f"val2017/{img['file_name']}",
+                member=f"{member_prefix}{img['file_name']}",
                 sha256="",
                 width=int(img["width"]),
                 height=int(img["height"]),
@@ -303,15 +306,23 @@ def build(
 ) -> tuple[list[GtImage], str]:
     """Select images, read their ground truth and fetch them. Returns (images with sha256,
     annotations sha256). Images are written to `images_dir`."""
-    coco, ann_hash = _build_coco(spec, transport, retry, images_dir, workers)
-    mot = _build_mot17(spec.mot17, transport, retry, images_dir, workers)
+    coco, ann_hash = build_coco(spec.coco, spec.seed, transport, retry, images_dir, workers)
+    mot = build_mot17(spec.mot17, transport, retry, images_dir, workers)
     return coco + mot, ann_hash
 
 
-def _build_coco(
-    spec: SubsetSpec, transport: Transport, retry: RetryPolicy, images_dir: Path, workers: int
+def build_coco(
+    c: CocoSpec,
+    seed: int,
+    transport: Transport,
+    retry: RetryPolicy,
+    images_dir: Path,
+    workers: int,
+    member_prefix: str = "val2017/",
+    exclude_ids: frozenset[int] = frozenset(),
 ) -> tuple[list[GtImage], str]:
-    c = spec.coco
+    """Sample `c.images` images (never one of `exclude_ids`), read their ground truth and
+    fetch them. Returns (images with sha256, annotations sha256)."""
     ann_url = str(c.annotations_url)
     index = remote_zip_index(transport, retry, ann_url, c.annotations_bytes)
     if c.annotations_member not in index:
@@ -327,8 +338,9 @@ def _build_coco(
     if ann_hash != c.annotations_sha256:
         raise ChecksumError(f"{c.annotations_member}: sha256 {ann_hash} != {c.annotations_sha256}")
     annotations = json.loads(data)
-    ids = select_coco_ids([img["id"] for img in annotations["images"]], c.images, spec.seed)
-    gts = coco_ground_truth(annotations, ids)
+    candidates = [img["id"] for img in annotations["images"] if img["id"] not in exclude_ids]
+    ids = select_coco_ids(candidates, c.images, seed)
+    gts = coco_ground_truth(annotations, ids, member_prefix)
 
     url = str(c.images_url)
     img_index = remote_zip_index(transport, retry, url, c.images_bytes)
@@ -352,7 +364,7 @@ def mot_root(index: dict[str, zipfile.ZipInfo], sequence: str) -> str:
     raise ChecksumError(f"MOT17 archive has no sequence {sequence}")
 
 
-def _build_mot17(
+def build_mot17(
     spec: Mot17Spec, transport: Transport, retry: RetryPolicy, images_dir: Path, workers: int
 ) -> list[GtImage]:
     url = str(spec.url)
@@ -406,10 +418,23 @@ def fetch(
     workers: int = 8,
 ) -> int:
     """Download the listed images that are missing or corrupt; returns how many were fetched."""
+    return fetch_images(spec.coco, spec.mot17, images, transport, retry, images_dir, workers)
+
+
+def fetch_images(
+    coco: CocoSpec,
+    mot17: Mot17Spec,
+    images: list[GtImage],
+    transport: Transport,
+    retry: RetryPolicy,
+    images_dir: Path,
+    workers: int = 8,
+) -> int:
+    """`fetch` for any list of COCO and MOT17 images (the eval subset, the fine-tune set)."""
     missing = [img for img in images if not image_ok(images_dir, img)]
     archives = {
-        "coco": (str(spec.coco.images_url), spec.coco.images_bytes),
-        "mot17": (str(spec.mot17.url), spec.mot17.archive_bytes),
+        "coco": (str(coco.images_url), coco.images_bytes),
+        "mot17": (str(mot17.url), mot17.archive_bytes),
     }
     for source, (url, size) in archives.items():
         todo = [img for img in missing if img.source == source]

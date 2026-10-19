@@ -169,6 +169,14 @@ calibration-data: ## Fetch and verify the INT8 calibration images (64 COCO train
 quantize: ## Static INT8 quantization of the ONNX exports (needs make onnx and make calibration-data; WEIGHTS=yolo11s)
 	$(RUN) python -m vms.worker quantize $(WEIGHTS)
 
+.PHONY: finetune-data
+finetune-data: ## Fetch and verify the 9.5 training images (800 COCO train2017 + ~790 MOT17 frames)
+	$(RUN) python -m vms.finetune fetch
+
+.PHONY: finetune
+finetune: ## Fine-tune YOLO11n against blur and score it before/after (SCENARIO=bench/scenarios/finetune-blur-cpu.yaml; needs finetune-data, eval-detection-data)
+	$(RUN) python -m vms.finetune run --scenario $(or $(SCENARIO),bench/scenarios/finetune-blur-cpu.yaml)
+
 .PHONY: onnx-parity
 onnx-parity: ## ONNX Runtime vs PyTorch parity on the eval subset and data-mini (WEIGHTS=yolo11n|yolo11s)
 	$(RUN) python -m vms.worker onnx-parity --weights $(or $(WEIGHTS),yolo11n)
@@ -190,7 +198,7 @@ loadgen-selftest: ## Measure the load generator's own max rate (no server)
 loadgen-stub: ## Stub ingest server for loadgen tests (STUB_WORKERS=n processes)
 	$(RUN) python -m vms.loadgen stub --workers $(STUB_WORKERS)
 
-# --- GPU sessions on AWS (task 2.4; RUNBOOK: GPU sessions) ------------------------
+# --- Cloud sessions on AWS (task 2.4, D35; RUNBOOK: GPU sessions) -----------------
 
 GPU_SCENARIOS ?= bench/scenarios/gpu-smoke.yaml bench/scenarios/worker-model-gpu-n.yaml
 SESSION ?=
@@ -202,6 +210,21 @@ gpu-preflight: ## Free checks before a GPU session: credentials, Region, quota, 
 .PHONY: gpu-session
 gpu-session: ## Launch, run GPU_SCENARIOS, collect results, tear down and verify (asks first; costs money)
 	scripts/gpu_session.sh run $(GPU_SCENARIOS)
+
+# CPU sessions (D35): the same driver on a CPU instance (configs/cloud.yaml machines.cpu);
+# INSTANCE=c7i.4xlarge picks another priced type.
+CPU_SCENARIOS ?= bench/scenarios/ramp-cpu-ort-b4-nospin.yaml bench/scenarios/query-load-cpu.yaml \
+	bench/scenarios/ladder-cpu-n.yaml bench/scenarios/sweep-cpu-ort-n.yaml
+INSTANCE ?=
+CPU_ENV = VMS_MACHINE=cpu $(if $(INSTANCE),VMS_INSTANCE_TYPE=$(INSTANCE))
+
+.PHONY: cpu-preflight
+cpu-preflight: ## Free checks before a CPU session (INSTANCE=c7i.2xlarge by default)
+	$(CPU_ENV) scripts/gpu_session.sh preflight
+
+.PHONY: cpu-session
+cpu-session: ## Launch a CPU instance, run CPU_SCENARIOS, collect, tear down and verify (asks first; costs money)
+	$(CPU_ENV) scripts/gpu_session.sh run $(CPU_SCENARIOS)
 
 .PHONY: gpu-teardown
 gpu-teardown: ## Delete what a GPU session left behind and verify (SESSION=<id>)

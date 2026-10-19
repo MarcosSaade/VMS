@@ -1,0 +1,54 @@
+# Detector fine-tune training set, version 1 (task 9.5, vms.finetune; D36). Resolved once by
+# `python -m vms.finetune build` into the frozen list configs/finetune.v1.lock.jsonl (archive
+# member, sha256 and boxes per image, in git); `make finetune-data` fetches the listed images
+# into data/finetune/images/v1/ (gitignored). Never edit after the list is built: a different
+# selection is a new version.
+#
+# Disjoint from the detection eval subset (configs/eval/detection.v1.yaml, D31) and from the
+# INT8 calibration set (configs/calibration.v1.yaml): COCO train2017 instead of val2017, minus
+# the calibration images; the MOT17 train sequences outside the eval's 02, 04 and 09, so the
+# fine-tuned model is scored on camera scenes it never saw. `build` checks both.
+
+version: 1
+seed: 20261019
+
+licenses:
+  coco:
+    name: COCO annotations CC BY 4.0; images under their Flickr licenses
+    url: https://cocodataset.org/#termsofuse
+  mot17:
+    name: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+    url: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+coco:
+  # Path-style HTTPS, as the eval subset: images.cocodataset.org serves another certificate.
+  images_url: https://s3.amazonaws.com/images.cocodataset.org/zips/train2017.zip
+  images_bytes: 19336861798
+  annotations_url: https://s3.amazonaws.com/images.cocodataset.org/annotations/annotations_trainval2017.zip
+  annotations_bytes: 252907541
+  annotations_member: annotations/instances_train2017.json
+  # sha256 of the annotations member, pinned on the first build (2026-10-19).
+  annotations_sha256: 610fce4944abdeb15354cc765333805529359d12d88f2f711393ca586901d01d
+  images: 800                   # sampled uniformly without replacement from train2017 (118,287)
+member_prefix: train2017/
+exclude_locks: [configs/calibration.v1.lock.jsonl]
+
+mot17:
+  url: https://motchallenge.net/data/MOT17.zip
+  archive_bytes: 5860214001
+  # The train sequences with ground truth outside the eval (05 and 10 to 13 move with the
+  # camera; 02, 04 and 09 are the eval's). One sequence variant: the frames are the same.
+  sequences: [MOT17-05-FRCNN, MOT17-10-FRCNN, MOT17-11-FRCNN, MOT17-13-FRCNN]
+  # ~790 of 3,141 frames (minus the calibration list's); neighbours 4 frames apart overlap
+  frame_stride: 4
+  # As the eval's labels: persons (1, 2, 7) at least 25% visible are positives. Training has
+  # no ignore regions, so ignore-class and barely visible persons are simply not labeled.
+  positive_classes: [1, 2, 7]
+  ignore_classes: [8, 12]
+  crowd_classes: [13]
+  min_visibility: 0.25
+
+mot_frame:                      # as loadgen sends camera frames (configs/loadgen.yaml)
+  width: 1280
+  height: 720
+  jpeg_quality: 85

@@ -153,6 +153,7 @@ class FakeRemote:
     interrupt_on: str | None = None
     commands: list[str] = field(default_factory=list)
     pushed: list[str] = field(default_factory=list)
+    pulled: list[str] = field(default_factory=list)
     repo_results: str = "already-committed.json"
 
     def wait_ready(self, timeout_s: float) -> None:
@@ -173,6 +174,14 @@ class FakeRemote:
 
     def pull(self, remote_dir: str, local_dir: Path, timeout_s: float) -> None:
         local_dir.mkdir(parents=True, exist_ok=True)
+        self.pulled.append(remote_dir)
+        if remote_dir.endswith("models/finetune"):
+            (local_dir / "ft.pt").write_bytes(b"\x80weights")
+            return
+        if remote_dir.endswith("eval/results"):
+            new = results_file("eval-run", sha=None)
+            (local_dir / "2026-10-13-eval-run.json").write_text(new.model_dump_json())
+            return
         new = results_file("gpu-smoke", sha=None)
         (local_dir / "2026-10-13-gpu-smoke-run.json").write_text(new.model_dump_json())
         (local_dir / self.repo_results).write_text("{}")

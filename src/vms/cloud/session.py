@@ -1,4 +1,5 @@
-"""One GPU session: preflight, provision, sync, run scenarios, collect, teardown, verify.
+"""One cloud session (GPU or CPU machine): preflight, provision, sync, run scenarios, collect,
+teardown, verify.
 
 Teardown runs in a `finally`, so a failed setup, a failed scenario, Ctrl-C or SIGTERM still
 terminates the instance and deletes the security group and key pair. Afterwards the session's
@@ -58,8 +59,11 @@ for line in open("/proc/cpuinfo"):
     if line.startswith("model name"):
         cpu = line.split(":", 1)[1].strip()
         break
-smi = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"],
-                     capture_output=True, text=True, timeout=60).stdout
+try:
+    smi = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"],
+                         capture_output=True, text=True, timeout=60).stdout
+except FileNotFoundError:  # a CPU machine
+    smi = ""
 print(json.dumps({"cpu": cpu, "logical_cpus": os.cpu_count(),
                   "ram_bytes": os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES"),
                   "platform": platform.platform(),
@@ -75,6 +79,7 @@ class PreflightError(Exception):
 class Preflight:
     identity: Identity
     image: Image
+    accelerator: str
     instance_type: str
     vcpus: int
     vcpu_quota: float
@@ -179,7 +184,7 @@ class GpuSession:
         self._tracked_files = tracked_files or git_tracked_files
         self.state = SessionState(session_id=session_id)
         self.tags = session_tags(settings, session_id)
-        self.name = f"vms-gpu-{session_id.lower()}"
+        self.name = f"vms-{settings.target.accelerator}-{session_id.lower()}"
 
     @property
     def state_path(self) -> Path:
@@ -193,14 +198,14 @@ class GpuSession:
     def _spec(self, image: Image) -> LaunchSpec:
         user_data = (
             "#!/bin/bash\n"
-            f'shutdown -h +{self.settings.max_session_minutes} "VMS GPU session time limit"\n'
+            f'shutdown -h +{self.settings.max_session_minutes} "VMS session time limit"\n'
         )
         return LaunchSpec(
             image=image,
-            instance_type=self.settings.instance_type,
+            instance_type=self.settings.target.instance_type,
             key_name=self.state.key_name or "",
             security_group_id=self.state.security_group_id or "",
-            root_volume_gb=self.settings.root_volume_gb,
+            root_volume_gb=self.settings.target.root_volume_gb,
             user_data=user_data,
             tags={**self.tags, "Name": self.name},
         )
@@ -208,21 +213,22 @@ class GpuSession:
     def preflight(self) -> Preflight:
         """Checks that cost nothing and create nothing: Region, quota, AMI, a dry-run launch."""
         s = self.settings
+        m = s.target
         identity = self.cloud.identity()
         if s.region and identity.region != s.region:
             raise PreflightError(
                 f"AWS Region is {identity.region}, configs/cloud.yaml says {s.region}"
             )
         hourly = s.hourly_usd()
-        vcpus = self.cloud.instance_vcpus(s.instance_type)
-        quota = self.cloud.vcpu_quota(s.vcpu_quota_code)
+        vcpus = self.cloud.instance_vcpus(m.instance_type)
+        quota = self.cloud.vcpu_quota(m.vcpu_quota_code)
         if quota < vcpus:
             raise PreflightError(
-                f"{s.instance_type} needs {vcpus} vCPUs but the on-demand G and VT quota "
-                f"({s.vcpu_quota_code}) in {identity.region} is {quota:g}: request an increase "
+                f"{m.instance_type} needs {vcpus} vCPUs but the {m.quota_name} quota "
+                f"({m.vcpu_quota_code}) in {identity.region} is {quota:g}: request an increase "
                 "in Service Quotas (RUNBOOK, GPU sessions)"
             )
-        image = self.cloud.resolve_image(s.ami_parameter)
+        image = self.cloud.resolve_image(m.ami_parameter)
         try:
             self.cloud.check_launch(self._spec(image))
         except LaunchDeniedError as exc:
@@ -231,7 +237,8 @@ class GpuSession:
         return Preflight(
             identity=identity,
             image=image,
-            instance_type=s.instance_type,
+            accelerator=m.accelerator,
+            instance_type=m.instance_type,
             vcpus=vcpus,
             vcpu_quota=quota,
             hourly_usd=hourly,
@@ -308,7 +315,11 @@ class GpuSession:
 
     def _remote(self, *args: str) -> str:
         quoted = " ".join(shlex.quote(a) for a in args)
-        return f"cd {shlex.quote(self.settings.remote.dir)} && bash {REMOTE_SCRIPT} {quoted}"
+        accel = self.settings.target.accelerator
+        return (
+            f"cd {shlex.quote(self.settings.remote.dir)} && "
+            f"VMS_ACCELERATOR={accel} bash {REMOTE_SCRIPT} {quoted}"
+        )
 
     def _provision(self, image: Image) -> Remote:
         t = self.settings.timeouts
@@ -350,11 +361,14 @@ class GpuSession:
             self._sleep(self.settings.timeouts.poll_s)
 
     def _bootstrap(self, remote: Remote) -> Hardware:
+        m = self.settings.target
+        for command in m.host_setup:
+            remote.run(command, self.settings.timeouts.setup_s)
         # The docker group applies to the next SSH login, i.e. every later command.
         remote.run('sudo usermod -aG docker "$USER"', 60, capture=True)
         out = remote.run(f"python3 -c {shlex.quote(HW_PROBE)}", 120, capture=True)
         hw = Hardware.model_validate_json(out.strip().splitlines()[-1])
-        if not hw.gpus:
+        if m.accelerator == "gpu" and not hw.gpus:
             raise RuntimeError("nvidia-smi found no GPU on the instance")
         log.info("instance hardware", extra={"hardware": hw.model_dump()})
         return hw
@@ -378,19 +392,26 @@ class GpuSession:
         return ScenarioRun(scenario, ok=True)
 
     def _collect(self, remote: Remote, results_dir: Path) -> list[Path]:
-        """Copy the results files the session produced (not those synced from the repo)."""
-        staging = self.dir / "results"
-        remote.pull(
-            f"{self.settings.remote.dir}/{RESULTS_DIR}", staging, self.settings.timeouts.collect_s
-        )
-        results_dir.mkdir(parents=True, exist_ok=True)
+        """Copy the files the session produced (not those synced from the repo): results JSON
+        from bench/results into `results_dir`, and everything new under each of
+        `remote.collect` (eval results, fine-tuned weights) to the same path in the repo."""
+        t = self.settings.timeouts
+        pulls = [(RESULTS_DIR, results_dir, "*.json")]
+        pulls += [(d, self.repo / d, "*") for d in self.settings.remote.collect]
+        extra = " ".join(shlex.quote(d) for d in self.settings.remote.collect)
+        if extra:  # rsync fails on a missing source directory
+            remote.run(f"cd {shlex.quote(self.settings.remote.dir)} && mkdir -p {extra}", 60)
         new: list[Path] = []
-        for path in sorted(staging.glob("*.json")):
-            target = results_dir / path.name
-            if target.exists():
-                continue
-            target.write_bytes(path.read_bytes())
-            new.append(target)
+        for k, (rel, local, pattern) in enumerate(pulls):
+            staging = self.dir / "collect" / str(k)
+            remote.pull(f"{self.settings.remote.dir}/{rel}", staging, t.collect_s)
+            local.mkdir(parents=True, exist_ok=True)
+            for path in sorted(staging.glob(pattern)):
+                target = local / path.name
+                if not path.is_file() or target.exists():
+                    continue
+                target.write_bytes(path.read_bytes())
+                new.append(target)
         return new
 
     # --- Teardown ------------------------------------------------------------------------
@@ -472,12 +493,15 @@ class GpuSession:
 
     def _annotate(self, files: list[Path], git: GitInfo, hourly: float) -> None:
         for path in files:
+            if path.suffix != ".json":
+                continue  # weights and other artifacts
             try:
                 result = RunResult.model_validate_json(path.read_text(encoding="utf-8"))
             except ValueError:
                 continue  # not a results file
             wall = (result.ended_at - result.started_at).total_seconds()
-            note = f"GPU session {self.session_id} ({self.settings.instance_type})"
+            m = self.settings.target
+            note = f"{m.accelerator.upper()} session {self.session_id} ({m.instance_type})"
             if result.git.sha is None:
                 result.git = git  # written in a container without git; the session's checkout
                 note += "; git from the session"
@@ -501,7 +525,7 @@ class GpuSession:
         s = self.state
         return RunResult(
             run_id=self.session_id,
-            name="gpu-session",
+            name=f"{self.settings.target.accelerator}-session",
             kind=KIND,
             started_at=started,
             ended_at=self.clock.now(),
@@ -513,7 +537,8 @@ class GpuSession:
             scenario={"scenarios": scenarios},
             metrics={
                 "region": s.region,
-                "instance_type": self.settings.instance_type,
+                "machine": self.settings.machine,
+                "instance_type": self.settings.target.instance_type,
                 "instance_id": s.instance_id,
                 "image": {"id": pre.image.id, "name": pre.image.name},
                 "launched_at": s.launched_at.isoformat() if s.launched_at else None,

@@ -1,16 +1,36 @@
-# GPU sessions on AWS (vms.cloud, scripts/gpu_session.sh, task 2.4). Overrides
-# configs/common.yaml; VMS_* environment variables override this file (e.g.
-# VMS_INSTANCE_TYPE=g4dn.xlarge). Credentials and the Region come from the AWS CLI configuration
-# (AWS_PROFILE, AWS_REGION in .env or the shell).
+# Cloud sessions on AWS (vms.cloud, scripts/gpu_session.sh; tasks 2.4, D28, D35): one tagged
+# on-demand instance, GPU or CPU. Overrides configs/common.yaml; VMS_* environment variables
+# override this file (VMS_MACHINE=cpu, VMS_INSTANCE_TYPE=c7i.4xlarge). Credentials and the
+# Region come from the AWS CLI configuration (AWS_PROFILE, AWS_REGION in .env or the shell).
 
 region: null                   # null: the AWS configuration's Region (the project's selected Region)
-instance_type: g6.xlarge       # 1x NVIDIA L4 24 GB, 4 vCPU, 16 GiB (D28)
+machine: gpu                   # a key of machines below
+instance_type: null            # null: the machine's own; any type priced below
 # On-demand only: the managed SCP denies spot launches on this account (D28).
-vcpu_quota_code: L-DB2E81BA    # Running On-Demand G and VT instances (vCPUs)
-# AWS Deep Learning Base OSS Nvidia Driver GPU AMI: NVIDIA driver, Docker and the NVIDIA
-# container toolkit. Resolved at launch; the AMI id is recorded in the session's results.
-ami_parameter: /aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-22.04/latest/ami-id
-root_volume_gb: 100            # the AMI needs 75; the CUDA image and clips need ~25 more
+machines:
+  gpu:
+    accelerator: gpu
+    instance_type: g6.xlarge   # 1x NVIDIA L4 24 GB, 4 vCPU, 16 GiB (D28)
+    vcpu_quota_code: L-DB2E81BA
+    quota_name: on-demand G and VT
+    # AWS Deep Learning Base OSS Nvidia Driver GPU AMI: NVIDIA driver, Docker and the NVIDIA
+    # container toolkit. Resolved at launch; the AMI id is recorded in the session's results.
+    ami_parameter: /aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-22.04/latest/ami-id
+    root_volume_gb: 100        # the AMI needs 75; the CUDA image and clips need ~25 more
+  cpu:
+    accelerator: cpu
+    instance_type: c7i.2xlarge # Intel Sapphire Rapids, 8 vCPU (4 cores), 16 GiB (D35)
+    vcpu_quota_code: L-1216C47A
+    quota_name: on-demand standard (A, C, D, H, I, M, R, T, Z)
+    # Canonical's Ubuntu 24.04 LTS; Docker comes from the Ubuntu archive in host_setup.
+    ami_parameter: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    root_volume_gb: 60         # images, clips, weights, training data, Postgres, object store
+    host_setup:
+      - cloud-init status --wait >/dev/null || true
+      - >-
+        sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 -q update &&
+        sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 -q install -y
+        docker.io docker-compose-v2 docker-buildx make rsync
 ssh_user: ubuntu
 ssh_cidr: null                 # null: this machine's public IP /32 (checkip.amazonaws.com)
 # Safety net if this machine dies mid-session: the instance powers itself off after this long,
@@ -19,14 +39,17 @@ max_session_minutes: 150
 tags:
   project: vms
 
-# On-demand Linux prices in us-east-2 from the AWS Price List API, 2026-10-13. A session's
-# cost = (instance + root volume + public IPv4) x billed seconds (per second, 60 s minimum).
+# On-demand Linux prices in us-east-2 from the AWS Price List API, 2026-10-13 (c7i 2026-10-19).
+# A session's cost = (instance + root volume + public IPv4) x billed seconds (per second, 60 s minimum).
 prices:
   hourly_usd:
     g4dn.xlarge: 0.526
     g5.xlarge: 1.006
     g6.xlarge: 0.8048
     g6e.xlarge: 1.861
+    c7i.xlarge: 0.1785
+    c7i.2xlarge: 0.357
+    c7i.4xlarge: 0.714
   gp3_gb_month_usd: 0.08
   hours_per_month: 730
   public_ipv4_hour_usd: 0.005
@@ -35,6 +58,9 @@ remote:
   dir: vms                     # under the SSH user's home
   # Clips copied from data/clips instead of downloaded on the instance (the mini subset).
   clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  # Copied back besides bench/results: eval results (9.5's before/after runs) and the
+  # fine-tuned weights (DVC-tracked locally after the session).
+  collect: [eval/results, models/finetune]
 
 timeouts:
   aws_connect_s: 10

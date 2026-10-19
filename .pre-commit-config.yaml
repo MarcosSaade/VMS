@@ -5,6 +5,8 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=500"]
+        # The 9.5 training list: 1,567 images with their boxes, text, frozen (D36).
+        exclude: ^configs/finetune\.v1\.lock\.jsonl$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml

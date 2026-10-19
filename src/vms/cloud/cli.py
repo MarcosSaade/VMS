@@ -1,9 +1,10 @@
-"""`python -m vms.cloud` (`scripts/gpu_session.sh`): GPU sessions on AWS.
+"""`python -m vms.cloud` (`scripts/gpu_session.sh`): cloud sessions on AWS, on a GPU machine or,
+with VMS_MACHINE=cpu, a CPU one (configs/cloud.yaml `machines`).
 
     preflight                      checks that cost nothing: credentials, Region, the
-                                   on-demand G vCPU quota, the AMI, a dry-run launch, and
+                                   machine's vCPU quota, the AMI, a dry-run launch, and
                                    project resources left from earlier sessions
-    run SCENARIO [SCENARIO ...]    a whole session: launch one tagged on-demand GPU instance,
+    run SCENARIO [SCENARIO ...]    a whole session: launch one tagged on-demand instance,
                                    sync the code, run the scenarios there, copy the results
                                    back into bench/results/, terminate everything and verify by
                                    tag. Asks before launching (--yes skips the prompt).
@@ -50,7 +51,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("preflight", help="checks that cost nothing")
-    run = commands.add_parser("run", help="a whole GPU session")
+    run = commands.add_parser("run", help="a whole session")
     run.add_argument("scenarios", nargs="+", help="bench/scenarios/*.yaml (e2e or model)")
     run.add_argument("--yes", action="store_true", help="do not ask before launching")
     run.add_argument("--allow-dirty", action="store_true", help="allow uncommitted changes")
@@ -93,7 +94,7 @@ def _describe(pre: Preflight) -> str:
 
 
 def _confirm(pre: Preflight) -> bool:
-    _out("GPU session about to launch:\n" + _describe(pre))
+    _out(f"{pre.accelerator.upper()} session about to launch:\n" + _describe(pre))
     try:
         answer = input("Type 'launch' to start it: ")
     except EOFError:
@@ -102,7 +103,7 @@ def _confirm(pre: Preflight) -> bool:
 
 
 def _announce(pre: Preflight) -> bool:
-    _out("GPU session launching (--yes):\n" + _describe(pre))
+    _out(f"{pre.accelerator.upper()} session launching (--yes):\n" + _describe(pre))
     return True
 
 

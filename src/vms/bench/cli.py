@@ -9,6 +9,8 @@
                                                   (vms.worker.ladder)
                                    profile        one service under load with py-spy
                                                   (vms.bench.profile)
+                                   finetune       detector fine-tune and before/after mAP
+                                                  (vms.finetune, task 9.5)
     report  FILE [FILE ...]      Markdown tables of results files, for docs/BENCHMARKS.md
 
 `make bench SCENARIO=bench/scenarios/<name>.yaml` runs the first. An e2e scenario needs the
@@ -73,6 +75,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         from vms.worker.cli import main as worker_main
 
         return worker_main(["ladder", "--scenario", str(args.scenario)])
+    if kind == "finetune":
+        from vms.finetune.run import run_finetune  # imports torch: only when needed
+
+        configure_logging(SERVICE, "INFO")
+        run_finetune(args.scenario)
+        return 0
     if kind == "profile":
         from vms.bench.profile import run_profile
 

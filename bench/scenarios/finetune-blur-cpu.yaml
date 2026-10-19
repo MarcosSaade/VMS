@@ -1,0 +1,44 @@
+name: finetune-blur-cpu
+description: >
+  Task 9.5 (CPU, so a small training set and few epochs, D36): fine-tune YOLO11n, the deployed
+  CPU worker's model (D5), against blur, the drift that hurts the camera scenes most (9.2,
+  E-051: -17 points of MOT17 mAP@50-95 at sigma 6). Training list v1 (configs/finetune.v1.yaml):
+  800 COCO train2017 images and ~790 frames of the MOT17 train sequences outside the eval,
+  disjoint from the eval subset and the INT8 calibration set. One fixed configuration for both
+  runs (10 epochs, batch 16, imgsz 640, Ultralytics' automatic optimizer, no mosaic, last epoch
+  kept). Runs differ in one variable: blur-mix blurs a seeded half of the images (sigma drawn
+  per image from 1 to 8 px at 1280 width, vms.drift.transforms), control blurs none, so the
+  blur gain is told apart from the gain of training on camera scenes and MOT's box
+  convention. Eval: detection subset v1, PyTorch (same mAP as ONNX Runtime FP32, E-046),
+  clean, blur 3 and 6 (the target), and noise 25 (an untargeted drift); paired bootstrap.
+kind: finetune
+seed: 20261019
+data_spec: configs/finetune.v1.yaml
+data_lock: configs/finetune.v1.lock.jsonl
+images_dir: data/finetune/images/v1
+dataset_dir: data/finetune/runs
+artifacts_dir: models/finetune
+base_weights: yolo11n
+train:
+  epochs: 10
+  imgsz: 640
+  batch: 16
+  workers: 0                   # Ultralytics uses none on CPU anyway
+  close_mosaic: 10             # = epochs: no mosaic, train on whole frames as the eval scores
+  val_images: 64
+runs:
+  - name: blur-mix
+    blur: {fraction: 0.5, sigma_min: 1.0, sigma_max: 8.0}
+  - name: control
+    role: control
+    blur: {fraction: 0.0}
+eval:
+  detector:
+    backend: ultralytics
+conditions:
+  - name: blur-3
+    drift: {kind: blur, strength: 3.0}
+  - name: blur-6
+    drift: {kind: blur, strength: 6.0}
+  - name: noise-25
+    drift: {kind: noise, strength: 25.0}
