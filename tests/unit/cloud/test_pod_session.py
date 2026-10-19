@@ -167,7 +167,7 @@ def make(settings: PodSettings, repo: Path, tmp_path: Path):  # type: ignore[no-
 
 def test_committed_config_prices_the_l4_from_the_catalog(settings: PodSettings) -> None:
     assert (settings.gpu_type, settings.cloud, settings.min_cuda_version) == (
-        "NVIDIA L4",
+        "NVIDIA A40",
         "SECURE",
         "12.8",
     )

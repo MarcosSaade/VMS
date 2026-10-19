@@ -392,9 +392,9 @@ AWS denied the GPU quota (EC2 and SageMaker, D35), so **GPU sessions run on Runp
 
 ### Runpod GPU sessions (D37)
 
-Settings: `configs/runpod.yaml` (GPU type, cloud tier, CUDA floor, image digest, disk, time limit). Override per run with `VMS_GPU_TYPE="NVIDIA GeForce RTX 4090"`, `VMS_CLOUD=COMMUNITY` or `VMS_MAX_SESSION_MINUTES=90`; a different GPU is a new baseline, never mixed with L4 numbers.
+Settings: `configs/runpod.yaml` (GPU type, cloud tier, CUDA floor, image digest, disk, time limit). Override per run with `VMS_GPU_TYPE="NVIDIA GeForce RTX 4090"`, `VMS_CLOUD=COMMUNITY` or `VMS_MAX_SESSION_MINUTES=90`; a different GPU is a new baseline, never mixed with A40 numbers.
 
-**Cost.** 1x L4 on the secure cloud: $0.59 per hour from the catalog on 2026-10-19, plus 40 GB of container disk (about $0.005/h), billed per second while the pod exists. Preflight prints the live price. Setup (uv, the environment, the ~3 GB of CUDA wheels, weights) takes roughly 10 minutes before the first scenario. The pod deletes itself after 150 minutes whatever happens, so one session costs at most about $1.50. Each results file records its cost; the session's own file (`bench/results/<date>-gpu-session-<id>.json`, kind `cloud.pod_session`) has the total.
+**Cost.** 1x A40 (48 GB) on the secure cloud: $0.59 per hour from the catalog on 2026-10-19, plus 40 GB of container disk (about $0.005/h), billed per second while the pod exists. Preflight prints the live price. Setup (uv, the environment, the ~3 GB of CUDA wheels, weights) takes roughly 10 minutes before the first scenario. The pod deletes itself after 150 minutes whatever happens, so one session costs at most about $1.50. Each results file records its cost; the session's own file (`bench/results/<date>-gpu-session-<id>.json`, kind `cloud.pod_session`) has the total.
 
 Prerequisites, once:
 1. Prepaid credit with **auto-pay off**, and a low-balance email alert (Runpod console > Billing). The balance is the hard spend cap: at $0 every pod stops. Credits are not refundable, so top up small amounts ($20 on 2026-10-19).

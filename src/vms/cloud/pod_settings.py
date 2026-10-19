@@ -51,7 +51,7 @@ class PodTimeouts(_Section):
 
 
 class PodSettings(ServiceSettings):
-    gpu_type: str = "NVIDIA L4"  # a catalog id (GET /v2/catalog/gpus), VMS_GPU_TYPE
+    gpu_type: str = "NVIDIA A40"  # a catalog id (GET /v2/catalog/gpus), VMS_GPU_TYPE
     gpu_count: int = Field(default=1, ge=1)
     cloud: Literal["SECURE", "COMMUNITY"] = "SECURE"
     min_cuda_version: str = "12.8"  # the host driver's CUDA floor
