@@ -63,7 +63,10 @@ print('onnxruntime', o.__version__, o.get_available_providers())"
   step "weights, ONNX export, TensorRT engines"
   uv run python -m vms.worker weights
   make onnx
-  make trt-prepare WEIGHTS=yolo11n
+  # One engine at a time: a precision that fails to build is logged and its ladder step fails
+  # on its own, so the other steps still run (D38).
+  make trt-prepare WEIGHTS=yolo11n TRT_PRECISION=fp16 || echo "!! TensorRT FP16 engine failed" >&2
+  make trt-prepare WEIGHTS=yolo11n TRT_PRECISION=int8 || echo "!! TensorRT INT8 engine failed" >&2
 }
 
 run() {

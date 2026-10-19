@@ -39,7 +39,8 @@ class PodPrices(_Section):
 class PodTimeouts(_Section):
     api_s: float = Field(default=30.0, gt=0)
     api_max_attempts: int = Field(default=5, ge=1)
-    running_s: float = Field(default=900.0, gt=0)  # placement, image pull, sshd up
+    running_s: float = Field(default=900.0, gt=0)  # placement, image pull, container up
+    ssh_direct_s: float = Field(default=180.0, gt=0)  # RUNNING -> a public port for 22/tcp
     ssh_ready_s: float = Field(default=300.0, gt=0)
     ssh_connect_s: int = Field(default=10, gt=0)
     sync_s: float = Field(default=1200.0, gt=0)

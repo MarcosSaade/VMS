@@ -218,3 +218,35 @@ def test_gpu_scenarios_are_valid() -> None:
     q = LadderScenario.model_validate(ladder_raw).quality
     assert q is not None
     assert ("trt-fp16", "trt-int8") in q.compare  # D32: INT8 against TensorRT FP16
+
+
+def test_a_failing_step_is_recorded_and_the_others_still_run() -> None:
+    import subprocess
+
+    from vms.worker.ladder import run_quality
+
+    calls: list[str] = []
+
+    def runner(path: Path, name: str) -> dict[str, Any]:
+        calls.append(name)
+        if name == "b":
+            raise subprocess.CalledProcessError(1, ["ladder-step", name])
+        return fake_run(10, 100)
+
+    steps, orders = ladder(scenario(), Path("s.yaml"), runner=runner, sleep=lambda _s: None)
+    assert calls.count("b") == 1  # not retried in later repetitions
+    assert calls.count("a") == 3
+    assert "error" in steps["b"]
+    assert steps["a"]["repetitions"] == 3
+    assert "b" not in orders[1]
+
+    s = scenario(quality={"compare": [["a", "b"], ["a", "c"]]})
+    for name in ("a", "c"):
+        steps[name]["detector"] = {"backend": "onnxruntime"}
+
+    def eval_runner(argv: list[str], env: dict[str, str]) -> str:
+        return f"results: {argv[-1]}.json\n"
+
+    q = run_quality(s, steps, eval_runner)
+    assert set(q["eval"]) == {"a", "c"}  # the failed step is not scored
+    assert [(c["base"], c["other"]) for c in q["compare"]] == [("a", "c")]

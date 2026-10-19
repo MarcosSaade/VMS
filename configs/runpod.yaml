@@ -36,7 +36,8 @@ remote:
 timeouts:
   api_s: 30
   api_max_attempts: 5           # reads and deletes: backoff with full jitter; creates never retried
-  running_s: 900                # placement, image pull, sshd up
+  running_s: 900                # placement, image pull, container up
+  ssh_direct_s: 180             # RUNNING -> public port for 22/tcp (a host without one: E-063)
   ssh_ready_s: 300
   ssh_connect_s: 10
   sync_s: 1200

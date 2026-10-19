@@ -133,6 +133,10 @@ def scenario_kind(path: Path) -> str:
     return str((yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("kind", ""))
 
 
+class NoDirectSshError(RuntimeError):
+    """The pod runs but never got a public port for SSH."""
+
+
 class PodSession:
     def __init__(
         self,
@@ -309,9 +313,22 @@ class PodSession:
         self.state.launched_at = pod.created_at or launched
         self._save()
         log.info("pod created", extra={"pod_id": pod.id})
-        ready = self._wait_pod(
-            lambda p: p is not None and p.status == "RUNNING" and p.ssh is not None, t.running_s
-        )
+        running = self._wait_pod(lambda p: p is not None and p.status == "RUNNING", t.running_s)
+        assert running is not None
+        self.state.data_center, self.state.cuda_version = running.data_center, running.cuda_version
+        self._save()
+        # Direct SSH needs a public port for 22/tcp. A host without one never gets it (E-063), so
+        # give up early instead of paying for the whole running_s.
+        try:
+            ready = self._wait_pod(lambda p: p is not None and p.ssh is not None, t.ssh_direct_s)
+        except TimeoutError as exc:
+            last = self.pods.get_pod(running.id)
+            ports = last.ports if last else ()
+            raise NoDirectSshError(
+                f"pod {running.id} in {running.data_center} is RUNNING but has no direct SSH "
+                f"after {t.ssh_direct_s:.0f} s (ports {list(ports)}): the host likely has no "
+                "public IP; try again (another host) or set data_center_ids"
+            ) from exc
         assert ready is not None
         assert ready.ssh is not None
         self.state.ssh_host, self.state.ssh_port = ready.ssh.host, ready.ssh.port

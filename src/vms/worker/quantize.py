@@ -49,6 +49,11 @@ class Int8Settings(_Section):
     # Zero points of 0 for activations and weights: TensorRT reads Q/DQ pairs only when they
     # are symmetric and signed (D38).
     symmetric: bool = False
+    # Op types to quantize; empty: every type ONNX Runtime can quantize. TensorRT takes Conv only
+    # (D38): ORT also wraps scalar constants (attention scale) whose Q/DQ TensorRT rejects.
+    op_types: list[str] = Field(default_factory=list)
+    # Biases as int32 Q/DQ (ORT's default); TensorRT fuses FP32 biases itself.
+    quantize_bias: bool = True
     exclude_nodes: list[str] = Field(default_factory=list)  # regexes on ONNX node names
 
 
@@ -186,6 +191,7 @@ def quantize_int8(
             weight_type=types[settings.weight_type],
             calibrate_method=methods[settings.method],
             nodes_to_exclude=skip,
+            op_types_to_quantize=settings.op_types or None,
             extra_options=quantizer_options(settings),
         )
     if reader.count == 0:
@@ -211,9 +217,12 @@ def quantize_int8(
 
 def quantizer_options(settings: Int8Settings) -> dict[str, Any]:
     """`extra_options` of ONNX Runtime's `quantize_static` for these settings."""
-    if not settings.symmetric:
-        return {}
-    return {"ActivationSymmetric": True, "WeightSymmetric": True}
+    options: dict[str, Any] = {}
+    if settings.symmetric:
+        options |= {"ActivationSymmetric": True, "WeightSymmetric": True}
+    if not settings.quantize_bias:
+        options["QuantizeBias"] = False
+    return options
 
 
 def verified_int8(
