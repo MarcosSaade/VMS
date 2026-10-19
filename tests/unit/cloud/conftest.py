@@ -178,6 +178,9 @@ class FakeRemote:
         if remote_dir.endswith("models/finetune"):
             (local_dir / "ft.pt").write_bytes(b"\x80weights")
             return
+        if remote_dir.endswith("detection/predictions"):
+            (local_dir / "run.jsonl.gz").write_bytes(b"\x1f\x8bpredictions")
+            return
         if remote_dir.endswith("eval/results"):
             new = results_file("eval-run", sha=None)
             (local_dir / "2026-10-13-eval-run.json").write_text(new.model_dump_json())

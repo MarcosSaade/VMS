@@ -115,6 +115,11 @@ def plot_sweep(series: list[tuple[str, list[SweepPoint]]], slo_s: float, path: P
             linewidths=1.5,
         )
     ax.set_xscale("log")
+    from matplotlib.ticker import NullFormatter, ScalarFormatter
+
+    ax.set_xticks([20, 50, 100, 200, 500, 1000])
+    ax.xaxis.set_major_formatter(ScalarFormatter())
+    ax.xaxis.set_minor_formatter(NullFormatter())
     ax.set_xlabel("Batch latency p50 (ms, log; bars to p95)")
     ax.set_ylabel("Throughput (images/s)")
     ax.set_title(

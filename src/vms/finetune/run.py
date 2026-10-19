@@ -295,7 +295,24 @@ def evaluate_models(
     return {"base": base_scores, "runs": table, "eval_files": files}
 
 
-def run_finetune(scenario_path: Path, root: Path = Path()) -> Path:
+def latest_train_result(scenario: FinetuneScenario, run: FinetuneRun, root: Path) -> Path:
+    """The newest `train.detector` results file of a run (for `evaluate` without training)."""
+    pattern = f"*-{scenario.name}-{run.name}-*.json"
+    found = sorted(
+        (p for p in (root / scenario.results_dir).glob(pattern)),
+        key=lambda p: load_run(p).started_at,
+    )
+    found = [p for p in found if load_run(p).kind == "train.detector"]
+    if not found:
+        raise FileNotFoundError(
+            f"no train.detector results for {run.name} in {scenario.results_dir}"
+        )
+    return found[-1]
+
+
+def run_finetune(scenario_path: Path, root: Path = Path(), *, train: bool = True) -> Path:
+    """Train every run (unless `train` is False: reuse the weights in `artifacts_dir`, checked
+    against their newest training record), then score and write the summary."""
     from vms.worker.weights import ensure_weights, load_models_config
 
     scenario, raw = load_scenario(scenario_path)
@@ -306,16 +323,23 @@ def run_finetune(scenario_path: Path, root: Path = Path()) -> Path:
     models: dict[str, tuple[Path, str]] = {"base": (base_path, base_sha)}
     trained: dict[str, Any] = {}
     for run in scenario.runs:
-        path, sha, results = train_run(scenario, run, base_path, root)
+        if train:
+            path, sha, results = train_run(scenario, run, base_path, root)
+        else:
+            results = latest_train_result(scenario, run, root)
+            path = root / load_run(results).metrics["weights"]
+            sha = sha256_file(path)
+            if sha != load_run(results).metrics["weights_sha256"]:
+                raise ValueError(f"{path} does not match its training record {results}")
         models[run.name] = (path, sha)
-        train = load_run(results)
+        record = load_run(results)
         trained[run.name] = {
             "weights": _rel(path, root),
             "sha256": sha,
             "results_file": _rel(results, root),
-            "train_s": train.metrics["train_s"],
-            "images_per_s": train.metrics["images_per_s"],
-            "blurred": train.metrics["dataset"]["blurred"],
+            "train_s": record.metrics["train_s"],
+            "images_per_s": record.metrics["images_per_s"],
+            "blurred": record.metrics["dataset"]["blurred"],
         }
     scores = evaluate_models(scenario, models, root)
     result = RunResult(

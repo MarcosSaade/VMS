@@ -205,3 +205,61 @@ def test_evaluate_pairs_each_run_with_the_base_and_the_treatment_with_the_contro
     assert mix["vs_control"]["blur-6"]["mot17"]["delta_map50_95"]["value"] == pytest.approx(0.03)
     assert ("control|blur-6", "blur-mix|blur-6") in pairs
     assert out["base"]["clean"]["mot17"] == {"value": 0.30}
+
+
+def test_evaluate_only_reuses_weights_checked_against_their_newest_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = ft.FinetuneScenario.model_validate(base_raw())
+    results = tmp_path / scenario.results_dir
+    results.mkdir(parents=True)
+    weights = {}
+    for k, run in enumerate(scenario.runs):
+        w = tmp_path / scenario.artifacts_dir / f"{scenario.name}-{run.name}.pt"
+        w.parent.mkdir(parents=True, exist_ok=True)
+        w.write_bytes(run.name.encode())
+        weights[run.name] = w
+        for age, sha in ((0, "stale"), (1, ft.sha256_file(w))):
+            record = result(f"{scenario.name}-{run.name}", {}).model_copy(
+                update={
+                    "kind": "train.detector",
+                    "started_at": datetime(2026, 10, 19, 10 + age, k, tzinfo=UTC),
+                    "metrics": {
+                        "weights": str(w.relative_to(tmp_path)),
+                        "weights_sha256": sha,
+                        "train_s": 10.0,
+                        "images_per_s": 1.0,
+                        "dataset": {"blurred": 0},
+                    },
+                }
+            )
+            (results / f"2026-10-19-{scenario.name}-{run.name}-{age}.json").write_text(
+                record.model_dump_json()
+            )
+    base = tmp_path / "base.pt"
+    base.write_bytes(b"base")
+    seen: dict[str, Any] = {}
+    (tmp_path / "configs").mkdir()
+    (tmp_path / "configs/models.yaml").write_text((REPO_ROOT / "configs/models.yaml").read_text())
+
+    def evaluate(scen, models, root):  # type: ignore[no-untyped-def]
+        seen.update(models)
+        return {"base": {}, "runs": {}, "eval_files": {}}
+
+    import vms.worker.weights as weights_module
+
+    monkeypatch.setattr(weights_module, "ensure_weights", lambda *_a, **_k: base)
+    monkeypatch.setattr(ft, "evaluate_models", evaluate)
+    settings = ft.eval_settings(scenario, REPO_ROOT)
+    monkeypatch.setattr(ft, "eval_settings", lambda _s, _r: settings)
+    monkeypatch.setattr(ft, "train_run", lambda *_a: pytest.fail("evaluate must not train"))
+    scenario_file = tmp_path / "scenario.yaml"
+    scenario_file.write_text(SCENARIO.read_text())
+    out = ft.run_finetune(scenario_file, tmp_path, train=False)
+    summary = RunResult.model_validate_json(out.read_text())
+    assert seen["blur-mix"] == (weights["blur-mix"], ft.sha256_file(weights["blur-mix"]))
+    assert summary.metrics["trained"]["control"]["results_file"].endswith("-control-1.json")
+
+    weights["control"].write_bytes(b"retrained elsewhere")
+    with pytest.raises(ValueError, match="does not match"):
+        ft.run_finetune(scenario_file, tmp_path, train=False)

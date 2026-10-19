@@ -106,6 +106,7 @@ def test_a_session_runs_scenarios_tears_down_and_records_its_cost(make_harness) 
     assert m["results_files"] == [
         "2026-10-13-gpu-smoke-run.json",
         "2026-10-13-eval-run.json",
+        "run.jsonl.gz",
         "ft.pt",
     ]
     billed = m["billed_s"]
@@ -124,8 +125,17 @@ def test_collected_results_get_their_cost_and_the_session_git_sha(make_harness) 
     assert smoke.cost_usd == pytest.approx(h.session.settings.hourly_usd() * 360 / 3600, abs=1e-4)
     assert "GPU session 01SESSION (g6.xlarge)" in smoke.notes
     # Eval results and weights land at their own repo paths; only JSON results are annotated.
-    assert h.remote.pulled == ["vms/bench/results", "vms/eval/results", "vms/models/finetune"]
-    assert any("mkdir -p eval/results models/finetune" in c for c in h.remote.commands)
+    assert h.remote.pulled == [
+        "vms/bench/results",
+        "vms/eval/results",
+        "vms/data/eval/detection/predictions",
+        "vms/models/finetune",
+    ]
+    assert any(
+        "mkdir -p eval/results data/eval/detection/predictions models/finetune" in c
+        for c in h.remote.commands
+    )
+    assert (h.repo / "data/eval/detection/predictions/run.jsonl.gz").exists()
     ev = RunResult.model_validate_json(
         (h.repo / "eval/results/2026-10-13-eval-run.json").read_text()
     )
@@ -154,6 +164,7 @@ def test_a_failed_scenario_is_recorded_and_the_session_continues(make_harness) -
     assert m["results_files"] == [
         "2026-10-13-gpu-smoke-run.json",
         "2026-10-13-eval-run.json",
+        "run.jsonl.gz",
         "ft.pt",
     ]  # still collected
     assert m["teardown_verified"] is True

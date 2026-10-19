@@ -58,9 +58,10 @@ remote:
   dir: vms                     # under the SSH user's home
   # Clips copied from data/clips instead of downloaded on the instance (the mini subset).
   clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
-  # Copied back besides bench/results: eval results (9.5's before/after runs) and the
-  # fine-tuned weights (DVC-tracked locally after the session).
-  collect: [eval/results, models/finetune]
+  # Copied back besides bench/results: eval results (9.5's before/after runs), their raw
+  # detections (paired comparisons are recomputed from them) and the fine-tuned weights
+  # (DVC-tracked locally after the session).
+  collect: [eval/results, data/eval/detection/predictions, models/finetune]
 
 timeouts:
   aws_connect_s: 10

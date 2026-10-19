@@ -5,6 +5,8 @@ build                    resolve configs/finetune.v1.yaml once into the frozen l
 fetch                    (make finetune-data) download and verify the listed images
 run --scenario FILE      (make finetune) a `kind: finetune` scenario: train each run,
                          score base and fine-tuned models clean and drifted, summary JSON
+evaluate --scenario FILE the scoring and summary only, on weights already trained (e.g.
+                         copied back from a cloud session), checked against their records
 """
 
 from __future__ import annotations
@@ -35,16 +37,19 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("fetch", help="download and verify the listed images")
     run = commands.add_parser("run", help="run a fine-tune scenario")
     run.add_argument("--scenario", type=Path, required=True)
+    ev = commands.add_parser("evaluate", help="score already trained weights")
+    ev.add_argument("--scenario", type=Path, required=True)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     configure_logging("finetune", "INFO")
-    if args.command == "run":
+    if args.command in ("run", "evaluate"):
         from vms.finetune.run import run_finetune
 
-        sys.stdout.write(f"{run_finetune(args.scenario)}\n")
+        path = run_finetune(args.scenario, train=args.command == "run")
+        sys.stdout.write(f"{path}\n")
         return 0
 
     from vms.datasets.http import RetryPolicy, UrllibTransport
