@@ -412,21 +412,21 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 ### 8.1 vLLM serving
 
-**Status:** planned after C1 (2026-10-16). Changed: Helm dropped (6.4 is deferred).
+**Status:** planned after C1 (2026-10-16); moved before publishing (2026-10-19). Changed: Helm dropped (6.4 is deferred). Runs on a Runpod A40 session (D37); the 3.5 local-LLM dev comparison runs on the same served model. Needs the pod driver to allow an LLM-serving scenario kind (it runs `model` and `ladder` only today).
 
 **Prompt:** Serve candidate small open models with vLLM behind the OpenAI-compatible interface; check which current small models are strongest at structured JSON output and SQL before choosing candidates. Enable prefix caching (the schema prompt is long and shared) and measure its effect. Measure constrained-decoding overhead: structured outputs on vs off for `QueryPlan` generation (tokens/s, time to first token, p95, and plan validity rate). Load test concurrent requests for tokens/s, time to first token and p95, and compare with llama.cpp or Ollama on the same GPU. Add the llm-service to compose (GPU profile).
 **Done when:** serving comparison in `BENCHMARKS.md`; query service runs against vLLM.
 
 ### 8.2 Training data
 
-**Status:** planned after C1 (2026-10-16).
+**Status:** planned after C1 (2026-10-16); moved before publishing (2026-10-19). CPU only (a hosted LLM drafts pairs), no GPU session needed.
 
 **Prompt:** Generate training (question, `QueryPlan`) pairs with a strong model over the schema and varied synthetic DB states. Filter: the plan is schema-valid, compiles successfully, executes, and the result sets of two independent generations agree. Deduplicate and run leakage checks against the test set: exact match, near-duplicate by embedding similarity and template overlap. Target 2k to 10k pairs; record generation cost and filter pass rates. If a SQL adapter is planned for D11 (8.3), keep the compiled or independently generated SQL for each pair as well.
 **Done when:** dataset tracked with DVC (generation script, seed and filter config in git); leakage report shows no overlap.
 
 ### 8.3 LoRA fine-tune
 
-**Status:** planned after C1 (2026-10-16). Changed: W&B and the MLflow registry are gone (D16); runs write results JSON, adapters go to DVC.
+**Status:** planned after C1 (2026-10-16); moved before publishing (2026-10-19), on a Runpod A40 (48 GB fits a 7B model in 16-bit plus LoRA). Changed: W&B and the MLflow registry are gone (D16); runs write results JSON, adapters go to DVC.
 
 **Prompt:** Fine-tune the chosen base with LoRA (PEFT or Unsloth) on a rented GPU via the session script, with plan JSON as the target. Each training run and eval writes a results JSON (D16). Ablate data size (e.g., 500, 2k, all) and rank on the dev split; evaluate the best once on test. Optionally train a second adapter with SQL targets on the same questions for the D11 comparison.
 **Done when:** ablation table and final test numbers recorded; adapter weights tracked with DVC; the chosen adapter pinned by hash in config.
@@ -479,6 +479,12 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Done when:** before/after table in `BENCHMARKS.md`; weights tracked with DVC; limitation stated that augmentation-based drift is not real domain shift.
 **Considerations:** no sweep and no experiment tracker in this plan. Geometric drifts (camera shift) need box adjustment, so skip them.
 **As built (2026-10-19, D36, E-060, E-061):** `vms.finetune` with a frozen training list v1 (800 COCO train2017 + 767 MOT17 frames, disjoint from the eval and calibration sets), blur as the target (worst for the camera scenes, E-051), a blur-mix run and a no-blur control with one fixed configuration, trained on an AWS c7i.4xlarge (D35, $0.80) and scored on detection subset v1 clean, blur 3/6 and noise 25. Negative: the augmentation is worth +4.4 MOT17 mAP@50-95 at blur 6 over the control, but the recipe loses 2 to 7 points elsewhere; not deployed. Weights DVC-tracked; limitation (synthetic blur) stated with every number.
+
+### 9.6 Fine-tune follow-up (added 2026-10-19)
+
+**Prompt:** 9.5's no-blur control lost 2 to 7 points against the base model on every condition (E-061), so the training recipe hurts by itself. Change exactly one thing in the D36 configuration, either freezing the backbone (`freeze` the first layers, so only the neck and head adapt) or turning off Ultralytics' warmup, and re-run both the blur-mix run and the control on the same frozen training list v1, seed and eval (clean, blur 3 and 6, noise 25; COCO and MOT17). Pick the change before running and say why in the decision record; do not try both and report the better one.
+**Done when:** a before/after table next to 9.5's in `BENCHMARKS.md` (base, 9.5 runs, 9.6 runs); D36 updated or a new decision says whether a fine-tuned model is deployed; weights tracked with DVC; cost logged.
+**Considerations:** the same AWS CPU path as 9.5 (`make cpu-session INSTANCE=c7i.4xlarge`, `VMS_MAX_SESSION_MINUTES=240`); 9.5's session hit the 1 h scenario timeout, so raise `timeouts.scenario_s` for this one. If neither run beats the base on clean data, the result stays negative and that is reported as such.
 
 ---
 

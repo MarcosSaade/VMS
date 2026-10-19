@@ -8,14 +8,13 @@
 
 **Estimate.** 29 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). GPU access is settled: AWS denied the GPU quota for EC2 and SageMaker (D35), so GPU sessions run on Runpod pods (D37, 2026-10-19), model-level work only; the GPU end-to-end parts of 2.5, 2.6 and 5.5 are deferred (no Docker inside a pod).
 
-**Order of work.** Phase 1, then 2.1 to 2.3, then Phase 3, then 2.4 to 2.6 (first GPU session), then Phase 5, then Phase 9, then Phase 11 (publish at C1), then Phase 8 (after C1, added 2026-10-16; 8.1 may run early on the first GPU session, alongside the 3.5 local LLM run). Phase numbers are kept for stable IDs, so this order differs from the numbering.
+**Order of work.** Phase 1, then 2.1 to 2.3, then Phase 3, then 2.4 to 2.6 (first GPU session), then Phase 5, then Phase 9, then (2026-10-19 revision) 9.6 and 8.1 to 8.3, then Phase 11 (publish), then 8.4 and 8.5. Phase numbers are kept for stable IDs, so this order differs from the numbering.
 
-**Publish point and job-search order (2026-10-16).** The GPU quota must not block publishing, so the project goes public when Phase 9 and Phase 11 are done, with the GPU-only results (the TensorRT rungs of 5.2, the 5.3 GPU sweep, and the deferred GPU end-to-end parts of 2.5, 2.6 and 5.5) marked "pending" in the README; C1 itself still needs every task ticked. From there:
-1. Phase 9, then Phase 11 (polished: README, screenshots, 2-minute video), then publish and apply to MLE roles.
-2. 8.1 vLLM serving, on the first GPU session together with the GPU-blocked tasks above; then apply to AI-serving roles (8.1 plus the quantization numbers of 8.4 cover serving interviews).
-3. Deferred 10.1 and 10.3 (Terraform, full-scale cloud benchmark, cost per camera-hour, which absorbs the cloud-CPU run), back through the scope-lock rule.
-4. 8.2 to 8.5 (training data, LoRA, quantization, D7).
-5. Deferred 6.4 and 6.5 (Helm, KEDA autoscaling), back through the scope-lock rule.
+**Publish point and job-search order (2026-10-16; revised 2026-10-19).** The project goes public when Phase 9 (with 9.6), 8.1 to 8.3 and Phase 11 are done, with the deferred GPU end-to-end parts of 2.5, 2.6 and 5.5 marked "not measured" in the README; C1 itself still needs every task ticked. From there:
+1. 9.6 (fine-tune follow-up), then 8.1 (vLLM serving, with the 3.5 local-LLM run on the same GPU session), 8.2 (training data), 8.3 (LoRA), then Phase 11 (README, write-up, 2-minute video, fresh clone), then publish and apply to MLE and AI-serving roles.
+2. 8.4 and 8.5 (quantization and multi-LoRA, D7).
+3. Deferred 10.1 and 10.3 (Terraform, full-scale cloud benchmark, cost per camera-hour), back through the scope-lock rule.
+4. Deferred 6.4 and 6.5 (Helm, KEDA autoscaling), back through the scope-lock rule.
 After each step the README headline numbers and the write-up are updated.
 
 **Understand it.** Each task carries one question the user must be able to answer with specifics before the task is ticked. This is how the user verifies they understand what the agent built.
@@ -101,6 +100,8 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: an alert fires on one camera at 3 a.m.; what do you check, in order?
 - [x] 9.5 Detector fine-tune on drifted data: before/after mAP on drifted and clean sets (SHRINK: no sweep, no W&B). Done 2026-10-19 on AWS CPU (E-060, E-061, D36): negative, blur augmentation +4.4 MOT17 mAP at blur 6 over a no-blur control but the recipe loses 2 to 7 points elsewhere; not deployed
   - Understand it: did fine-tuning help the drifted set without hurting the clean set, and why is augmentation not real domain shift?
+- [ ] 9.6 Fine-tune follow-up (added 2026-10-19): one recipe change (freeze the backbone, or no warmup) against the same control and the same eval, to test whether 9.5's loss comes from the recipe; AWS CPU, ~$0.80
+  - Understand it: what did the one change do to the control's loss on clean video, and does blur training now help without hurting clean?
 
 ## Phase 11: Packaging
 - [ ] 11.1 README with headline numbers, UI and dashboard screenshots, diagram
@@ -112,8 +113,8 @@ After each step the README headline numbers and the write-up are updated.
 - [ ] 11.4 Fresh-clone reproduction test
   - Understand it: which steps needed fixing on a clean machine, and is anything still manual?
 
-## Phase 8: LLM serving and LoRA (after C1)
-Added 2026-10-16 by the user's decision, as work after checkpoint C1: C1's scope is unchanged, and the README and write-up are updated as each task lands. 8.1 to 8.4 need a GPU session.
+## Phase 8: LLM serving and LoRA
+Added 2026-10-16 by the user's decision, as work after checkpoint C1; 8.1 to 8.3 moved before publishing on 2026-10-19 (Plan revisions). 8.1 to 8.4 need a GPU session (Runpod, D37).
 - [ ] 8.1 vLLM serving with prefix caching and structured outputs (overhead measured); load test vs llama.cpp/Ollama
   - Understand it: what did prefix caching save on the long schema prompt, and what does constrained decoding cost in tokens/s and plan validity?
 - [ ] 8.2 Synthetic (question, QueryPlan) training data with filtering and leakage checks (DVC)
@@ -148,6 +149,7 @@ The finished project should let the user answer each of these with specifics fro
 - **2026-10-14:** By the user's decision, the second LLM in 3.5 is not run now through another hosted API; it runs locally on the first GPU session (2.4/2.5) instead, with the same harness and dev split. 3.5 closes without it, with DeepSeek as the provisional planner (D7 stays "default, not compared" until then). No work is added or removed, only moved.
 - **2026-10-16:** By the user's decision, Phase 8 (LLM serving and LoRA, 5 tasks) comes back as work after C1 rather than as a swap: the user publishes at C1, starts applying, and keeps going, updating the README and write-up per phase. C1's scope and the scope lock for it are unchanged. 8.3 drops W&B and the MLflow registry (removed by D16; results JSON and DVC instead), and 8.1 drops Helm (6.4 stays deferred). 8.1 may run on the first GPU session next to the 3.5 local LLM run, since both need the same served model.
 - **2026-10-19 (GPU provider):** AWS denied the GPU quota for EC2 and SageMaker; Lambda Cloud declined the card (no payments from Mexico), and DigitalOcean wanted a ~$250 prepayment. By the user's decision, GPU sessions run on Runpod pods (D37), which run containers without Docker, so GPU work is model-level only: the 5.2 TensorRT rungs, the 5.3 GPU sweep, the 3.5 local-LLM run, and 8.1 to 8.4. The GPU end-to-end parts of 2.5 (GPU ramp), 2.6 (GPU profile) and 5.5 (GPU ramp) move to the Deferred list; those tasks tick on their CPU parts, and the README marks GPU end-to-end numbers as not measured. 2.4 is rebuilt for Runpod. No other task is added or removed.
+- **2026-10-19 (before publishing):** By the user's decision, three items move before Phase 11 and publishing: a new 9.6 (one follow-up fine-tune with a single recipe change against 9.5's control, ~$0.80 on AWS CPU), 8.1 (vLLM serving; the 3.5 local-LLM comparison runs on the same Runpod session) and 8.2 to 8.3 (synthetic plan data and the LoRA fine-tune). 8.4 and 8.5 stay after publishing. This adds about 1 task's worth of work (9.6) beyond the plan, recorded here as an exception the user chose over the scope lock; nothing is removed. Expected GPU cost for 8.1 to 8.3 on the A40: about $3 to $6 (Runpod top-up may be needed).
 - **2026-10-16 (publish point):** Publishing no longer waits for C1: the project goes public after Phase 9 and Phase 11, with GPU-only results marked pending, and the work after it follows the job-search order under "Order of work". No task is added or removed; deferred tasks named in that order still come back only through the scope-lock rule.
 
 ## Deferred (not planned)
