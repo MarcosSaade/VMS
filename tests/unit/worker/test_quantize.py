@@ -234,7 +234,7 @@ def test_tensorrt_int8_model_has_only_zero_points_of_zero(
     assert zps
     assert all(z.dtype == np.int8 for z in zps)
     assert all(not z.any() for z in zps)
-    # What TensorRT rejects (E-059): Q/DQ on scalars, and int32 bias Q/DQ.
+    # What TensorRT rejects (E-062): Q/DQ on scalars, and int32 bias Q/DQ.
     for n in m.graph.node:
         if n.op_type == "DequantizeLinear" and n.input[0] in inits:
             x = inits[n.input[0]]
