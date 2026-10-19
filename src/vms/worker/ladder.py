@@ -14,13 +14,18 @@ backend and is left out (it is in the worker's own stage metrics). Per batch siz
 `warmup_batches` batches are run and discarded (ONNX Runtime allocates per input shape). The
 last partial batch is dropped so every timed batch has the same size.
 
-Quality is not measured here: every step is also scored with `make eval SUITE=detection` and
-compared with a paired bootstrap (`python -m vms.eval.detection compare`).
+Quality: with a `quality:` section, after the speed runs each step is scored on the detection
+eval subset (`python -m vms.eval.detection run`, its own process, the step's backend, precision
+and device) and the listed pairs are compared with the paired bootstrap and the D32 verdict
+(`python -m vms.eval.detection compare`); the result files are listed in the ladder's metrics.
+On a GPU session this keeps speed and mAP from the same engines (D38). Without it, score each
+step with `make eval SUITE=detection` as on the CPU ladder.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import resource
 import statistics
 import subprocess
@@ -42,7 +47,17 @@ from vms.worker.detector import Detection
 
 log = get_logger(__name__)
 
-PACKAGES = ("numpy", "torch", "torchvision", "ultralytics", "onnx", "onnxruntime", "opencv-python")
+PACKAGES = (
+    "numpy",
+    "torch",
+    "torchvision",
+    "ultralytics",
+    "onnx",
+    "onnxruntime",
+    "onnxruntime-gpu",
+    "tensorrt-cu13",
+    "opencv-python",
+)
 STEP_TIMEOUT_S = 3600.0
 
 
@@ -73,6 +88,16 @@ class LadderStep(_Model):
     detector: dict[str, Any] = Field(default_factory=dict)  # overrides of the detector section
 
 
+# Detector fields that pick the model and how it runs; the eval keeps its own thresholds
+# (conf, iou, max_det from configs/eval-detection.yaml).
+QUALITY_FIELDS = ("weights", "backend", "precision", "device", "imgsz")
+
+
+class LadderQuality(_Model):
+    # (base, other) step pairs for the paired comparison; D32 reads "other" against "base".
+    compare: list[tuple[str, str]] = Field(default_factory=list)
+
+
 class LadderScenario(_Model):
     name: str
     description: str = ""
@@ -81,12 +106,17 @@ class LadderScenario(_Model):
     bench: LadderBench
     config: dict[str, Any] = Field(default_factory=dict)  # overrides of configs/worker.yaml
     steps: list[LadderStep] = Field(min_length=1)
+    quality: LadderQuality | None = None
 
     @model_validator(mode="after")
     def _unique(self) -> LadderScenario:
         names = [s.name for s in self.steps]
         if len(set(names)) != len(names):
             raise ValueError("step names must be unique")
+        for pair in self.quality.compare if self.quality else []:
+            unknown = [n for n in pair if n not in names]
+            if unknown:
+                raise ValueError(f"quality.compare names unknown steps: {unknown}")
         return self
 
     def step(self, name: str) -> LadderStep:
@@ -290,6 +320,56 @@ def ladder(
     return {n: aggregate(runs[n]) for n in names}, orders
 
 
+# (argv, extra environment) -> stdout; raises on a non-zero exit.
+CommandRunner = Callable[[list[str], dict[str, str]], str]
+
+
+def subprocess_command(argv: list[str], env: dict[str, str]) -> str:
+    done = subprocess.run(
+        argv,
+        env={**os.environ, **env},
+        check=True,
+        timeout=STEP_TIMEOUT_S,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    return done.stdout
+
+
+def _results_path(stdout: str) -> str:
+    for line in reversed(stdout.splitlines()):
+        if line.startswith("results: "):
+            return line.removeprefix("results: ").strip()
+    raise RuntimeError(f"no 'results:' line in the eval output: {stdout[-500:]}")
+
+
+def detector_env(detector: dict[str, Any]) -> dict[str, str]:
+    """VMS_DETECTOR__* overrides that make the eval run this step's model the same way."""
+    return {f"VMS_DETECTOR__{k.upper()}": str(detector[k]) for k in QUALITY_FIELDS if k in detector}
+
+
+def run_quality(
+    scenario: LadderScenario,
+    steps: dict[str, dict[str, Any]],
+    runner: CommandRunner = subprocess_command,
+) -> dict[str, Any]:
+    """Score every step on the detection subset, then compare the listed pairs."""
+    assert scenario.quality is not None
+    py = [sys.executable, "-m", "vms.eval.detection"]
+    evals: dict[str, str] = {}
+    for step in scenario.steps:
+        name = f"{scenario.name}-{step.name}"
+        log.info("ladder quality", extra={"step": step.name})
+        out = runner([*py, "run", "--name", name], detector_env(steps[step.name]["detector"]))
+        evals[step.name] = _results_path(out)
+    compares = []
+    for base, other in scenario.quality.compare:
+        name = f"{scenario.name}-{other}-vs-{base}"
+        out = runner([*py, "compare", evals[base], evals[other], "--name", name], {})
+        compares.append({"base": base, "other": other, "results": _results_path(out)})
+    return {"eval": evals, "compare": compares}
+
+
 def run_ladder(scenario_path: Path) -> Path:
     from vms.bench.results import RunResult, git_info, hardware, package_versions, write_result
     from vms.common.ids import new_ulid
@@ -298,6 +378,7 @@ def run_ladder(scenario_path: Path) -> Path:
     run_id = new_ulid()
     started = datetime.now(UTC)
     steps, orders = ladder(scenario, scenario_path)
+    quality = run_quality(scenario, steps) if scenario.quality else None
     settings = step_settings(scenario, scenario.steps[0])
     result = RunResult(
         run_id=run_id,
@@ -314,7 +395,7 @@ def run_ladder(scenario_path: Path) -> Path:
             "steps": {n: s["detector"] for n, s in steps.items()},
         },
         scenario=raw,
-        metrics={"steps": steps, "orders": orders},
+        metrics={"steps": steps, "orders": orders, "quality": quality},
         notes="Model-only: detect_batch (letterbox, forward, NMS) on decoded frames; JPEG "
         "decode excluded. Latency percentiles pool every timed batch of every repetition; "
         "throughput is the mean and std of per-repetition values. Each step ran in its own "

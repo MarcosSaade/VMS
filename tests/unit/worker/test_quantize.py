@@ -165,3 +165,65 @@ def test_build_detector_needs_a_quantized_model_for_int8(
     )
     detector = build_detector(settings, tmp_path)
     assert "+onnx-int8@" in detector.model_version
+
+
+def test_backend_and_precision_combinations() -> None:
+    assert DetectorSettings(backend="tensorrt", precision="int8", device="cuda").precision == "int8"
+    assert (
+        DetectorSettings(backend="tensorrt", precision="fp16", device="cuda").backend == "tensorrt"
+    )
+    with pytest.raises(ValueError, match="'fp16' needs backend 'tensorrt'"):
+        DetectorSettings(backend="onnxruntime", precision="fp16")
+    with pytest.raises(ValueError, match="'tensorrt' needs device 'cuda'"):
+        DetectorSettings(backend="tensorrt", precision="fp16")
+
+
+def test_tensorrt_target_is_symmetric_with_the_cpu_exclusions() -> None:
+    from vms.common.settings import load_settings
+    from vms.worker.quantize import QuantizeSettings, quantizer_options
+
+    s = load_settings(QuantizeSettings, "quantize", config_dir=Path("configs"))
+    trt, cpu = s.for_target("tensorrt"), s.for_target("onnxruntime")
+    assert (trt.activation_type, trt.weight_type, trt.symmetric) == ("qint8", "qint8", True)
+    assert trt.exclude_nodes == cpu.exclude_nodes  # same head decode in FP32
+    assert (trt.method, trt.per_channel) == (cpu.method, cpu.per_channel)
+    assert quantizer_options(trt) == {"ActivationSymmetric": True, "WeightSymmetric": True}
+    assert quantizer_options(cpu) == {}
+    assert int8_paths(Path("m"), "yolo11n", "tensorrt")[0] == Path("m/yolo11n.int8-trt.onnx")
+    assert int8_paths(Path("m"), "yolo11n")[0] == Path("m/yolo11n.int8.onnx")
+
+
+def test_tensorrt_int8_model_has_only_zero_points_of_zero(
+    random_yolo: tuple[Path, Path, str], tmp_path: Path
+) -> None:
+    from onnx import numpy_helper
+
+    _, model, sha = random_yolo
+    source_sha = sha256_file(model)
+    path = quantize_int8(
+        model,
+        source_sha,
+        "rand",
+        sha,
+        iter(noise_images(2)),
+        "c" * 64,
+        Int8Settings(activation_type="qint8", symmetric=True, exclude_nodes=[HEAD]),
+        tmp_path,
+        640,
+        "tensorrt",
+    )
+    assert path.name == "rand.int8-trt.onnx"
+    m = onnx.load(str(path))
+    inits = {i.name: numpy_helper.to_array(i) for i in m.graph.initializer}
+    zps = [
+        inits[n.input[2]]
+        for n in m.graph.node
+        if n.op_type == "QuantizeLinear" and len(n.input) > 2 and n.input[2] in inits
+    ]
+    assert zps
+    assert all(z.dtype == np.int8 for z in zps)
+    assert all(not z.any() for z in zps)
+    _, meta = verified_int8(tmp_path, "rand", sha, source_sha, "tensorrt")
+    assert meta.target == "tensorrt"
+    with pytest.raises(FileNotFoundError):
+        verified_int8(tmp_path, "rand", sha, source_sha)  # the ONNX Runtime model is another file

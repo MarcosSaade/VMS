@@ -4,9 +4,10 @@
 # scenarios (`kind: model` and `ladder`) run here, in the project's environment with CUDA PyTorch.
 #
 #   setup            uv, the locked environment with torch and torchvision swapped for their
-#                    CUDA builds (the versions uv.lock pins, as in deploy/docker/Dockerfile.gpu),
-#                    the mini clips (copied from the operator's machine), the detector weights
-#                    and their ONNX export
+#                    CUDA 13 builds (the versions uv.lock pins), onnxruntime swapped for
+#                    onnxruntime-gpu and TensorRT added (pinned below; D38), the mini clips
+#                    (copied from the operator's machine), the calibration and detection eval
+#                    images, the detector weights, their ONNX export, and the TensorRT engines
 #   run SCENARIO     one model or ladder scenario through python -m vms.bench
 #
 # No secrets reach the pod: .env comes from .env.example, so no LLM key and no Runpod or AWS
@@ -15,7 +16,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 UV_VERSION=0.12.20  # as in CI and deploy/docker/Dockerfile
-TORCH_CUDA=cu126    # as in deploy/docker/Dockerfile.gpu (drivers from 560, D28)
+# One CUDA major for everything on the pod (D38): onnxruntime-gpu 1.31 is built for CUDA 13, so
+# torch and TensorRT use their CUDA 13 builds too. Needs a host driver for CUDA >= 13.0
+# (configs/runpod.yaml min_cuda_version). Versions are pinned here, outside uv.lock, because
+# the laptop's lock is CPU-only; each results file records the installed versions.
+TORCH_CUDA=cu130
+ORT_GPU_VERSION=1.31.0        # = onnxruntime in uv.lock
+TENSORRT_VERSION=11.3.0.99    # tensorrt-cu13, released 2026-09-09
 export PATH="$HOME/.local/bin:$PATH"
 # After the CUDA swap, `uv run` must not re-sync the environment back to the CPU wheels.
 export UV_NO_SYNC=1
@@ -39,13 +46,24 @@ setup() {
     --index "https://download.pytorch.org/whl/${TORCH_CUDA}" \
     --default-index https://pypi.org/simple \
     "torch==${torch}+${TORCH_CUDA}" "torchvision==${vision}+${TORCH_CUDA}"
+  uv pip uninstall --python .venv/bin/python onnxruntime
+  uv pip install --python .venv/bin/python \
+    "onnxruntime-gpu[cuda,cudnn]==${ORT_GPU_VERSION}" "tensorrt-cu13==${TENSORRT_VERSION}"
   uv run python -c "import torch; assert torch.cuda.is_available(), 'no CUDA'; \
 print('torch', torch.__version__, 'CUDA', torch.version.cuda, torch.cuda.get_device_name(0))"
+  uv run python -c "import onnxruntime as o; o.preload_dlls(); \
+assert 'CUDAExecutionProvider' in o.get_available_providers(), o.get_available_providers(); \
+print('onnxruntime', o.__version__, o.get_available_providers())"
+  uv run python -c "import tensorrt; print('tensorrt', tensorrt.__version__)"
 
-  step "clips and weights"
+  step "data: clips, calibration and eval images"
   make data-mini   # the synced clips are verified and kept, not downloaded again
+  make calibration-data eval-detection-data
+
+  step "weights, ONNX export, TensorRT engines"
   uv run python -m vms.worker weights
   make onnx
+  make trt-prepare WEIGHTS=yolo11n
 }
 
 run() {

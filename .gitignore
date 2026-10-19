@@ -49,6 +49,7 @@ htmlcov/
 *.gguf
 models/weights/
 models/onnx/
+models/trt/
 /models/finetune/*.pt
 models/triton/**/[0-9]*/
 

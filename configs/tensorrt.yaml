@@ -1,0 +1,11 @@
+# TensorRT engine builds (vms.worker.trt_detector, make trt-prepare; D38). Engines are built on
+# the GPU they run on and cached in models/trt/ (gitignored) with a sidecar naming the source
+# model, TensorRT version and GPU. Overrides configs/common.yaml; VMS_* variables override this.
+
+# Optimization profile of the dynamic input (batch, channels, height, width). opt is the
+# worker's frame (1280x720 letterboxed to 384x640) at its deployed batch of 4 (E-048); max
+# covers the batch sweep up to 32 and the eval's square inputs up to 640x640.
+min_shape: [1, 3, 64, 64]
+opt_shape: [4, 3, 384, 640]
+max_shape: [32, 3, 640, 640]
+workspace_gb: 4

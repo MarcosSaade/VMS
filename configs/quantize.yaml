@@ -21,3 +21,15 @@ int8:
   # convs (cv2.*, cv3.*) stay quantized. An empty list quantizes everything.
   exclude_nodes:
     - '^/model\.23/(?!cv2\.|cv3\.)'
+
+# For TensorRT (make trt-prepare, D38): the same calibration set, method and excluded nodes,
+# with symmetric signed activations, the only Q/DQ form TensorRT reads.
+int8_tensorrt:
+  format: qdq
+  per_channel: true
+  activation_type: qint8
+  weight_type: qint8
+  method: minmax
+  symmetric: true
+  exclude_nodes:
+    - '^/model\.23/(?!cv2\.|cv3\.)'

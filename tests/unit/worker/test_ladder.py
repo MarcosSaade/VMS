@@ -148,3 +148,73 @@ def test_ladder_runs_every_step_each_repetition_with_a_cooldown() -> None:
     assert sleeps == [2.0] * 9
     assert set(steps) == {"a", "b", "c"}
     assert steps["a"]["repetitions"] == 3
+
+
+def test_quality_scores_every_step_then_compares_the_pairs() -> None:
+    from vms.worker.ladder import detector_env, run_quality
+
+    s = scenario(
+        steps=[
+            {"name": "ort", "detector": {"backend": "onnxruntime"}},
+            {"name": "trt", "detector": {"backend": "tensorrt", "precision": "fp16"}},
+        ],
+        quality={"compare": [["ort", "trt"]]},
+    )
+    steps = {
+        "ort": {
+            "detector": {
+                "weights": "yolo11n",
+                "backend": "onnxruntime",
+                "precision": "fp32",
+                "device": "cuda",
+                "imgsz": 640,
+                "conf": 0.1,
+            }
+        },
+        "trt": {
+            "detector": {
+                "weights": "yolo11n",
+                "backend": "tensorrt",
+                "precision": "fp16",
+                "device": "cuda",
+                "imgsz": 640,
+                "conf": 0.1,
+            }
+        },
+    }
+    calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def runner(argv: list[str], env: dict[str, str]) -> str:
+        calls.append((argv, env))
+        return f"log line\nresults: eval/results/{argv[-1]}.json\n"
+
+    out = run_quality(s, steps, runner)
+    assert [c[0][3] for c in calls] == ["run", "run", "compare"]
+    assert calls[1][1] == {
+        "VMS_DETECTOR__WEIGHTS": "yolo11n",
+        "VMS_DETECTOR__BACKEND": "tensorrt",
+        "VMS_DETECTOR__PRECISION": "fp16",
+        "VMS_DETECTOR__DEVICE": "cuda",
+        "VMS_DETECTOR__IMGSZ": "640",
+    }  # the eval keeps its own thresholds: no conf
+    assert calls[2][0][4:6] == [out["eval"]["ort"], out["eval"]["trt"]]
+    assert out["compare"][0]["results"].endswith("-trt-vs-ort.json")
+    assert detector_env({"backend": "onnxruntime"}) == {"VMS_DETECTOR__BACKEND": "onnxruntime"}
+
+
+def test_quality_pairs_must_name_steps() -> None:
+    with pytest.raises(ValidationError, match="unknown steps"):
+        scenario(quality={"compare": [["pytorch", "nope"]]})
+
+
+def test_gpu_scenarios_are_valid() -> None:
+    import yaml
+
+    for name in ("ladder-gpu-n", "sweep-gpu-trt-fp16-n", "sweep-gpu-trt-int8-n"):
+        raw = yaml.safe_load((REPO_ROOT / f"bench/scenarios/{name}.yaml").read_text())
+        s = LadderScenario.model_validate(raw)
+        assert s.config["detector"]["device"] == "cuda"
+    ladder_raw = yaml.safe_load((REPO_ROOT / "bench/scenarios/ladder-gpu-n.yaml").read_text())
+    q = LadderScenario.model_validate(ladder_raw).quality
+    assert q is not None
+    assert ("trt-fp16", "trt-int8") in q.compare  # D32: INT8 against TensorRT FP16

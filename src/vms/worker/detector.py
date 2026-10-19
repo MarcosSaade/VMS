@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 if TYPE_CHECKING:
     from vms.worker.onnx_detector import OnnxDetector
+    from vms.worker.trt_detector import TrtDetector
 
 # Before ultralytics is imported anywhere: no usage analytics, no pip installs at runtime, no
 # console banners. ONLINE=False also stops its update checks.
@@ -65,11 +66,13 @@ class DetectorSettings(BaseModel):
 
     weights: str = "yolo11s"  # a key of configs/models.yaml
     # ultralytics: PyTorch through Ultralytics' predictor; onnxruntime: the ONNX export
-    # (make onnx) with numpy pre/post-processing.
-    backend: Literal["ultralytics", "onnxruntime"] = "ultralytics"
-    # fp32, or int8: the ONNX export statically quantized on the calibration set
-    # (vms.worker.quantize, make quantize; onnxruntime only).
-    precision: Literal["fp32", "int8"] = "fp32"
+    # (make onnx) with numpy pre/post-processing; tensorrt: a TensorRT engine built from an
+    # ONNX export on the GPU it runs on (make trt-prepare, D38), same pre/post-processing.
+    backend: Literal["ultralytics", "onnxruntime", "tensorrt"] = "ultralytics"
+    # fp32; int8: the ONNX export statically quantized on the calibration set
+    # (vms.worker.quantize: make quantize for ONNX Runtime, make trt-prepare for TensorRT);
+    # fp16: the FP16 ONNX export (tensorrt only).
+    precision: Literal["fp32", "fp16", "int8"] = "fp32"
     device: Literal["cpu", "cuda"] = "cpu"
     imgsz: int = Field(default=640, ge=32, multiple_of=32)
     conf: float = Field(default=0.25, ge=0.0, le=1.0)  # minimum confidence kept
@@ -82,9 +85,13 @@ class DetectorSettings(BaseModel):
     spin: bool = True
 
     @model_validator(mode="after")
-    def _int8_needs_onnxruntime(self) -> DetectorSettings:
-        if self.precision == "int8" and self.backend != "onnxruntime":
-            raise ValueError("precision 'int8' needs backend 'onnxruntime'")
+    def _precision_fits_backend(self) -> DetectorSettings:
+        if self.precision == "int8" and self.backend == "ultralytics":
+            raise ValueError("precision 'int8' needs backend 'onnxruntime' or 'tensorrt'")
+        if self.precision == "fp16" and self.backend != "tensorrt":
+            raise ValueError("precision 'fp16' needs backend 'tensorrt'")
+        if self.backend == "tensorrt" and self.device != "cuda":
+            raise ValueError("backend 'tensorrt' needs device 'cuda'")
         return self
 
 
@@ -170,10 +177,13 @@ class YoloDetector:
         self.detect(np.zeros((height, width, 3), dtype=np.uint8))
 
 
-def build_detector(settings: DetectorSettings, root: Path = Path()) -> YoloDetector | OnnxDetector:
+def build_detector(
+    settings: DetectorSettings, root: Path = Path()
+) -> YoloDetector | OnnxDetector | TrtDetector:
     """The configured backend with verified weights (fetched if missing). The ONNX backend
-    needs an export made from the same weights (`make onnx`); it is not exported here, because
-    the worker's model directories are read-only in its container."""
+    needs an export made from the same weights (`make onnx`), and TensorRT an engine built on
+    this GPU (`make trt-prepare`); neither is made here, because the worker's model
+    directories are read-only in its container."""
     from vms.worker.weights import ensure_weights, load_models_config
 
     models = load_models_config(root / "configs/models.yaml")
@@ -182,6 +192,13 @@ def build_detector(settings: DetectorSettings, root: Path = Path()) -> YoloDetec
     sha = models.weights[name].sha256
     if settings.backend == "ultralytics":
         return YoloDetector(path, sha, settings)
+    if settings.backend == "tensorrt":
+        from vms.worker.trt_detector import TrtDetector, verified_engine
+
+        engine_path, engine_meta = verified_engine(
+            root / models.trt_dir, root / models.onnx_dir, name, sha, settings.precision
+        )
+        return TrtDetector(engine_path, engine_meta, sha, settings)
     from vms.worker.onnx_detector import OnnxDetector, verified_export
 
     model_path, meta = verified_export(root / models.onnx_dir, name, sha)

@@ -8,6 +8,7 @@
 
 weights_dir: models/weights
 onnx_dir: models/onnx        # ONNX exports and their sidecars (make onnx), gitignored
+trt_dir: models/trt          # TensorRT engines (make trt-prepare, on the GPU), gitignored
 
 weights:
   yolo11n:

@@ -54,6 +54,7 @@ class OnnxExport(BaseModel):
     opset: int
     imgsz: int
     dynamic: bool
+    half: bool = False  # FP16 weights and I/O (exported on a GPU, for TensorRT FP16; D38)
     packages: dict[str, str | None]
     exported_at: datetime
 
@@ -75,10 +76,23 @@ def onnx_paths(onnx_dir: Path, name: str) -> tuple[Path, Path]:
     return model, model.with_name(model.name + ".json")
 
 
+def export_stem(name: str, half: bool) -> str:
+    """File stem of an export: `<name>` (FP32) or `<name>.fp16`."""
+    return f"{name}.fp16" if half else name
+
+
 def export_onnx(
-    weights_path: Path, weights_sha256: str, name: str, onnx_dir: Path, imgsz: int
+    weights_path: Path,
+    weights_sha256: str,
+    name: str,
+    onnx_dir: Path,
+    imgsz: int,
+    *,
+    half: bool = False,
 ) -> Path:
     """Export `weights_path` to `<onnx_dir>/<name>.onnx` plus its sidecar; returns the model path.
+    `half` exports FP16 weights and I/O to `<name>.fp16.onnx` instead; Ultralytics converts to
+    FP16 only on a GPU, so that export runs on CUDA (D38).
 
     Ultralytics writes the export next to its input, so it runs on a copy in a temporary
     directory (the weights directory is read-only in the worker container). The file embeds
@@ -86,7 +100,7 @@ def export_onnx(
     """
     yolo: Any = importlib.import_module("ultralytics").YOLO
     onnx_dir.mkdir(parents=True, exist_ok=True)
-    model_path, meta_path = onnx_paths(onnx_dir, name)
+    model_path, meta_path = onnx_paths(onnx_dir, export_stem(name, half))
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / f"{name}.pt"
         shutil.copyfile(weights_path, src)
@@ -98,8 +112,8 @@ def export_onnx(
                 simplify=False,
                 imgsz=imgsz,
                 nms=False,
-                half=False,
-                device="cpu",
+                half=half,
+                device="cuda" if half else "cpu",
             )
         )
         shutil.move(out, model_path)
@@ -115,6 +129,7 @@ def export_onnx(
         opset=opset,
         imgsz=imgsz,
         dynamic=True,
+        half=half,
         packages=package_versions(("torch", "ultralytics", "onnx", "onnxruntime")),
         exported_at=datetime.now(UTC),
     )
@@ -122,9 +137,12 @@ def export_onnx(
     return model_path
 
 
-def verified_export(onnx_dir: Path, name: str, weights_sha256: str) -> tuple[Path, OnnxExport]:
-    """The exported model for `name`, checked against its sidecar and the pinned weights."""
-    model_path, meta_path = onnx_paths(onnx_dir, name)
+def verified_export(
+    onnx_dir: Path, name: str, weights_sha256: str, *, half: bool = False
+) -> tuple[Path, OnnxExport]:
+    """The exported model for `name` (`half`: the FP16 export), checked against its sidecar and
+    the pinned weights."""
+    model_path, meta_path = onnx_paths(onnx_dir, export_stem(name, half))
     if not model_path.exists() or not meta_path.exists():
         raise FileNotFoundError(f"{model_path} or its sidecar is missing; run `make onnx`")
     meta = OnnxExport.model_validate_json(meta_path.read_text(encoding="utf-8"))
@@ -274,6 +292,10 @@ class OnnxDetector:
         ort = _ort()
         providers = ["CPUExecutionProvider"]
         if settings.device == "cuda":
+            # onnxruntime-gpu finds the CUDA and cuDNN libraries of the pip packages (the
+            # ones PyTorch's CUDA build also uses) only once they are loaded (D38).
+            if hasattr(ort, "preload_dlls"):
+                ort.preload_dlls()
             if "CUDAExecutionProvider" not in ort.get_available_providers():
                 raise RuntimeError("device 'cuda' requested but onnxruntime has no CUDA provider")
             providers.insert(0, "CUDAExecutionProvider")

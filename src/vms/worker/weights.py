@@ -30,6 +30,7 @@ class ModelsConfig(BaseModel):
 
     weights_dir: Path
     onnx_dir: Path = Path("models/onnx")  # exports made by `make onnx` (vms.worker.onnx_detector)
+    trt_dir: Path = Path("models/trt")  # TensorRT engines built on the GPU they run on (D38)
     weights: dict[str, WeightSpec]
 
 

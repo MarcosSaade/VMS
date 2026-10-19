@@ -287,7 +287,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 **Prompt:** On one rented GPU type, measure each step for YOLO11: PyTorch eager, ONNX Runtime CUDA, TensorRT FP16, TensorRT INT8 (calibrate on a representative frame set that is disjoint from the eval sets). Measure latency at batch 1 and throughput at a few batch sizes with a small in-process harness, plus GPU memory, and run detection mAP (3.4) with CIs for every step. Build TensorRT engines on the target GPU by script. CPU fallback if no GPU is available: PyTorch, ORT FP32 and ORT INT8 (static quantization) on CPU.
 **Done when:** ladder table complete with mAP and CIs; INT8 kept only if its mAP drop is within a threshold stated in `DECISIONS.md` beforehand.
-**GPU (2026-10-19, D37):** the GPU rungs run on a Runpod pod (1x A40) as a `kind: ladder` scenario through `make runpod-session`; TensorRT is installed into the pod's environment by the scenario's setup, and engines are built on the pod.
+**GPU (2026-10-19, D37, D38):** the GPU rungs run on a Runpod pod (1x A40) as `bench/scenarios/ladder-gpu-n.yaml` through `make runpod-session`, with mAP for every rung and the paired comparisons in the same session (the ladder's `quality:` section); `bench/scenarios/sweep-gpu-trt-{fp16,int8}-n.yaml` are the 5.3 GPU sweep. TensorRT 11 has no FP16/INT8 builder flags (strongly typed networks only), so FP16 comes from an FP16 ONNX export and INT8 from a symmetric Q/DQ model (D38).
 
 ### 5.3 Batching sweep
 

@@ -9,10 +9,10 @@
 gpu_type: NVIDIA A40            # a catalog id: GET https://api.runpod.io/v2/catalog/gpus
 gpu_count: 1
 cloud: SECURE                   # Runpod-owned data centers; COMMUNITY hosts vary more
-min_cuda_version: "12.8"        # host driver floor; the cu126 wheels need driver >= 560
+min_cuda_version: "13.0"        # host driver floor: the pod's stack is CUDA 13 (D38)
 data_center_ids: []             # empty: wherever the GPU is in stock
 # Runpod's base image (Ubuntu 24.04; sshd from PUBLIC_KEY in /start.sh; python3, rsync, make,
-# curl), pinned by digest. No CUDA toolkit needed: the cu126 wheels bring their own libraries.
+# curl), pinned by digest. No CUDA toolkit needed: the CUDA wheels bring their own libraries.
 image: runpod/base:1.0.3-ubuntu2404@sha256:d536f17af1c7bde1bc0ea642dbe0b0f222709ef3391588bce674eb9c55c1738b
 container_disk_gb: 40           # environment, CUDA wheels (~3 GB), clips, weights; wiped with the pod
 ssh_user: root

@@ -165,11 +165,11 @@ def make(settings: PodSettings, repo: Path, tmp_path: Path):  # type: ignore[no-
     return build
 
 
-def test_committed_config_prices_the_l4_from_the_catalog(settings: PodSettings) -> None:
+def test_committed_config_prices_the_a40_from_the_catalog(settings: PodSettings) -> None:
     assert (settings.gpu_type, settings.cloud, settings.min_cuda_version) == (
         "NVIDIA A40",
         "SECURE",
-        "12.8",
+        "13.0",
     )
     assert "@sha256:" in settings.image  # pinned by digest
     assert settings.require_self_terminate

@@ -23,6 +23,7 @@ from vms.worker.detector import Detector, YoloDetector, build_detector
 from vms.worker.onnx_detector import OnnxDetector
 from vms.worker.service import Worker
 from vms.worker.settings import WorkerSettings
+from vms.worker.trt_detector import TrtDetector
 
 SERVICE = "worker"
 
@@ -32,7 +33,9 @@ def worker_id() -> str:
     return f"{socket.gethostname()}-{os.getpid()}-{new_ulid()[-6:].lower()}"
 
 
-def load_detector(settings: WorkerSettings, obs: Observability) -> YoloDetector | OnnxDetector:
+def load_detector(
+    settings: WorkerSettings, obs: Observability
+) -> YoloDetector | OnnxDetector | TrtDetector:
     t0 = time.monotonic()
     detector = build_detector(settings.detector)
     detector.warmup()

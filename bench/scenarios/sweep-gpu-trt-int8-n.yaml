@@ -1,0 +1,25 @@
+name: sweep-gpu-trt-int8-n
+description: >
+  Task 5.3 on the GPU, the same harness and frames as sweep-cpu-ort-n with the device and
+  backend changed: YOLO11n TensorRT INT8 on the Runpod A40 (D37, D38),
+  detect_batch (letterbox, forward, NMS) at batch sizes 1, 2, 4, 8, 16 and 32 on 480 decoded
+  data-mini frames (1280x720), 3 repetitions. FP16 and INT8 are each swept (this file and
+  sweep-gpu-trt-fp16-n) because the best GPU backend depends on ladder-gpu-n's D32 verdict
+  for INT8, measured in the same session; the operating point comes from
+  `python -m vms.worker sweep-plot`. Pre- and post-processing stay
+  on the CPU, so large batches show where the host, not the GPU, sets the throughput.
+kind: ladder
+repeats: 3
+bench:
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  frames_per_clip: 160
+  batch_sizes: [1, 2, 4, 8, 16, 32]
+  warmup_batches: 5
+  cooldown_s: 5
+config:
+  detector:
+    weights: yolo11n
+    device: cuda
+steps:
+  - name: trt-int8
+    detector: {backend: tensorrt, precision: int8}

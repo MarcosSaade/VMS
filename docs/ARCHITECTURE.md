@@ -121,7 +121,7 @@ The diagram shows the target design; the current scope (top of this file) builds
 - Model repository under `models/triton/` (configs and export scripts are versioned; weights are fetched by script, never committed).
 - Models: `yolo` (detector), `clip_image`, `clip_text`. Pre- and post-processing can move to GPU (ensemble, DALI or TensorRT NMS plugin) if profiling shows CPU-bound stages.
 - Backend and precision ladder: PyTorch eager -> ONNX Runtime CUDA -> TensorRT FP16 -> TensorRT INT8 **(decided by benchmark, D5)**. Dynamic batching and instance counts are tuned with `perf_analyzer`.
-- TensorRT engines are built on the target GPU by script.
+- TensorRT engines are built on the target GPU by script. As built (D38): `make trt-prepare` on the Runpod pod builds strongly typed TensorRT 11 engines, FP16 from an FP16 ONNX export and INT8 from a symmetric Q/DQ model on the CPU INT8 step's calibration set; `TrtDetector` keeps the ONNX path's numpy pre- and post-processing, so backends differ only in the forward pass.
 
 ### 4.6 Storage
 

@@ -169,6 +169,10 @@ calibration-data: ## Fetch and verify the INT8 calibration images (64 COCO train
 quantize: ## Static INT8 quantization of the ONNX exports (needs make onnx and make calibration-data; WEIGHTS=yolo11s)
 	$(RUN) python -m vms.worker quantize $(WEIGHTS)
 
+.PHONY: trt-prepare
+trt-prepare: ## On a GPU: FP16 export, TensorRT INT8 model and TensorRT engines (WEIGHTS=yolo11n; D38)
+	$(RUN) python -m vms.worker trt-prepare $(or $(WEIGHTS),yolo11n)
+
 .PHONY: finetune-data
 finetune-data: ## Fetch and verify the 9.5 training images (800 COCO train2017 + ~790 MOT17 frames)
 	$(RUN) python -m vms.finetune fetch
@@ -239,7 +243,8 @@ gpu-list: ## AWS resources tagged project=vms that still exist
 # AWS denied the GPU quota (D35), so GPU work runs on Runpod pods: model scenarios only (a pod
 # has no Docker). Needs RUNPOD_API_KEY in .env. VMS_GPU_TYPE picks another catalog GPU.
 
-RUNPOD_SCENARIOS ?= bench/scenarios/worker-model-gpu-n.yaml
+RUNPOD_SCENARIOS ?= bench/scenarios/ladder-gpu-n.yaml bench/scenarios/sweep-gpu-trt-fp16-n.yaml \
+	bench/scenarios/sweep-gpu-trt-int8-n.yaml
 
 .PHONY: runpod-preflight
 runpod-preflight: ## Free checks before a Runpod GPU session: API key, GPU price and stock, old pods

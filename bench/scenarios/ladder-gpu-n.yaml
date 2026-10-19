@@ -1,0 +1,36 @@
+name: ladder-gpu-n
+description: >
+  Task 5.2 GPU rungs on the Runpod A40 (D37, D38): YOLO11n with PyTorch FP32 on CUDA (the
+  GPU baseline), ONNX Runtime FP32 with the CUDA provider, TensorRT FP16 (engine from the FP16
+  export) and TensorRT INT8 (engine from the symmetric Q/DQ model, calibration set v1, head
+  decode in FP32), each in its own process. Model-only: detect_batch (letterbox, forward, NMS;
+  pre- and post-processing on the CPU, as the worker runs them) on decoded data-mini frames
+  (1280x720, as loadgen sends them) at batch sizes 1, 4 and 8, rotated step order. After the
+  speed runs every step is scored on the detection subset and the pairs below are compared
+  (paired bootstrap; D32 verdict for INT8 against TensorRT FP16).
+kind: ladder
+repeats: 5
+bench:
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  frames_per_clip: 100
+  batch_sizes: [1, 4, 8]
+  warmup_batches: 5          # TensorRT and cuDNN pick kernels on the first calls per shape
+  cooldown_s: 5
+config:
+  detector:
+    weights: yolo11n
+    device: cuda
+steps:
+  - name: pytorch-fp32
+    detector: {backend: ultralytics}
+  - name: ort-fp32
+    detector: {backend: onnxruntime}
+  - name: trt-fp16
+    detector: {backend: tensorrt, precision: fp16}
+  - name: trt-int8
+    detector: {backend: tensorrt, precision: int8}
+quality:
+  compare:
+    - [pytorch-fp32, ort-fp32]
+    - [ort-fp32, trt-fp16]
+    - [trt-fp16, trt-int8]
