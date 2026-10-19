@@ -143,9 +143,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "ladder":
-        from vms.worker.ladder import run_ladder
+        from vms.worker.ladder import LadderFailedError, run_ladder
 
-        run_ladder(args.scenario)
+        try:
+            run_ladder(args.scenario)
+        except LadderFailedError as exc:
+            log.error("ladder incomplete", extra={"error": str(exc)})
+            return 1
         return 0
 
     if args.command == "sweep-plot":

@@ -31,5 +31,7 @@ int8_tensorrt:
   weight_type: qint8
   method: minmax
   symmetric: true
+  op_types: [Conv]              # TensorRT rejects ORT's Q/DQ on scalar constants (E-059)
+  quantize_bias: false          # FP32 biases; TensorRT fuses them into the INT8 convs
   exclude_nodes:
     - '^/model\.23/(?!cv2\.|cv3\.)'

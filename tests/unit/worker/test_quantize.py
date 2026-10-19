@@ -187,7 +187,12 @@ def test_tensorrt_target_is_symmetric_with_the_cpu_exclusions() -> None:
     assert (trt.activation_type, trt.weight_type, trt.symmetric) == ("qint8", "qint8", True)
     assert trt.exclude_nodes == cpu.exclude_nodes  # same head decode in FP32
     assert (trt.method, trt.per_channel) == (cpu.method, cpu.per_channel)
-    assert quantizer_options(trt) == {"ActivationSymmetric": True, "WeightSymmetric": True}
+    assert quantizer_options(trt) == {
+        "ActivationSymmetric": True,
+        "WeightSymmetric": True,
+        "QuantizeBias": False,
+    }
+    assert trt.op_types == ["Conv"]
     assert quantizer_options(cpu) == {}
     assert int8_paths(Path("m"), "yolo11n", "tensorrt")[0] == Path("m/yolo11n.int8-trt.onnx")
     assert int8_paths(Path("m"), "yolo11n")[0] == Path("m/yolo11n.int8.onnx")
@@ -207,7 +212,13 @@ def test_tensorrt_int8_model_has_only_zero_points_of_zero(
         sha,
         iter(noise_images(2)),
         "c" * 64,
-        Int8Settings(activation_type="qint8", symmetric=True, exclude_nodes=[HEAD]),
+        Int8Settings(
+            activation_type="qint8",
+            symmetric=True,
+            op_types=["Conv"],
+            quantize_bias=False,
+            exclude_nodes=[HEAD],
+        ),
         tmp_path,
         640,
         "tensorrt",
@@ -223,6 +234,12 @@ def test_tensorrt_int8_model_has_only_zero_points_of_zero(
     assert zps
     assert all(z.dtype == np.int8 for z in zps)
     assert all(not z.any() for z in zps)
+    # What TensorRT rejects (E-059): Q/DQ on scalars, and int32 bias Q/DQ.
+    for n in m.graph.node:
+        if n.op_type == "DequantizeLinear" and n.input[0] in inits:
+            x = inits[n.input[0]]
+            assert x.ndim > 0, n.name
+            assert x.dtype == np.int8, n.name
     _, meta = verified_int8(tmp_path, "rand", sha, source_sha, "tensorrt")
     assert meta.target == "tensorrt"
     with pytest.raises(FileNotFoundError):

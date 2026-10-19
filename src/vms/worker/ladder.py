@@ -307,17 +307,26 @@ def ladder(
     runner: StepRunner = subprocess_step,
     sleep: Callable[[float], None] = time.sleep,
 ) -> tuple[dict[str, Any], list[list[str]]]:
+    """Run every step `repeats` times. A step whose process fails is recorded with its error
+    and left out of later repetitions, so one broken backend does not cost the others' numbers
+    (on a GPU session, the setup time already paid)."""
     names = [s.name for s in scenario.steps]
     runs: dict[str, list[dict[str, Any]]] = {n: [] for n in names}
+    errors: dict[str, str] = {}
     orders = []
     for rep in range(scenario.repeats):
-        order = step_order(names, rep)
+        order = [n for n in step_order(names, rep) if n not in errors]
         orders.append(order)
         for name in order:
             sleep(scenario.bench.cooldown_s)
             log.info("ladder step", extra={"rep": rep, "step": name})
-            runs[name].append(runner(scenario_path, name))
-    return {n: aggregate(runs[n]) for n in names}, orders
+            try:
+                runs[name].append(runner(scenario_path, name))
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                log.error("ladder step failed", extra={"rep": rep, "step": name, "error": str(exc)})
+                errors[name] = f"repetition {rep}: {exc}"
+    steps = {n: aggregate(runs[n]) if n not in errors else {"error": errors[n]} for n in names}
+    return steps, orders
 
 
 # (argv, extra environment) -> stdout; raises on a non-zero exit.
@@ -353,21 +362,33 @@ def run_quality(
     steps: dict[str, dict[str, Any]],
     runner: CommandRunner = subprocess_command,
 ) -> dict[str, Any]:
-    """Score every step on the detection subset, then compare the listed pairs."""
+    """Score every step that ran on the detection subset, then compare the listed pairs whose
+    steps both have a score. Failures are recorded, not raised."""
     assert scenario.quality is not None
     py = [sys.executable, "-m", "vms.eval.detection"]
     evals: dict[str, str] = {}
+    errors: dict[str, str] = {}
     for step in scenario.steps:
+        if "error" in steps[step.name]:
+            continue
         name = f"{scenario.name}-{step.name}"
         log.info("ladder quality", extra={"step": step.name})
-        out = runner([*py, "run", "--name", name], detector_env(steps[step.name]["detector"]))
-        evals[step.name] = _results_path(out)
+        try:
+            out = runner([*py, "run", "--name", name], detector_env(steps[step.name]["detector"]))
+            evals[step.name] = _results_path(out)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, RuntimeError) as exc:
+            errors[f"eval {step.name}"] = str(exc)
     compares = []
     for base, other in scenario.quality.compare:
+        if base not in evals or other not in evals:
+            continue
         name = f"{scenario.name}-{other}-vs-{base}"
-        out = runner([*py, "compare", evals[base], evals[other], "--name", name], {})
-        compares.append({"base": base, "other": other, "results": _results_path(out)})
-    return {"eval": evals, "compare": compares}
+        try:
+            out = runner([*py, "compare", evals[base], evals[other], "--name", name], {})
+            compares.append({"base": base, "other": other, "results": _results_path(out)})
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, RuntimeError) as exc:
+            errors[f"compare {other} vs {base}"] = str(exc)
+    return {"eval": evals, "compare": compares, "errors": errors}
 
 
 def run_ladder(scenario_path: Path) -> Path:
@@ -379,6 +400,8 @@ def run_ladder(scenario_path: Path) -> Path:
     started = datetime.now(UTC)
     steps, orders = ladder(scenario, scenario_path)
     quality = run_quality(scenario, steps) if scenario.quality else None
+    failed = [n for n, s in steps.items() if "error" in s]
+    failed += list((quality or {}).get("errors", {}))
     settings = step_settings(scenario, scenario.steps[0])
     result = RunResult(
         run_id=run_id,
@@ -395,12 +418,18 @@ def run_ladder(scenario_path: Path) -> Path:
             "steps": {n: s["detector"] for n, s in steps.items()},
         },
         scenario=raw,
-        metrics={"steps": steps, "orders": orders, "quality": quality},
+        metrics={"steps": steps, "orders": orders, "quality": quality, "failed": failed},
         notes="Model-only: detect_batch (letterbox, forward, NMS) on decoded frames; JPEG "
         "decode excluded. Latency percentiles pool every timed batch of every repetition; "
         "throughput is the mean and std of per-repetition values. Each step ran in its own "
         "process, step order rotated per repetition.",
     )
     path = write_result(scenario.bench.results_dir, result)
-    log.info("ladder results written", extra={"path": str(path)})
+    log.info("ladder results written", extra={"path": str(path), "failed": failed})
+    if failed:
+        raise LadderFailedError(f"results written to {path}, but these failed: {failed}")
     return path
+
+
+class LadderFailedError(RuntimeError):
+    """Some steps or quality runs failed; the results file has the rest and the errors."""

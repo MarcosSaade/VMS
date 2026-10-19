@@ -171,7 +171,7 @@ quantize: ## Static INT8 quantization of the ONNX exports (needs make onnx and m
 
 .PHONY: trt-prepare
 trt-prepare: ## On a GPU: FP16 export, TensorRT INT8 model and TensorRT engines (WEIGHTS=yolo11n; D38)
-	$(RUN) python -m vms.worker trt-prepare $(or $(WEIGHTS),yolo11n)
+	$(RUN) python -m vms.worker trt-prepare $(or $(WEIGHTS),yolo11n) $(if $(TRT_PRECISION),--precision $(TRT_PRECISION))
 
 .PHONY: finetune-data
 finetune-data: ## Fetch and verify the 9.5 training images (800 COCO train2017 + ~790 MOT17 frames)
