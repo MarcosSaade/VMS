@@ -167,6 +167,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Prompt:** AWS is the default provider. Write `scripts/gpu_session.sh` (AWS CLI, no Terraform) that, in the project's single configured Region: launches one EC2 spot GPU instance (g5 or g6) from a GPU-ready AMI with Docker and the NVIDIA toolkit, tagged `project=vms` and `session=<id>` (instance, volumes, security group); syncs the code; runs named benchmark scenarios with docker compose; copies results back; and terminates everything, with teardown in a trap so it runs on failure. After teardown it lists resources still tagged with the session ID through the Resource Groups Tagging API and exits non-zero, loudly, if any remain. Create an AWS Budgets alarm for the project once. State the expected cost and ask the user before the first real launch.
 **Done when:** one real short session completes with automatic teardown verified by the tag check; cost recorded in the results; `RUNBOOK.md` GPU sessions section written.
 **As built (2026-10-13, D28):** spot launches are denied by the account's managed SCP, so sessions are on-demand (g6.xlarge); the driver is `vms.cloud` in Python (boto3) behind `scripts/gpu_session.sh`, for testable teardown. Everything except the real session is done; the session waits for the on-demand G and VT quota (L-DB2E81BA, 4 vCPUs requested). Then: `make gpu-preflight`, `make gpu-session` (gpu-smoke and worker-model-gpu-n), log the run, write the cost into BENCHMARKS.
+**Rebuilt on Runpod (2026-10-19, D37):** AWS denied the GPU quota for EC2 and SageMaker (D35), Lambda Cloud declined the card and DigitalOcean wanted a ~$250 prepayment, so GPU sessions run on Runpod pods: `scripts/runpod_session.sh` (`vms.cloud.pod_session`, REST v2) creates one pod (`vms-gpu-<id>`, 1x L4 secure, base image by digest, per-session SSH key, no volume), runs `kind: model` and `ladder` scenarios through `scripts/pod_remote.sh` (locked environment with CUDA torch, no Docker), copies results back, deletes the pod and verifies by name and recorded id; the pod deletes itself after 150 minutes. Done when: `make runpod-preflight`, then one real `make runpod-session` (worker-model-gpu-n) with `teardown_verified` true, the time limit armed, the cost logged in EXPERIMENTS and BENCHMARKS, and the RUNBOOK section checked against what happened. The EC2 path stays as built for the CPU sessions.
 **Considerations:** before the first launch, confirm the account plan allows GPU instances and that the on-demand vCPU quota for G instances in the project Region is at least the instance's vCPUs (`make gpu-preflight` checks both). If the quota never arrives, Phase 5 and 9.5 use their CPU fallbacks. No S3 bucket, ECR, IAM roles, k3s or DVC S3 remote in this plan.
 
 ### 2.5 Baseline load tests
@@ -175,13 +176,13 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Prompt:** Write scenarios for (a) an ingest ramp: step cameras through 1, 2, 4, 8, 16, ... at 5 FPS, hold each step long enough for steady state, and record freshness p95, backlog growth and drops to find rated capacity; (b) a small structured-query load (a few concurrency levels, fake or local LLM so cost stays zero) while ingest runs at about 70% of rated capacity. Run on CPU locally and once on the GPU instance.
 **Done when:** results files exist for both environments; rated capacity determined per the definition in `ARCHITECTURE.md` section 2, with variance across repetitions.
 **Also on that session (2026-10-14 revision):** the 3.5 second-LLM dev run on a local model (see 3.5).
-**CPU part as built (2026-10-14, E-039, E-040):** `bench/scenarios/ramp-cpu.yaml` (1 to 4 cameras: the CPU edge is between 2 and 3, so powers of two would step over it) and `query-load-cpu.yaml` (ingest at 70% of rated as 2 cameras x 3.5 FPS, concurrency 1 to 8, canned planner). Rated capacity on CPU: 2 cameras. Remaining: the same ramp on the GPU instance (a GPU scenario with steps sized to the GPU) once the quota arrives.
+**CPU part as built (2026-10-14, E-039, E-040):** `bench/scenarios/ramp-cpu.yaml` (1 to 4 cameras: the CPU edge is between 2 and 3, so powers of two would step over it) and `query-load-cpu.yaml` (ingest at 70% of rated as 2 cameras x 3.5 FPS, concurrency 1 to 8, canned planner). Rated capacity on CPU: 2 cameras. GPU part deferred (2026-10-19, D37): a Runpod pod has no Docker, so the GPU ramp needs the stack on a GPU host another way (Deferred list); 2.5 ticks on its CPU part.
 
 ### 2.6 Baseline report
 
 **Prompt:** Profile the worker and query service under load (py-spy flame graphs, trace breakdowns, GPU utilization). Write the baseline section of `BENCHMARKS.md`: tables, hardware, methodology, and a ranked list of bottlenecks with evidence. Use the list to check whether Phase 5 targets the real bottleneck, and propose a swap under the scope lock if it does not.
 **Done when:** baseline section complete; bottleneck list links to traces or profiles saved as artifacts.
-**CPU part as built (2026-10-14, E-041, E-042):** `kind: profile` scenarios (`vms.bench.profile`, py-spy on the host with the container stopped) for the worker at saturation and the query service; the ranked list is in BENCHMARKS ("Baseline bottlenecks"). Phase 5 targets the top bottleneck (the forward pass); the second (serial per-frame I/O) fits inside 5.5, so no scope swap. Remaining: a GPU worker profile with GPU utilization on the GPU session.
+**CPU part as built (2026-10-14, E-041, E-042):** `kind: profile` scenarios (`vms.bench.profile`, py-spy on the host with the container stopped) for the worker at saturation and the query service; the ranked list is in BENCHMARKS ("Baseline bottlenecks"). Phase 5 targets the top bottleneck (the forward pass); the second (serial per-frame I/O) fits inside 5.5, so no scope swap. GPU part deferred with the GPU ramp (2026-10-19, D37); 2.6 ticks on its CPU part.
 
 ---
 
@@ -286,6 +287,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 **Prompt:** On one rented GPU type, measure each step for YOLO11: PyTorch eager, ONNX Runtime CUDA, TensorRT FP16, TensorRT INT8 (calibrate on a representative frame set that is disjoint from the eval sets). Measure latency at batch 1 and throughput at a few batch sizes with a small in-process harness, plus GPU memory, and run detection mAP (3.4) with CIs for every step. Build TensorRT engines on the target GPU by script. CPU fallback if no GPU is available: PyTorch, ORT FP32 and ORT INT8 (static quantization) on CPU.
 **Done when:** ladder table complete with mAP and CIs; INT8 kept only if its mAP drop is within a threshold stated in `DECISIONS.md` beforehand.
+**GPU (2026-10-19, D37):** the GPU rungs run on a Runpod pod (1x L4) as a `kind: ladder` scenario through `make runpod-session`; TensorRT is installed into the pod's environment by the scenario's setup, and engines are built on the pod.
 
 ### 5.3 Batching sweep
 
@@ -306,6 +308,7 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 **Prompt:** Switch the worker to the best backend in-process (ONNX Runtime with the TensorRT or CUDA provider, or the CPU fallback), batching frames across cameras up to the batch size from 5.3 while keeping per-camera order for tracking. Re-run the ingest ramp on the same hardware as the baseline and report rated capacity before vs after. Write D5.
 **Done when:** D5 accepted; `BENCHMARKS.md` shows model-only and end-to-end improvement separately.
 **Considerations:** the end-to-end number (cameras per GPU) is the headline; model-only speedups are supporting detail.
+**GPU part (2026-10-19, D37):** the GPU ramp is deferred (a Runpod pod has no Docker for the stack), so on GPU only model-only numbers exist; D5's GPU part is decided from 5.2 and 5.3 on the pod and labeled model-only, and the README says cameras per GPU was not measured.
 
 ---
 

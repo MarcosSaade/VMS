@@ -40,7 +40,7 @@ Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacit
 
 ### Baseline ramp, CPU (task 2.5, E-039)
 
-`make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` on `laptop`, commit 7803f35: containerized ingest, one worker (yolo11n, PyTorch CPU build, batch size 1, imgsz 640), Postgres and SeaweedFS from `make up`; loadgen replays the data-mini clips at 5 FPS per camera (1280x720 q85); no query load. Warmup 20 s, hold 90 s, 3 repetitions; mean (std). GPU column: waits for the GPU quota (2.4).
+`make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` on `laptop`, commit 7803f35: containerized ingest, one worker (yolo11n, PyTorch CPU build, batch size 1, imgsz 640), Postgres and SeaweedFS from `make up`; loadgen replays the data-mini clips at 5 FPS per camera (1280x720 q85); no query load. Warmup 20 s, hold 90 s, 3 repetitions; mean (std). GPU column: not measured; the GPU end-to-end ramp is deferred (D37: GPU sessions run on Runpod pods, which have no Docker for the stack).
 
 | Cameras | Offered = accepted fps | Worker done fps | Freshness p50 / p95 s | Backlog slope fps (max frames) | Lost | Worker cores | Ingest SLO |
 |---|---|---|---|---|---|---|---|
@@ -128,7 +128,7 @@ The inference thread was busy 57 s of the 80 s under load (71%).
 
 **Query service, canned planner, 8 clients** (130 q/s with the profiler attached; [results](../bench/results/2026-10-14-profile-query-cpu-01M4XXP40EA6Q9CQ3GV2C73DCB.json), [profile](../bench/profiles/2026-10-14-profile-query-cpu-01M4XXP40EA6Q9CQ3GV2C73DCB.speedscope.json.gz)): SQL validation (sqlglot parse and regenerate) 53.2%, HTTP and pydantic 14.0%, OpenTelemetry 11.6%, execution 10.4%, planning 4.8%, event loop 3.4%, compile 0.7%.
 
-**Ranked bottlenecks** (for the CPU deployment; the GPU column comes with the quota):
+**Ranked bottlenecks** (for the CPU deployment; no GPU profile: deferred with the GPU ramp, D37):
 
 1. **The detector's forward pass** sets the worker's ceiling: 66% of the worker's time at saturation, infer p95 73 ms per frame, at batch size 1. PyTorch runs 10 intra-op threads on a 2P+8E hybrid CPU yet the worker uses only 3.5 cores at saturation; whether fewer threads (on the performance cores) are faster is a hypothesis for 5.2, not measured here. This is what Phase 5 attacks: ONNX Runtime (already at parity, 5.1), the precision ladder (5.2) and batching (5.3). Fix first: largest share, and the levers are planned.
 2. **The worker runs each frame's stages one after another**: claim, fetch, infer, write. The inference thread idles 29% of the time while the event loop does I/O, a ceiling of about 1/0.71 = 1.4x left on the table. Overlapping the next frame's fetch and the previous frame's write with inference is part of 5.5 (batching across cameras); no plan change needed.
@@ -202,7 +202,7 @@ Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch 
 - **Batching does not help ONNX Runtime on this CPU** (batch 4 is +5%, inside the repetition std): one image already uses all 10 cores. PyTorch gains 17% at batch 4.
 - Calibration: 64 COCO train2017 images and 64 frames of MOT17-05/10/11/13 (`configs/calibration.v1.lock.jsonl`, sha256 35018eeb...), disjoint from the eval subset (unit test). MinMax ranges, per-channel weights.
 - **yolo11n:** ONNX Runtime FP32 is 1.84x PyTorch at batch 1 with identical mAP; INT8 loses 1.3 to 1.4 points on both sources with intervals that exclude 0, so it fails D32 clearly. Here batch 4 adds 16% for ONNX Runtime (smaller convolutions leave cores idle at batch 1), which the batch sweep (5.3) will pin down.
-- Not measured: the GPU rungs (TensorRT FP16 and INT8, waiting for the GPU quota). End to end: "Optimized worker ramp, CPU".
+- Not measured: the GPU rungs (TensorRT FP16 and INT8, next on a Runpod GPU session, D37). End to end: "Optimized worker ramp, CPU".
 
 ## Evaluation
 
@@ -256,7 +256,7 @@ Self-test (E-031): `PLANNER=gold` scores 100% on all 279 items (dev and test) wi
 
 ### Baseline planner (task 3.5; E-032, E-035, E-036)
 
-Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, planner.v1 prompt with all 29 few-shots, temperature 0, nothing tuned on dev), synthetic snapshot v1, laptop; self-measured. This is the provisional planner of D7: the second LLM (a local open model on dev) runs on the first GPU session. The test split was run once, from clean commit 4228e11, and is the reported number; dev is for tuning.
+Typed-plan engine with DeepSeek `deepseek-flash` (hosted, `json_object` output, planner.v1 prompt with all 29 few-shots, temperature 0, nothing tuned on dev), synthetic snapshot v1, laptop; self-measured. This is the provisional planner of D7: the second LLM (a local open model on dev) runs on a Runpod GPU session (D37). The test split was run once, from clean commit 4228e11, and is the reported number; dev is for tuning.
 
 - Test: [`2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json`](../eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json)
 - Dev (current, after sq-103 was accepted as a class listing): [`2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X45EXKGJP2055D6A04VPVK.json); first dev run: [`eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json`](../eval/results/2026-10-14-structured-dev-deepseek-flash-01M4X1CYSJZH1946PW8FJKE5HD.json)

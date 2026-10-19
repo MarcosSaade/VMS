@@ -392,27 +392,16 @@ class GpuSession:
         return ScenarioRun(scenario, ok=True)
 
     def _collect(self, remote: Remote, results_dir: Path) -> list[Path]:
-        """Copy the files the session produced (not those synced from the repo): results JSON
-        from bench/results into `results_dir`, and everything new under each of
-        `remote.collect` (eval results, fine-tuned weights) to the same path in the repo."""
-        t = self.settings.timeouts
-        pulls = [(RESULTS_DIR, results_dir, "*.json")]
-        pulls += [(d, self.repo / d, "*") for d in self.settings.remote.collect]
-        extra = " ".join(shlex.quote(d) for d in self.settings.remote.collect)
-        if extra:  # rsync fails on a missing source directory
-            remote.run(f"cd {shlex.quote(self.settings.remote.dir)} && mkdir -p {extra}", 60)
-        new: list[Path] = []
-        for k, (rel, local, pattern) in enumerate(pulls):
-            staging = self.dir / "collect" / str(k)
-            remote.pull(f"{self.settings.remote.dir}/{rel}", staging, t.collect_s)
-            local.mkdir(parents=True, exist_ok=True)
-            for path in sorted(staging.glob(pattern)):
-                target = local / path.name
-                if not path.is_file() or target.exists():
-                    continue
-                target.write_bytes(path.read_bytes())
-                new.append(target)
-        return new
+        r = self.settings.remote
+        return collect_new_files(
+            remote,
+            r.dir,
+            r.collect,
+            self.repo,
+            results_dir,
+            self.dir / "collect",
+            self.settings.timeouts.collect_s,
+        )
 
     # --- Teardown ------------------------------------------------------------------------
 
@@ -492,22 +481,9 @@ class GpuSession:
         return round(self.settings.hourly_usd() * self._billed() / 3600, 4)
 
     def _annotate(self, files: list[Path], git: GitInfo, hourly: float) -> None:
-        for path in files:
-            if path.suffix != ".json":
-                continue  # weights and other artifacts
-            try:
-                result = RunResult.model_validate_json(path.read_text(encoding="utf-8"))
-            except ValueError:
-                continue  # not a results file
-            wall = (result.ended_at - result.started_at).total_seconds()
-            m = self.settings.target
-            note = f"{m.accelerator.upper()} session {self.session_id} ({m.instance_type})"
-            if result.git.sha is None:
-                result.git = git  # written in a container without git; the session's checkout
-                note += "; git from the session"
-            result.cost_usd = round(hourly * wall / 3600, 4)
-            result.notes = f"{result.notes}; {note}" if result.notes else note
-            path.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        m = self.settings.target
+        note = f"{m.accelerator.upper()} session {self.session_id} ({m.instance_type})"
+        annotate_results(files, git, hourly, note)
 
     def _record(
         self,
@@ -568,6 +544,57 @@ def shielded() -> Iterator[None]:
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)
+
+
+def collect_new_files(
+    remote: Remote,
+    remote_dir: str,
+    collect: list[str],
+    repo: Path,
+    results_dir: Path,
+    staging_dir: Path,
+    timeout_s: float,
+) -> list[Path]:
+    """Copy the files a session produced (not those synced from the repo): results JSON from
+    bench/results into `results_dir`, and everything new under each of `collect` (eval results,
+    fine-tuned weights) to the same path in the repo."""
+    pulls = [(RESULTS_DIR, results_dir, "*.json")]
+    pulls += [(d, repo / d, "*") for d in collect]
+    extra = " ".join(shlex.quote(d) for d in collect)
+    if extra:  # rsync fails on a missing source directory
+        remote.run(f"cd {shlex.quote(remote_dir)} && mkdir -p {extra}", 60)
+    new: list[Path] = []
+    for k, (rel, local, pattern) in enumerate(pulls):
+        staging = staging_dir / str(k)
+        remote.pull(f"{remote_dir}/{rel}", staging, timeout_s)
+        local.mkdir(parents=True, exist_ok=True)
+        for path in sorted(staging.glob(pattern)):
+            target = local / path.name
+            if not path.is_file() or target.exists():
+                continue
+            target.write_bytes(path.read_bytes())
+            new.append(target)
+    return new
+
+
+def annotate_results(files: list[Path], git: GitInfo, hourly: float, note: str) -> None:
+    """Give each collected results file its cost (hourly rate x its own wall time), a note
+    naming the session, and the session's git info when it was written without git."""
+    for path in files:
+        if path.suffix != ".json":
+            continue  # weights and other artifacts
+        try:
+            result = RunResult.model_validate_json(path.read_text(encoding="utf-8"))
+        except ValueError:
+            continue  # not a results file
+        wall = (result.ended_at - result.started_at).total_seconds()
+        text = note
+        if result.git.sha is None:
+            result.git = git  # written in a container without git; the session's checkout
+            text += "; git from the session"
+        result.cost_usd = round(hourly * wall / 3600, 4)
+        result.notes = f"{result.notes}; {text}" if result.notes else text
+        path.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
 def git_tracked_files(repo: Path) -> list[str]:

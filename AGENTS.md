@@ -124,12 +124,12 @@ Rules:
 
 ## 10. Cloud, GPUs and cost
 
-- AWS is the default provider for all infrastructure (S3, ECR, IAM, AWS Budgets, EC2 spot GPU instances running k3s). All resources go in the project's single configured Region. D9 only decides whether long GPU benchmark runs move to a cheaper provider.
+- AWS is the default provider for all infrastructure (S3, ECR, IAM, AWS Budgets, EC2 instances). All AWS resources go in the project's single configured Region. Exception: AWS denied the GPU quota, so GPU sessions run on Runpod pods (D37); CPU sessions stay on AWS (D35).
 - GPUs are rented per session, only through scripts in `deploy/terraform/` or `scripts/`: provision -> run -> collect results -> destroy. Teardown runs even on failure.
-- Tag every cloud resource `project=vms` and `session=<id>`. After teardown, `scripts/gpu_session.sh` lists resources still carrying the session tag (Resource Groups Tagging API) and fails loudly if any remain.
+- Tag every AWS resource `project=vms` and `session=<id>`. After teardown, `scripts/gpu_session.sh` lists resources still carrying the session tag (Resource Groups Tagging API) and fails loudly if any remain. Runpod has no tags: pods are named `vms-gpu-<session id>`, and `scripts/runpod_session.sh` lists pods by that name after teardown and fails loudly if one remains.
 - Before anything that costs money or is irreversible (provisioning, deleting data or volumes, force-pushing, publishing anything), state the expected cost or impact and get the user's confirmation.
 - Never leave resources running at the end of a session. Verify teardown and log the cost in the run's results.
-- Secrets live only in `.env` (gitignored) or a secret manager. Keep `.env.example` complete, including optional variables such as `LLM_API_KEY` and `AWS_PROFILE`.
+- Secrets live only in `.env` (gitignored) or a secret manager. Keep `.env.example` complete, including optional variables such as `LLM_API_KEY`, `AWS_PROFILE` and `RUNPOD_API_KEY`.
 
 ## 11. Git
 

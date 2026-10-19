@@ -45,6 +45,20 @@ def test_ssh_pins_the_session_key_and_host_key(
     assert rec.calls[0]["timeout"] == 30
 
 
+def test_a_mapped_ssh_port_reaches_ssh_and_rsync(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    rec = Recorder()
+    monkeypatch.setattr(subprocess, "run", rec)
+    pod = SshRemote("203.0.113.9", "root", tmp_path / "key", tmp_path / "known", 10, port=40122)
+    pod.run("true", 5, capture=True)
+    pod.push(tmp_path, ["a.py"], "vms", 60)
+    ssh, rsync = rec.calls[0]["cmd"], rec.calls[1]["cmd"]
+    assert ssh[ssh.index("-p") + 1] == "40122"
+    assert "-p 40122" in rsync[rsync.index("-e") + 1]
+    assert ssh[-2] == "root@203.0.113.9"
+
+
 def test_failures_and_timeouts_raise(remote: SshRemote, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(subprocess, "run", Recorder(returncode=3))
     with pytest.raises(RemoteError, match="exit 3"):
@@ -77,5 +91,11 @@ def test_gpu_override_runs_the_worker_on_cuda_with_pinned_images() -> None:
 
 
 def test_scripts_are_valid_bash() -> None:
-    for script in ("scripts/gpu_session.sh", "scripts/gpu_remote.sh"):
+    scripts = (
+        "scripts/gpu_session.sh",
+        "scripts/gpu_remote.sh",
+        "scripts/runpod_session.sh",
+        "scripts/pod_remote.sh",
+    )
+    for script in scripts:
         subprocess.run(["bash", "-n", str(REPO_ROOT / script)], check=True, timeout=10)

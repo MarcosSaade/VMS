@@ -1,9 +1,10 @@
 name: worker-model-gpu-n
 description: >
   worker-model-cpu-n with one variable changed, the device: model-only latency of the worker's
-  per-frame work (JPEG decode, input statistics, YOLO11n detection) at batch size 1 on the GPU
-  instance, inside the CUDA worker image. Decode and statistics stay on the CPU. Baseline for
-  the GPU precision ladder (5.2).
+  per-frame work (JPEG decode, input statistics, YOLO11n detection) at batch size 1 on a GPU
+  with the CUDA build of the locked PyTorch (a Runpod pod's project environment, D37; on EC2,
+  the CUDA worker image). Decode and statistics stay on the CPU. Baseline for the GPU precision
+  ladder (5.2).
 kind: model
 repeats: 3
 bench:

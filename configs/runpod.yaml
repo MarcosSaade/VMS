@@ -1,0 +1,45 @@
+# GPU sessions on Runpod pods (vms.cloud.pod_cli, scripts/runpod_session.sh; D37): one pod per
+# session, model scenarios only. Overrides configs/common.yaml; VMS_* environment variables
+# override this file (VMS_GPU_TYPE="NVIDIA GeForce RTX 4090", VMS_CLOUD=COMMUNITY). The API key
+# is RUNPOD_API_KEY in .env, never in this file.
+
+# The L4 matches the AWS g6.xlarge D28 planned for, so GPU numbers stay comparable with the plan.
+gpu_type: NVIDIA L4             # a catalog id: GET https://api.runpod.io/v2/catalog/gpus
+gpu_count: 1
+cloud: SECURE                   # Runpod-owned data centers; COMMUNITY hosts vary more
+min_cuda_version: "12.8"        # host driver floor; the cu126 wheels need driver >= 560
+data_center_ids: []             # empty: wherever the GPU is in stock
+# Runpod's base image (Ubuntu 24.04; sshd from PUBLIC_KEY in /start.sh; python3, rsync, make,
+# curl), pinned by digest. No CUDA toolkit needed: the cu126 wheels bring their own libraries.
+image: runpod/base:1.0.3-ubuntu2404@sha256:d536f17af1c7bde1bc0ea642dbe0b0f222709ef3391588bce674eb9c55c1738b
+container_disk_gb: 40           # environment, CUDA wheels (~3 GB), clips, weights; wiped with the pod
+ssh_user: root
+name_prefix: vms                # pods are named vms-gpu-<session id>: the leftover check
+# Safety net if this machine dies: the pod deletes itself after this long, through the API with
+# the pod-scoped key Runpod injects. The session refuses to run if that timer is not armed.
+max_session_minutes: 150
+require_self_terminate: true
+host_setup: []
+
+# The GPU price comes from the live catalog at preflight; container disk is billed on top.
+prices:
+  container_disk_gb_month_usd: 0.10
+  hours_per_month: 730
+
+remote:
+  dir: vms                      # under root's home
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  collect: [eval/results]
+
+timeouts:
+  api_s: 30
+  api_max_attempts: 5           # reads and deletes: backoff with full jitter; creates never retried
+  running_s: 900                # placement, image pull, sshd up
+  ssh_ready_s: 300
+  ssh_connect_s: 10
+  sync_s: 1200
+  setup_s: 3600                 # uv, the environment, CUDA wheels, weights
+  scenario_s: 3600
+  collect_s: 600
+  terminate_s: 300
+  poll_s: 5

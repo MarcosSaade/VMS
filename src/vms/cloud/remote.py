@@ -1,4 +1,5 @@
-"""The GPU instance seen from this machine: SSH commands and rsync, behind `Remote`.
+"""The session host (an EC2 instance or a Runpod pod) seen from this machine: SSH commands
+and rsync, behind `Remote`.
 
 `SshRemote` shells out to `ssh` and `rsync` with a per-session key and known_hosts file, a
 connect timeout and keepalives, and a hard timeout on every call. Long commands stream their
@@ -52,6 +53,7 @@ class SshRemote:
         known_hosts: Path,
         connect_timeout_s: int,
         poll_s: float = 5.0,
+        port: int = 22,
     ) -> None:
         self._target = f"{user}@{host}"
         self._ssh = [
@@ -73,6 +75,8 @@ class SshRemote:
             "ServerAliveInterval=15",
             "-o",
             "ServerAliveCountMax=4",
+            "-p",  # a Runpod pod publishes its sshd on a mapped port
+            str(port),
         ]
         self._poll_s = poll_s
 

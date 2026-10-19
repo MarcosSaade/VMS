@@ -235,6 +235,29 @@ gpu-teardown: ## Delete what a GPU session left behind and verify (SESSION=<id>)
 gpu-list: ## AWS resources tagged project=vms that still exist
 	scripts/gpu_session.sh list
 
+# --- GPU sessions on Runpod (D37; RUNBOOK: GPU sessions) ---------------------------
+# AWS denied the GPU quota (D35), so GPU work runs on Runpod pods: model scenarios only (a pod
+# has no Docker). Needs RUNPOD_API_KEY in .env. VMS_GPU_TYPE picks another catalog GPU.
+
+RUNPOD_SCENARIOS ?= bench/scenarios/worker-model-gpu-n.yaml
+
+.PHONY: runpod-preflight
+runpod-preflight: ## Free checks before a Runpod GPU session: API key, GPU price and stock, old pods
+	scripts/runpod_session.sh preflight
+
+.PHONY: runpod-session
+runpod-session: ## Create a pod, run RUNPOD_SCENARIOS, collect, delete and verify (asks first; costs money)
+	scripts/runpod_session.sh run $(RUNPOD_SCENARIOS)
+
+.PHONY: runpod-teardown
+runpod-teardown: ## Delete a Runpod session's pod and verify (SESSION=<id>)
+	@test -n "$(SESSION)" || { echo "make runpod-teardown: set SESSION=<id>" >&2; exit 1; }
+	scripts/runpod_session.sh teardown --session $(SESSION)
+
+.PHONY: runpod-list
+runpod-list: ## Runpod pods named vms-* that still exist
+	scripts/runpod_session.sh list
+
 # --- Benchmarks and evaluation -------------------------------------------------
 
 .PHONY: dashboards

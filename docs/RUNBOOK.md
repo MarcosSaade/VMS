@@ -388,7 +388,37 @@ VMS_DETECTOR__BACKEND=onnxruntime VMS_DETECTOR__PRECISION=int8 make worker
 
 ## GPU sessions
 
-One on-demand GPU instance per session, launched, used and destroyed by `scripts/gpu_session.sh` (`python -m vms.cloud`; design in ARCHITECTURE 9, D28). Settings: `configs/cloud.yaml`.
+AWS denied the GPU quota (EC2 and SageMaker, D35), so **GPU sessions run on Runpod pods** (D37): one pod per session, created, used and deleted by `scripts/runpod_session.sh` (`python -m vms.cloud.pod_cli`). A pod is a container, so only in-process scenarios run there (`kind: model` and `kind: ladder`: the precision ladder, batch sweeps, model-only latency); end-to-end scenarios are refused and the GPU end-to-end ramp is pending. CPU sessions stay on AWS ([CPU sessions](#cpu-sessions-d35)); the EC2 GPU path below them is built and waits for a quota.
+
+### Runpod GPU sessions (D37)
+
+Settings: `configs/runpod.yaml` (GPU type, cloud tier, CUDA floor, image digest, disk, time limit). Override per run with `VMS_GPU_TYPE="NVIDIA GeForce RTX 4090"`, `VMS_CLOUD=COMMUNITY` or `VMS_MAX_SESSION_MINUTES=90`; a different GPU is a new baseline, never mixed with L4 numbers.
+
+**Cost.** 1x L4 on the secure cloud: $0.59 per hour from the catalog on 2026-10-19, plus 40 GB of container disk (about $0.005/h), billed per second while the pod exists. Preflight prints the live price. Setup (uv, the environment, the ~3 GB of CUDA wheels, weights) takes roughly 10 minutes before the first scenario. The pod deletes itself after 150 minutes whatever happens, so one session costs at most about $1.50. Each results file records its cost; the session's own file (`bench/results/<date>-gpu-session-<id>.json`, kind `cloud.pod_session`) has the total.
+
+Prerequisites, once:
+1. Prepaid credit with **auto-pay off**, and a low-balance email alert (Runpod console > Billing). The balance is the hard spend cap: at $0 every pod stops. Credits are not refundable, so top up small amounts ($20 on 2026-10-19).
+2. An API key: Runpod console > Settings > API Keys, with read and write access to pods. Put it in `.env` as `RUNPOD_API_KEY=` (gitignored). It stays on this machine; pods get their own pod-scoped key.
+3. `rsync` and `ssh` on this machine, and the mini clips (`make data-mini`; they are copied to the pod).
+
+Running a session:
+```bash
+make runpod-preflight                 # free: API key, GPU price and stock, pods left from earlier sessions
+git status                            # must be clean: results carry the commit's SHA (--allow-dirty for a test)
+make runpod-session                   # RUNPOD_SCENARIOS="bench/scenarios/a.yaml ..." to choose; asks first
+scripts/runpod_session.sh run --yes bench/scenarios/worker-model-gpu-n.yaml   # no prompt (scripted use)
+```
+`make runpod-session` prints the GPU, cloud tier, stock, CUDA floor, image, hourly cost and cap, and creates the pod only after you type `launch`. Then: a per-session SSH key, the pod (`vms-gpu-<id>`, port 22 published, no volume), direct SSH ready, the time-limit check (the session stops before running anything if the pod's self-delete timer is not armed with a pod-scoped key), code and clips synced, `scripts/pod_remote.sh setup` (output streams here), one `scripts/pod_remote.sh run <scenario>` per scenario, results copied into `bench/results/`, pod deleted, verification. A failing scenario is recorded and the next one still runs. Ctrl-C at any point tears down. Per-session files (private key, known_hosts, state) are in `.gpu-sessions/<id>/` (gitignored).
+
+Exit codes: 0 all good; 1 setup or a scenario failed; 2 **a pod remains after teardown**; 3 not confirmed (nothing created); 4 preflight failed (nothing created); 130 interrupted.
+
+If a session reports exit 2, or this machine died mid-session: `make runpod-teardown SESSION=<id>` (from the saved state and the pod's name), then `make runpod-list` must print "no project pods exist"; check the Runpod console's Pods page too. To look at a running pod: `ssh -i .gpu-sessions/<id>/id_ed25519 -o UserKnownHostsFile=.gpu-sessions/<id>/known_hosts -p <ssh_port> root@<ssh_host>` (both in `.gpu-sessions/<id>/state.json`).
+
+After a session: check the session file's `metrics.teardown_verified` is true and `metrics.time_limit` starts with `armed ... key=yes`, compare the cost with Runpod's billing page, log the run in `EXPERIMENTS.md`, and commit the results files behind any reported number.
+
+### EC2 GPU sessions (D28; waiting for a quota)
+
+One on-demand GPU instance per session, launched, used and destroyed by `scripts/gpu_session.sh` (`python -m vms.cloud`; design in ARCHITECTURE 9, D28). Settings: `configs/cloud.yaml`. Not usable while the account's G and VT quota is 0; kept because the CPU sessions share the driver.
 
 **Cost.** g6.xlarge (1x L4, 4 vCPUs) costs about **$0.82 per hour** in us-east-2 (instance $0.8048 + 100 GB gp3 + public IPv4), billed per second with a 60 s minimum. A session needs roughly 15 to 25 minutes of setup (tools, `make setup`, the stack, the CUDA image) before the first scenario. The instance terminates itself after 150 minutes whatever happens, so one session costs at most about $2.05. Each results file records its cost; the session's own file (`bench/results/<date>-gpu-session-<id>.json`) has the total.
 
@@ -486,7 +516,11 @@ Symptom, cause and fix entries as issues are met.
 
 Locally: `make down` (`make down-volumes` also deletes stack data).
 
-GPU sessions tear themselves down and verify it (above). How you know nothing is still billing:
+Cloud sessions tear themselves down and verify it (above). How you know nothing is still billing on **Runpod** (GPU sessions):
+- The session ends with "teardown verified": no pod named `vms-gpu-<id>` is listed and the pod id it recorded reads as gone. `make runpod-list` lists every pod named `vms-*` from any session and should print "no project pods exist"; the Runpod console's Pods page should be empty too. Sessions create no network volumes (they bill even with no pod), so the console's Storage page should stay empty.
+- If a session exits 2, or this machine died mid-session: `make runpod-teardown SESSION=<id>`. Even without it, the pod deletes itself after 150 minutes, and the balance with auto-pay off caps the rest.
+
+On **AWS** (CPU sessions, and EC2 GPU sessions if the quota arrives):
 - The session ends with "teardown verified": it looked up every resource tagged `session=<id>` (Resource Groups Tagging API) plus the instance, security group and key pair it recorded, and none still exists. A terminated instance can stay listed by the Tagging API for a while; it counts as gone once EC2 reports it `terminated` (terminated instances are not billed).
 - `make gpu-list` lists every resource tagged `project=vms` that still exists, from any session. It should print "no project resources exist" (the budget is not an EC2 resource and is not listed).
 - If a session exits 2, or this machine died mid-session: `make gpu-teardown SESSION=<id>` (the id is printed at the start and names `.gpu-sessions/<id>/`). It finds the resources from the session's tags and saved state, deletes them and verifies. Even without it, the instance terminated itself after 150 minutes; the security group and key pair left behind cost nothing but should be removed.

@@ -6,11 +6,11 @@
 
 **Checkpoint C1 (end of this plan).** Every task below is ticked: the system runs end to end on CPU with a UI and dashboards; it has a measured baseline with a bottleneck analysis; structured-query and detection quality are evaluated with bootstrap confidence intervals; a precision ladder shows accuracy against latency; drift detection is scored on delay against false-alarm rate; and the README and write-up present it all. At C1, stop and decide whether to continue at all. Deferred work comes back only through the scope-lock rule.
 
-**Estimate.** 29 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). The biggest schedule risk is the GPU quota: spot is denied by the account's SCP, and the on-demand G quota is 0 (4 vCPUs requested 2026-10-13; D28): Phase 5 and 9.5 need a GPU, and both have a CPU fallback in `PLAN_FULL.md`.
+**Estimate.** 29 tasks remain, about 75 to 80 hours of the user's time: roughly 6 weeks at 12 to 15 hours per week. Assumption: the coding agent implements; the user's hours go to specifying, reviewing, running, verifying and answering each task's "Understand it" question (tasks 0.5, 0.6 and 1.1 each took about 1 to 1.5 hours of agent time). GPU access is settled: AWS denied the GPU quota for EC2 and SageMaker (D35), so GPU sessions run on Runpod pods (D37, 2026-10-19), model-level work only; the GPU end-to-end parts of 2.5, 2.6 and 5.5 are deferred (no Docker inside a pod).
 
 **Order of work.** Phase 1, then 2.1 to 2.3, then Phase 3, then 2.4 to 2.6 (first GPU session), then Phase 5, then Phase 9, then Phase 11 (publish at C1), then Phase 8 (after C1, added 2026-10-16; 8.1 may run early on the first GPU session, alongside the 3.5 local LLM run). Phase numbers are kept for stable IDs, so this order differs from the numbering.
 
-**Publish point and job-search order (2026-10-16).** The GPU quota must not block publishing, so the project goes public when Phase 9 and Phase 11 are done, with the GPU-only results (2.4, the GPU parts of 2.5 and 5.5, the TensorRT rungs of 5.2, 5.3) marked "pending" in the README; C1 itself still needs every task ticked. From there:
+**Publish point and job-search order (2026-10-16).** The GPU quota must not block publishing, so the project goes public when Phase 9 and Phase 11 are done, with the GPU-only results (the TensorRT rungs of 5.2, the 5.3 GPU sweep, and the deferred GPU end-to-end parts of 2.5, 2.6 and 5.5) marked "pending" in the README; C1 itself still needs every task ticked. From there:
 1. Phase 9, then Phase 11 (polished: README, screenshots, 2-minute video), then publish and apply to MLE roles.
 2. 8.1 vLLM serving, on the first GPU session together with the GPU-blocked tasks above; then apply to AI-serving roles (8.1 plus the quantization numbers of 8.4 cover serving interviews).
 3. Deferred 10.1 and 10.3 (Terraform, full-scale cloud benchmark, cost per camera-hour, which absorbs the cloud-CPU run), back through the scope-lock rule.
@@ -63,11 +63,11 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: for each panel, what decision would you make from it?
 - [x] 2.3 Benchmark framework: scenario YAML, runner, results JSON schema, warmup and repetitions
   - Understand it: why exclude warmup, how many repetitions, and how is variance reported?
-- [ ] 2.4 GPU session on AWS: one tagged on-demand instance by script (spot is denied by the account's SCP, D28), Budgets alarm, verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote). Built and budget created 2026-10-13; waiting for the on-demand G quota for the real session
+- [ ] 2.4 GPU session by script with verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote). EC2 driver built 2026-10-13 (D28) but AWS denied the GPU quota; rebuilt on Runpod pods 2026-10-19 (D37: one pod per session, model and ladder scenarios only, teardown verified by pod name, self-delete timer, prepaid balance as the cap). Remaining: the first real session (`make runpod-session`, worker-model-gpu-n), its cost logged
   - Understand it: how do you know nothing is still billing after a session, and what does an hour cost?
-- [ ] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK). CPU part done 2026-10-14 (rated 2 cameras, E-039; query load E-040); the GPU run waits for the quota
+- [ ] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK). CPU part done 2026-10-14 (rated 2 cameras, E-039; query load E-040); the GPU run is deferred (D37: no Docker inside a Runpod pod), so this ticks on its CPU part
   - Understand it: what is the definition of rated capacity, and where did the ramp break?
-- [ ] 2.6 Baseline report and bottleneck analysis (profiling). CPU part done 2026-10-14 (E-041, E-042; ranked list in BENCHMARKS); the GPU profile waits for the quota
+- [ ] 2.6 Baseline report and bottleneck analysis (profiling). CPU part done 2026-10-14 (E-041, E-042; ranked list in BENCHMARKS); the GPU profile is deferred with the GPU ramp (D37), so this ticks on its CPU part
   - Understand it: rank the top three bottlenecks with evidence, and say which one you would fix first and why.
 
 ## Phase 3: Evaluation harness
@@ -83,11 +83,11 @@ After each step the README headline numbers and the write-up are updated.
 ## Phase 5: Model internals
 - [x] 5.1 Export YOLO11 to ONNX with parity tests (SHRINK: no Triton, no CLIP)
   - Understand it: what tolerance did parity use and why, and where do ONNX and PyTorch outputs differ?
-- [ ] 5.2 Precision ladder: PyTorch, ORT, TensorRT FP16, TensorRT INT8, each with mAP (CI) and latency (CPU ladder as fallback). CPU part done 2026-10-15 (E-043 to E-046: ORT FP32 1.65x (yolo11s) and 1.84x (yolo11n) PyTorch at equal mAP; ORT INT8 faster still but fails D32 for both); the TensorRT rungs wait for the quota
+- [ ] 5.2 Precision ladder: PyTorch, ORT, TensorRT FP16, TensorRT INT8, each with mAP (CI) and latency (CPU ladder as fallback). CPU part done 2026-10-15 (E-043 to E-046: ORT FP32 1.65x (yolo11s) and 1.84x (yolo11n) PyTorch at equal mAP; ORT INT8 faster still but fails D32 for both); the TensorRT rungs run on Runpod (D37)
   - Understand it: why does INT8 need calibration, what did it cost in mAP, and is that drop inside the CI?
 - [ ] 5.3 Batch-size sweep in-process: throughput against latency (SHRINK: no Triton dynamic batching)
   - Understand it: why do throughput and latency both rise with batch size, and which point meets the freshness SLO?
-- [ ] 5.5 Worker on the best backend in-process; re-run ramp; decide D5 (SHRINK: no Triton). CPU part done 2026-10-16 (E-047 to E-049: ONNX Runtime FP32, cross-camera batch 4, no thread spinning: rated 2 -> 5 cameras, ceiling 1.8x; D5 accepted for CPU); the GPU ramp and D5's GPU part wait for the quota
+- [ ] 5.5 Worker on the best backend in-process; re-run ramp; decide D5 (SHRINK: no Triton). CPU part done 2026-10-16 (E-047 to E-049: ONNX Runtime FP32, cross-camera batch 4, no thread spinning: rated 2 -> 5 cameras, ceiling 1.8x; D5 accepted for CPU); the GPU ramp is deferred (D37) and D5's GPU part is decided model-level from 5.2 and 5.3 on Runpod
   - Understand it: how much of the model-only speedup survived end to end, and why not all of it?
 
 ## Phase 9: Drift detection
@@ -147,12 +147,14 @@ The finished project should let the user answer each of these with specifics fro
 - **2026-10-06 (re-scope):** The 18-week plan is cut to a finishable core of about 6 part-time weeks, chosen for hiring signal and learning per hour, because the semester is shared with a research paper and quant work. Kept: the end-to-end baseline with a UI and good dashboards (the demo and write-up are visual for recruiters who skim), observability, the benchmark runner and bottleneck analysis, the evaluation harness with bootstrap confidence intervals and an error taxonomy, a minimal model-internals track (ONNX parity, precision ladder, batch sweep), drift detection framed as sequential change detection, and packaging. Deferred: storage and queue benchmarks, gRPC, Kubernetes, autoscaling, chaos and capacity tests, CLIP with semantic and hybrid search (retrieval labels are the most expensive labeling in the plan), the free-form SQL engine, LLM serving and LoRA, full Terraform, CD and the retraining stretch. Decisions that depended on deferred tasks now have defaults marked "accepted (default, not benchmarked)" (D1 to D4, D6 to D11). Redis, MLflow and W&B are removed because no kept task measures a need for them (new task 0.7, D16). Tally over the original 65 tasks: 24 kept (7 already done), 14 shrunk, 27 deferred; plus the new task 0.7. A scope lock and checkpoint C1 now head this file.
 - **2026-10-14:** By the user's decision, the second LLM in 3.5 is not run now through another hosted API; it runs locally on the first GPU session (2.4/2.5) instead, with the same harness and dev split. 3.5 closes without it, with DeepSeek as the provisional planner (D7 stays "default, not compared" until then). No work is added or removed, only moved.
 - **2026-10-16:** By the user's decision, Phase 8 (LLM serving and LoRA, 5 tasks) comes back as work after C1 rather than as a swap: the user publishes at C1, starts applying, and keeps going, updating the README and write-up per phase. C1's scope and the scope lock for it are unchanged. 8.3 drops W&B and the MLflow registry (removed by D16; results JSON and DVC instead), and 8.1 drops Helm (6.4 stays deferred). 8.1 may run on the first GPU session next to the 3.5 local LLM run, since both need the same served model.
+- **2026-10-19 (GPU provider):** AWS denied the GPU quota for EC2 and SageMaker; Lambda Cloud declined the card (no payments from Mexico), and DigitalOcean wanted a ~$250 prepayment. By the user's decision, GPU sessions run on Runpod pods (D37), which run containers without Docker, so GPU work is model-level only: the 5.2 TensorRT rungs, the 5.3 GPU sweep, the 3.5 local-LLM run, and 8.1 to 8.4. The GPU end-to-end parts of 2.5 (GPU ramp), 2.6 (GPU profile) and 5.5 (GPU ramp) move to the Deferred list; those tasks tick on their CPU parts, and the README marks GPU end-to-end numbers as not measured. 2.4 is rebuilt for Runpod. No other task is added or removed.
 - **2026-10-16 (publish point):** Publishing no longer waits for C1: the project goes public after Phase 9 and Phase 11, with GPU-only results marked pending, and the work after it follows the job-search order under "Order of work". No task is added or removed; deferred tasks named in that order still come back only through the scope-lock rule.
 
 ## Deferred (not planned)
 
 Kept unchanged so nothing is lost. A deferred task comes back only through the scope-lock rule. Details stay in `PLAN_FULL.md`, marked deferred.
 
+- [ ] GPU end-to-end (from 2.5, 2.6, 5.5; 2026-10-19, D37): GPU ingest ramp, GPU worker profile with utilization, rated capacity on GPU. Needs the stack on the GPU host: a single-image variant for Runpod, a full-VM GPU provider, or the AWS quota
 - [ ] 3.3 Retrieval eval set and metrics (recall@k, nDCG)
 - [ ] 4.1 Synthetic detection generator fitted to real replay data (outputs DVC-tracked)
 - [ ] 4.2 Storage workload: ingest benchmark and query suite
