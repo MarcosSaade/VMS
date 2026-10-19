@@ -24,6 +24,8 @@ One entry per environment used (CPU, RAM, GPU model, driver, CUDA, instance type
 |---|---|---|
 | laptop | Intel i7-1355U (2 performance + 8 efficiency cores, 12 threads), 15 GiB RAM, no GPU, Linux 6.8 | Development laptop. Runs before 2026-10-14 had other work running and are indicative. The 2.5/2.6 runs (E-039 to E-042) stopped the unrelated containers; a browser and desktop stayed open, so it is quieter, not a dedicated host. |
 
+| runpod-a40 | Runpod pod, secure cloud: 1x NVIDIA A40 48 GB (driver 580.159.04, host CUDA 13.0), Intel Xeon Gold 6342 host (the pod gets a share of its 96 threads), data center EU-SE-1 on 2026-10-19 | GPU sessions (D37). A container, not a VM: model-level scenarios only. Data center and host vary per session and are recorded in each session file. |
+
 ## Headline results
 
 Self-measured on `laptop`; 95% bootstrap intervals. Still to come: rated capacity on a GPU, cost per camera-hour.
@@ -155,6 +157,16 @@ Self-measured on `laptop` with `make bench-model`: the worker's per-frame work i
 | yolo11n | 18.8 (1.9) | 40 / 47 | 62 | ~7.5 | 23.2 | E-016, `bench/results/2026-10-12-worker-model-cpu-n-01M4QVGTE15P83D77JXS71K9VF.json` |
 
 At the earlier threshold of 0.25 the numbers were the same within noise (E-013, E-014).
+
+### Worker model-only latency, GPU (task 2.4, E-058)
+
+The same scenario with one variable changed, the device (`worker-model-gpu-n`: PyTorch 2.14.1 cu126 build on CUDA), on `runpod-a40`. Not comparable as a ratio with the laptop rows beyond "the same scenario": the host CPU is different too.
+
+| Model | Frames/s (mean, std) | Decode / stats / infer p50 ms | Total p95 ms | Raw detections/frame | Evidence |
+|---|---|---|---|---|---|
+| yolo11n | 50.1 (0.47) | 3.8 / 7.6 / 8.4 | 20.9 | 23.2 | E-058, `bench/results/2026-10-19-worker-model-gpu-n-01M5A8QXX03BK69Q5XKAWV959X.json` |
+
+On the GPU the forward pass (8.4 ms) is no longer the largest stage: JPEG decode and the input statistics on the CPU take 11.4 ms of the ~20 ms per frame, so GPU work in 5.2 and 5.3 is measured model-only, and the per-frame CPU stages are what would limit a GPU worker end to end.
 
 At 5 FPS per camera, one CPU worker keeps up with about 2 cameras on yolo11s and about 4 on yolo11n, before the database and object store are added. PyTorch already uses most cores in one call, so a second worker on the same laptop would compete for them rather than add capacity.
 
@@ -376,7 +388,13 @@ _Fine-tune: placeholder (task 9.5)._
 
 ## Cost
 
-_Placeholder (task 10.3)._
+Per-session cost, estimated as the live catalog price x billed seconds (Runpod) or configured price x billed seconds (AWS); each session's results file has the figure.
+
+| Session | Machine | Billed | Cost | Evidence |
+|---|---|---|---|---|
+| GPU session 1, worker-model-gpu-n (E-058) | runpod-a40, $0.595/h | 199 s | $0.033 | `bench/results/2026-10-19-gpu-session-01M5A8JBB6JEE5V6PA674W0CRT.json` |
+
+Cost per camera-hour at full scale: placeholder (task 10.3).
 
 ## How to reproduce
 

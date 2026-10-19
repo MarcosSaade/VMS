@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5A8QXX03BK69Q5XKAWV959X",
+  "name": "worker-model-gpu-n",
+  "kind": "worker.model",
+  "started_at": "2026-10-19T14:23:41.472988Z",
+  "ended_at": "2026-10-19T14:23:50.496994Z",
+  "seed": 1234,
+  "git": {
+    "sha": "8eb20058a0a3b03a8a089fc6bb1d59ae50408bf3",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "logical_cpus": 96,
+    "ram_bytes": 540644081664,
+    "platform": "Linux-6.8.0-136-generic-x86_64-with-glibc2.39",
+    "gpus": [
+      "NVIDIA A40, 580.159.04"
+    ]
+  },
+  "packages": {
+    "python": "3.12.3",
+    "aiohttp": "3.14.3",
+    "numpy": "2.5.3",
+    "opencv-python-headless": "5.0.0.93",
+    "pydantic": "2.13.5",
+    "prometheus-client": "0.26.0",
+    "torch": "2.14.1+cu126",
+    "torchvision": "0.29.1+cu126",
+    "ultralytics": "8.4.175",
+    "onnxruntime": "1.31.0"
+  },
+  "config": {
+    "service": "worker",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 0.01
+    },
+    "http": {
+      "host": "127.0.0.1",
+      "port": 8090
+    },
+    "queue": {
+      "max_cameras": 16,
+      "lease_ttl_s": 30.0,
+      "renew_every_s": 5.0,
+      "idle_release_s": 60.0,
+      "claim_batch": 4,
+      "infer_batch": 1,
+      "max_attempts": 3,
+      "poll_min_s": 0.05,
+      "poll_max_s": 1.0,
+      "backlog_every_s": 5.0,
+      "shutdown_grace_s": 10.0
+    },
+    "detector": {
+      "weights": "yolo11n",
+      "backend": "ultralytics",
+      "precision": "fp32",
+      "device": "cuda",
+      "imgsz": 640,
+      "conf": 0.1,
+      "iou": 0.7,
+      "max_det": 300,
+      "threads": null,
+      "spin": true
+    },
+    "tracker": {
+      "fps": 5.0,
+      "high_thresh": 0.25,
+      "low_thresh": 0.1,
+      "new_track_thresh": 0.25,
+      "match_thresh": 0.8,
+      "fuse_score": true,
+      "buffer_s": 2.0,
+      "classes": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck"
+      ],
+      "store_min_conf": 0.25
+    },
+    "zones": {
+      "min_frames": 2,
+      "loiter_s": 30.0,
+      "refresh_s": 60.0
+    },
+    "db": {
+      "min_size": 1,
+      "max_size": 4,
+      "connect_timeout_s": 5.0,
+      "acquire_timeout_s": 2.0,
+      "statement_timeout_ms": 5000
+    },
+    "objects": {
+      "max_concurrency": 4,
+      "connect_timeout_s": 2.0,
+      "read_timeout_s": 5.0,
+      "max_attempts": 3
+    }
+  },
+  "scenario": {
+    "name": "worker-model-gpu-n",
+    "description": "worker-model-cpu-n with one variable changed, the device: model-only latency of the worker's per-frame work (JPEG decode, input statistics, YOLO11n detection) at batch size 1 on a GPU with the CUDA build of the locked PyTorch (a Runpod pod's project environment, D37; on EC2, the CUDA worker image). Decode and statistics stay on the CPU. Baseline for the GPU precision ladder (5.2).\n",
+    "kind": "model",
+    "repeats": 3,
+    "bench": {
+      "clips": [
+        "mot17-09-mini",
+        "mot17-04-mini",
+        "commons-roncesvalles"
+      ],
+      "frames_per_clip": 50,
+      "warmup_frames": 10
+    },
+    "config": {
+      "detector": {
+        "weights": "yolo11n",
+        "device": "cuda"
+      }
+    }
+  },
+  "metrics": {
+    "model_version": "yolo11n@0ebbc80d4a76",
+    "repetitions": [
+      {
+        "frames": 150,
+        "wall_s": 2.959305664524436,
+        "frames_per_s": 50.68756559965061,
+        "cpu_cores": 0.9998669740239553,
+        "detections_per_frame": 23.246666666666666,
+        "latency_ms": {
+          "decode": {
+            "p50": 3.8379263132810593,
+            "p95": 3.9934830740094185,
+            "p99": 4.0961806662380695,
+            "mean": 3.773805076877276,
+            "std": 0.19198393028242858,
+            "max": 4.353156313300133
+          },
+          "stats": {
+            "p50": 7.560614496469498,
+            "p95": 8.185423957183957,
+            "p99": 8.73992064036429,
+            "mean": 7.560915518552065,
+            "std": 0.5779249936029102,
+            "max": 12.083505280315876
+          },
+          "infer": {
+            "p50": 8.378037251532078,
+            "p95": 8.903543232008815,
+            "p99": 9.887281265109774,
+            "mean": 8.390208433071772,
+            "std": 0.48768467393698706,
+            "max": 12.4731520190835
+          },
+          "total": {
+            "p50": 19.725481513887644,
+            "p95": 20.87828884832561,
+            "p99": 22.616853471845364,
+            "mean": 19.724929028501112,
+            "std": 0.8914233005614124,
+            "max": 24.488906376063824
+          }
+        }
+      },
+      {
+        "frames": 150,
+        "wall_s": 3.0068689258769155,
+        "frames_per_s": 49.8857794262696,
+        "cpu_cores": 1.0005165087542454,
+        "detections_per_frame": 23.246666666666666,
+        "latency_ms": {
+          "decode": {
+            "p50": 3.8225320167839527,
+            "p95": 4.011575831100345,
+            "p99": 4.084440628066659,
+            "mean": 3.784212339669466,
+            "std": 0.236967748523425,
+            "max": 5.785149522125721
+          },
+          "stats": {
+            "p50": 7.724166847765446,
+            "p95": 8.333842502906917,
+            "p99": 8.811990097165106,
+            "mean": 7.703399583697319,
+            "std": 0.38307795578124887,
+            "max": 9.079230949282646
+          },
+          "infer": {
+            "p50": 8.573935367166996,
+            "p95": 8.853021590039134,
+            "p99": 9.390555787831543,
+            "mean": 8.55351397767663,
+            "std": 0.2877772129812674,
+            "max": 10.45397762209177
+          },
+          "total": {
+            "p50": 20.05652990192175,
+            "p95": 20.891884388402104,
+            "p99": 21.41201122663915,
+            "mean": 20.041125901043415,
+            "std": 0.5971338387647739,
+            "max": 22.605634294450283
+          }
+        }
+      },
+      {
+        "frames": 150,
+        "wall_s": 3.009003628976643,
+        "frames_per_s": 49.85038853243748,
+        "cpu_cores": 1.000660807120407,
+        "detections_per_frame": 23.246666666666666,
+        "latency_ms": {
+          "decode": {
+            "p50": 3.802376799285412,
+            "p95": 4.048393061384559,
+            "p99": 5.982640627771606,
+            "mean": 3.801687117666006,
+            "std": 0.40354282751138315,
+            "max": 6.775740534067154
+          },
+          "stats": {
+            "p50": 7.737897802144289,
+            "p95": 8.301072521135211,
+            "p99": 8.56886165216565,
+            "mean": 7.755911766240994,
+            "std": 0.44310571328368537,
+            "max": 10.597089305520058
+          },
+          "infer": {
+            "p50": 8.499376475811005,
+            "p95": 8.84072436019778,
+            "p99": 9.707713369280095,
+            "mean": 8.497413974255323,
+            "std": 0.35539826060460034,
+            "max": 11.240772902965546
+          },
+          "total": {
+            "p50": 19.99041298404336,
+            "p95": 20.83236798644066,
+            "p99": 23.53557594120502,
+            "mean": 20.055012858162325,
+            "std": 0.8898935668376293,
+            "max": 26.23717114329338
+          }
+        }
+      }
+    ],
+    "aggregate": {
+      "frames_per_s_mean": 50.14124451945256,
+      "frames_per_s_std": 0.47345873193249977,
+      "infer_p50_ms_mean": 8.483783031503359,
+      "infer_p95_ms_mean": 8.865763060748577,
+      "total_p95_ms_mean": 20.867513741056126,
+      "error_rate": 0.0
+    },
+    "clips": {
+      "mot17-09-mini": {
+        "frames": 50,
+        "size": [
+          1280,
+          720
+        ]
+      },
+      "mot17-04-mini": {
+        "frames": 50,
+        "size": [
+          1280,
+          720
+        ]
+      },
+      "commons-roncesvalles": {
+        "frames": 50,
+        "size": [
+          1280,
+          720
+        ]
+      }
+    }
+  },
+  "cost_usd": 0.0015,
+  "notes": "GPU session 01M5A8JBB6JEE5V6PA674W0CRT (Runpod A40, SECURE); git from the session"
+}

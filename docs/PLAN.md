@@ -63,7 +63,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: for each panel, what decision would you make from it?
 - [x] 2.3 Benchmark framework: scenario YAML, runner, results JSON schema, warmup and repetitions
   - Understand it: why exclude warmup, how many repetitions, and how is variance reported?
-- [ ] 2.4 GPU session by script with verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote). EC2 driver built 2026-10-13 (D28) but AWS denied the GPU quota; rebuilt on Runpod pods 2026-10-19 (D37: one pod per session, model and ladder scenarios only, teardown verified by pod name, self-delete timer, prepaid balance as the cap). Remaining: the first real session (`make runpod-session`, worker-model-gpu-n), its cost logged
+- [x] 2.4 GPU session by script with verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote). EC2 driver built 2026-10-13 (D28) but AWS denied the GPU quota; rebuilt on Runpod pods 2026-10-19 (D37: one pod per session, model and ladder scenarios only, teardown verified by pod name, self-delete timer, prepaid balance as the cap). First session 2026-10-19 (E-058): A40, 199 s billed, $0.033, teardown verified
   - Understand it: how do you know nothing is still billing after a session, and what does an hour cost?
 - [ ] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK). CPU part done 2026-10-14 (rated 2 cameras, E-039; query load E-040); the GPU run is deferred (D37: no Docker inside a Runpod pod), so this ticks on its CPU part
   - Understand it: what is the definition of rated capacity, and where did the ramp break?
