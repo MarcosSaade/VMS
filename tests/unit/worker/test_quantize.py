@@ -244,3 +244,23 @@ def test_tensorrt_int8_model_has_only_zero_points_of_zero(
     assert meta.target == "tensorrt"
     with pytest.raises(FileNotFoundError):
         verified_int8(tmp_path, "rand", sha, source_sha)  # the ONNX Runtime model is another file
+
+
+def test_thread_pools_follow_a_container_cpu_quota(monkeypatch: pytest.MonkeyPatch) -> None:
+    import cv2
+
+    import vms.common.cpus as cpus
+    from vms.worker.detector import fit_to_cpu_quota
+
+    before = cv2.getNumThreads()
+    try:
+        monkeypatch.setattr(cpus, "cpu_quota", lambda: None)
+        s = DetectorSettings(backend="onnxruntime")
+        assert fit_to_cpu_quota(s).threads is None  # no quota: backend defaults, as before
+        monkeypatch.setattr(cpus, "cpu_quota", lambda: 9)
+        assert fit_to_cpu_quota(s).threads == 9
+        assert cv2.getNumThreads() == 9
+        explicit = DetectorSettings(backend="onnxruntime", threads=2)
+        assert fit_to_cpu_quota(explicit).threads == 2  # an explicit setting wins
+    finally:
+        cv2.setNumThreads(before)

@@ -95,6 +95,8 @@ class Pod:
     ssh: SshEndpoint | None = None  # direct SSH over the published 22/tcp, once running
     created_at: datetime | None = None
     ports: tuple[str, ...] = ()  # runtime port mappings, "private->ip:public/type"
+    vcpus: float | None = None  # allocated to the pod (gpu.vcpuCount)
+    memory_gb: float | None = None
 
 
 class Pods(Protocol):
@@ -160,6 +162,8 @@ def parse_pod(item: dict[str, Any]) -> Pod:
         cuda_version=item.get("cudaVersion"),
         ssh=ssh,
         created_at=_parse_time(item.get("createdAt")),
+        vcpus=(item.get("gpu") or item.get("cpu") or {}).get("vcpuCount"),
+        memory_gb=(item.get("gpu") or item.get("cpu") or {}).get("memory"),
         ports=tuple(
             f"{p.get('private')}->{p.get('ip')}:{p.get('public')}/{p.get('type')}"
             for p in (item.get("runtime") or {}).get("ports") or []

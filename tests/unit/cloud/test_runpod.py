@@ -15,6 +15,7 @@ POD = {
     "dataCenterId": "EU-RO-1",
     "cudaVersion": "13.2",
     "createdAt": "2026-10-19T12:00:00Z",
+    "gpu": {"id": "NVIDIA A40", "count": 1, "vcpuCount": 9, "memory": 50},
     "ssh": {
         "proxy": {"host": "ssh.runpod.io", "port": 22, "username": "x", "command": "ssh x"},
         "direct": {"host": "203.0.113.9", "port": 40122, "username": "root", "command": "ssh"},
@@ -63,6 +64,7 @@ def test_pod_parsing_takes_direct_ssh_not_the_proxy() -> None:
     pod = parse_pod(POD)
     assert pod.ssh is not None
     assert (pod.ssh.host, pod.ssh.port, pod.ssh.user) == ("203.0.113.9", 40122, "root")
+    assert (pod.vcpus, pod.memory_gb) == (9, 50)
     assert pod.created_at is not None
     assert pod.created_at.isoformat() == "2026-10-19T12:00:00+00:00"
     provisioning = parse_pod({"id": "p", "status": "PROVISIONING", "ssh": {"direct": None}})

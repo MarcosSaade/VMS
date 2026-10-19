@@ -64,7 +64,12 @@ try:
                          capture_output=True, text=True, timeout=60).stdout
 except FileNotFoundError:  # a CPU machine
     smi = ""
-print(json.dumps({"cpu": cpu, "logical_cpus": os.cpu_count(),
+try:  # a container's CPU quota (cgroup v2): a Runpod pod gets a share of the host
+    quota, period = open("/sys/fs/cgroup/cpu.max").read().split()
+    cpu_quota = None if quota == "max" else max(1, int(quota) // int(period))
+except (OSError, ValueError):
+    cpu_quota = None
+print(json.dumps({"cpu": cpu, "logical_cpus": os.cpu_count(), "cpu_quota": cpu_quota,
                   "ram_bytes": os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES"),
                   "platform": platform.platform(),
                   "gpus": [g.strip() for g in smi.splitlines() if g.strip()]}))

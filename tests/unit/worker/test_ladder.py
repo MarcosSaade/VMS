@@ -210,7 +210,12 @@ def test_quality_pairs_must_name_steps() -> None:
 def test_gpu_scenarios_are_valid() -> None:
     import yaml
 
-    for name in ("ladder-gpu-n", "sweep-gpu-trt-fp16-n", "sweep-gpu-trt-int8-n"):
+    for name in (
+        "ladder-gpu-n",
+        "ladder-gpu-speed-n",
+        "sweep-gpu-trt-fp16-n",
+        "sweep-gpu-trt-int8-n",
+    ):
         raw = yaml.safe_load((REPO_ROOT / f"bench/scenarios/{name}.yaml").read_text())
         s = LadderScenario.model_validate(raw)
         assert s.config["detector"]["device"] == "cuda"

@@ -78,7 +78,8 @@ class DetectorSettings(BaseModel):
     conf: float = Field(default=0.25, ge=0.0, le=1.0)  # minimum confidence kept
     iou: float = Field(default=0.7, ge=0.0, le=1.0)  # NMS IoU threshold
     max_det: int = Field(default=300, ge=1)
-    # Intra-op threads of the backend; None: its default (one per physical core for both).
+    # Intra-op threads of the backend; None: its default (one per physical core for both),
+    # capped at the container's CPU quota when there is one (vms.common.cpus, E-065).
     threads: int | None = Field(default=None, ge=1)
     # onnxruntime only: intra-op threads busy-wait between runs (ORT's default). Off, idle
     # threads sleep: far less CPU below saturation, at the cost of a wake-up per run.
@@ -177,6 +178,23 @@ class YoloDetector:
         self.detect(np.zeros((height, width, 3), dtype=np.uint8))
 
 
+def fit_to_cpu_quota(settings: DetectorSettings) -> DetectorSettings:
+    """Under a container CPU quota, size the backend's and OpenCV's thread pools to it instead
+    of to the host's CPUs (E-064, E-065). Explicit `threads` and hosts without a quota keep
+    their behavior."""
+    from vms.common.cpus import cpu_quota
+
+    quota = cpu_quota()
+    if quota is None:
+        return settings
+    import cv2
+
+    cv2.setNumThreads(quota)
+    if settings.threads is not None:
+        return settings
+    return settings.model_copy(update={"threads": quota})
+
+
 def build_detector(
     settings: DetectorSettings, root: Path = Path()
 ) -> YoloDetector | OnnxDetector | TrtDetector:
@@ -186,6 +204,7 @@ def build_detector(
     directories are read-only in its container."""
     from vms.worker.weights import ensure_weights, load_models_config
 
+    settings = fit_to_cpu_quota(settings)
     models = load_models_config(root / "configs/models.yaml")
     name = settings.weights
     path = ensure_weights(models, name, root=root)

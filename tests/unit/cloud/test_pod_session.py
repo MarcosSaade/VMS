@@ -67,6 +67,8 @@ class FakePods:
                 ssh=None if self.no_public_ip else SshEndpoint("203.0.113.9", 40122, "root"),
                 created_at=pod.created_at,
                 ports=("22->None:None/tcp",),
+                vcpus=9,
+                memory_gb=50,
             )
         return pod
 
@@ -201,6 +203,7 @@ def test_a_session_creates_runs_collects_deletes_and_verifies(make) -> None:  # 
     assert rec.metrics["pod_id"] == "pod-1"
     assert rec.metrics["data_center"] == "EU-RO-1"
     assert rec.metrics["host_cuda_version"] == "13.2"
+    assert rec.metrics["pod_vcpus"] == 9
     assert rec.metrics["time_limit"] == ARMED
     assert rec.hardware.gpus == HW.gpus
     assert rec.cost_usd is not None

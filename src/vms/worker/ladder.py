@@ -228,6 +228,7 @@ def load_frames(bench: LadderBench) -> tuple[list[NDArray[np.uint8]], dict[str, 
 
 
 def run_step(scenario: LadderScenario, step: LadderStep) -> dict[str, Any]:
+    from vms.common.cpus import cpu_quota
     from vms.worker.detector import build_detector
 
     settings = step_settings(scenario, step)
@@ -240,6 +241,7 @@ def run_step(scenario: LadderScenario, step: LadderStep) -> dict[str, Any]:
         "step": step.name,
         "model_version": detector.model_version,
         "detector": settings.detector.model_dump(mode="json"),
+        "cpu_quota": cpu_quota(),
         "load_s": load_s,
         # ru_maxrss is in KiB on Linux: the step's whole process, model and frames included.
         "peak_rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
@@ -279,6 +281,7 @@ def aggregate(runs: list[dict[str, Any]]) -> dict[str, Any]:
         "detector": first["detector"],
         "repetitions": len(runs),
         "peak_rss_mb_max": max(r["peak_rss_mb"] for r in runs),
+        "cpu_quota": first.get("cpu_quota"),
         "load_s_mean": statistics.fmean(r["load_s"] for r in runs),
         "batch": {},
     }

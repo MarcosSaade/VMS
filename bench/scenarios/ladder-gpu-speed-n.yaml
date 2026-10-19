@@ -1,0 +1,27 @@
+name: ladder-gpu-speed-n
+description: >
+  Re-run of ladder-gpu-n's speed side (E-064) with one change: thread pools (ONNX Runtime's
+  intra-op threads, OpenCV's) sized to the pod's CPU quota instead of the host's 96 threads
+  (vms.common.cpus, E-065). yolo11n on the Runpod A40, PyTorch FP32, ONNX Runtime FP32 (CUDA
+  provider) and TensorRT FP16; TensorRT INT8 is left out (rejected by D32, E-064). Batch 2 is
+  added because E-064's sweep peaked there. Quality is unchanged from E-064 (same engines'
+  sources and settings), so no `quality:` section.
+kind: ladder
+repeats: 5
+bench:
+  clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
+  frames_per_clip: 100
+  batch_sizes: [1, 2, 4, 8]
+  warmup_batches: 5
+  cooldown_s: 5
+config:
+  detector:
+    weights: yolo11n
+    device: cuda
+steps:
+  - name: pytorch-fp32
+    detector: {backend: ultralytics}
+  - name: ort-fp32
+    detector: {backend: onnxruntime}
+  - name: trt-fp16
+    detector: {backend: tensorrt, precision: fp16}

@@ -19,6 +19,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from vms.common.cpus import cpu_quota
+
 SCHEMA_VERSION = 1
 COMMAND_TIMEOUT_S = 5.0
 DEFAULT_PACKAGES = ("aiohttp", "numpy", "opencv-python-headless", "pydantic", "prometheus-client")
@@ -32,6 +34,7 @@ class GitInfo(BaseModel):
 class Hardware(BaseModel):
     cpu: str
     logical_cpus: int | None
+    cpu_quota: int | None = None  # whole CPUs a container may use, when it has a quota
     ram_bytes: int | None
     platform: str
     gpus: list[str] = Field(default_factory=list)  # "name, driver" per GPU from nvidia-smi
@@ -102,6 +105,7 @@ def hardware() -> Hardware:
     return Hardware(
         cpu=_cpu_model(),
         logical_cpus=os.cpu_count(),
+        cpu_quota=cpu_quota(),
         ram_bytes=_ram_bytes(),
         platform=platform.platform(),
         gpus=_gpus(),

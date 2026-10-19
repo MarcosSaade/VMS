@@ -108,6 +108,8 @@ class PodSessionState:
     ssh_port: int | None = None
     data_center: str | None = None
     cuda_version: str | None = None
+    vcpus: float | None = None
+    memory_gb: float | None = None
     launched_at: datetime | None = None
     terminated_at: datetime | None = None
 
@@ -316,6 +318,7 @@ class PodSession:
         running = self._wait_pod(lambda p: p is not None and p.status == "RUNNING", t.running_s)
         assert running is not None
         self.state.data_center, self.state.cuda_version = running.data_center, running.cuda_version
+        self.state.vcpus, self.state.memory_gb = running.vcpus, running.memory_gb
         self._save()
         # Direct SSH needs a public port for 22/tcp. A host without one never gets it (E-063), so
         # give up early instead of paying for the whole running_s.
@@ -509,6 +512,8 @@ class PodSession:
                 "pod_name": s.pod_name,
                 "data_center": s.data_center,
                 "host_cuda_version": s.cuda_version,
+                "pod_vcpus": s.vcpus,
+                "pod_memory_gb": s.memory_gb,
                 "image": self.settings.image,
                 "launched_at": s.launched_at.isoformat() if s.launched_at else None,
                 "terminated_at": s.terminated_at.isoformat() if s.terminated_at else None,
