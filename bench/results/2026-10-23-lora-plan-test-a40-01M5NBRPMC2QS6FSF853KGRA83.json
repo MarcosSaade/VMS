@@ -1,0 +1,2466 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5NBRPMC2QS6FSF853KGRA83",
+  "name": "lora-plan-test-a40",
+  "kind": "bench.llm",
+  "started_at": "2026-10-23T21:40:26.696675Z",
+  "ended_at": "2026-10-23T21:48:11.276617Z",
+  "seed": 20261023,
+  "git": {
+    "sha": "2a9ea15fa9db5e0ddbcea6d147408245b1c5f996",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "logical_cpus": 96,
+    "cpu_quota": 7,
+    "ram_bytes": 540643647488,
+    "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+    "gpus": [
+      "NVIDIA A40, 595.91.07"
+    ]
+  },
+  "packages": {
+    "python": "3.12.3",
+    "aiohttp": "3.14.3",
+    "pydantic": "2.13.5"
+  },
+  "config": {
+    "serving": {
+      "service": "serving",
+      "env": "local",
+      "seed": 1234,
+      "log": {
+        "level": "INFO"
+      },
+      "telemetry": {
+        "enabled": true,
+        "otlp_endpoint": null,
+        "otlp_insecure": true,
+        "export_timeout_s": 10.0,
+        "sample_ratio": 1.0
+      },
+      "vllm": {
+        "bin": "/root/vllm-env/bin/vllm",
+        "host": "127.0.0.1",
+        "port": 8000,
+        "pull_timeout_s": 1800.0,
+        "env": {
+          "VLLM_USE_FLASHINFER_SAMPLER": "0"
+        }
+      },
+      "ollama": {
+        "bin": "/usr/local/bin/ollama",
+        "host": "127.0.0.1",
+        "port": 11434,
+        "pull_timeout_s": 1800.0,
+        "env": {}
+      },
+      "lora": {
+        "python": "/root/vllm-env/bin/python",
+        "script": "scripts/lora_train.py",
+        "unpack_dir": "data/serving/lora",
+        "work_dir": "data/lora",
+        "planner": {
+          "name": "all-r4",
+          "path": "models/lora/lora-plan-a40-b-all-r4.tar",
+          "sha256": "21412c6e55779d99affa44006a749676bbdb6a2648ef0dc8214fc90b9d35213c",
+          "base_model": "Qwen/Qwen3.5-4B",
+          "base_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "prompt": "configs/prompts/planner.compact.v1.txt"
+        }
+      },
+      "poll_s": 2.0,
+      "stop_timeout_s": 60.0,
+      "request_timeout_s": 120.0,
+      "log_tail_lines": 40
+    },
+    "llm": {
+      "provider": "auto",
+      "response_format": "json_schema",
+      "temperature": 0.0,
+      "max_tokens": 1024,
+      "timeout_s": 30.0,
+      "max_retries": 2,
+      "retry_base_s": 0.5,
+      "retry_max_s": 4.0,
+      "extra_body": {},
+      "canned_plans": [
+        "configs/demo/canned_plans.v1.jsonl"
+      ]
+    },
+    "assets": {
+      "fewshots": "eval/fewshot/structured.v1.jsonl",
+      "planner_prompt": "configs/prompts/planner.v1.txt",
+      "sql_prompt": "configs/prompts/sql.v1.txt"
+    },
+    "eval_clock": "2026-03-31T14:30:00+00:00",
+    "split": "test",
+    "split_sha256": "0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb",
+    "items": 142
+  },
+  "scenario": {
+    "name": "lora-plan-test-a40",
+    "description": "Task 8.3 (D42) test run on one Runpod A40: the adapter chosen on dev (all-r4 from lora-plan-a40-b: all 2,660 synthetic pairs, rank 4, compact prompt) and the base control it is compared against (Qwen3.5-4B with the service's full prompt, E-069's configuration), each recording the frozen test split once on the same server as the dev ablation (BF16, greedy, structured outputs on, thinking off, no prefix caching). No load test: latency under load is 8.4 and 8.5. Scored on the laptop by the replayed eval (make eval-replay SPLIT=test).\n",
+    "kind": "llm",
+    "seed": 20261023,
+    "split": "test",
+    "catalog": "eval/structured/catalog.v1.json",
+    "max_tokens": 1024,
+    "load": {
+      "concurrency": [
+        1
+      ]
+    },
+    "record": {
+      "concurrency": 4
+    },
+    "servers": [
+      {
+        "name": "qwen3.5-4b",
+        "engine": "vllm",
+        "model": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "args": [
+          "--max-model-len",
+          "16384",
+          "--gpu-memory-utilization",
+          "0.90",
+          "--language-model-only",
+          "--generation-config",
+          "vllm",
+          "--no-enable-prefix-caching"
+        ],
+        "request_extra": {
+          "chat_template_kwargs": {
+            "enable_thinking": false
+          }
+        },
+        "lora_modules": {
+          "all-r4": "models/lora/lora-plan-a40-b-all-r4.tar"
+        },
+        "variants": [
+          {
+            "name": "base-full",
+            "prompt": "configs/prompts/planner.v1.txt",
+            "load": false,
+            "record": true
+          },
+          {
+            "name": "all-r4",
+            "model": "all-r4",
+            "prompt": "configs/prompts/planner.compact.v1.txt",
+            "load": false,
+            "record": true
+          }
+        ]
+      }
+    ]
+  },
+  "metrics": {
+    "servers": {
+      "qwen3.5-4b": {
+        "engine": "vllm",
+        "model": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "args": [
+          "--max-model-len",
+          "16384",
+          "--gpu-memory-utilization",
+          "0.90",
+          "--language-model-only",
+          "--generation-config",
+          "vllm",
+          "--no-enable-prefix-caching",
+          "--enable-lora",
+          "--max-loras",
+          "1",
+          "--max-lora-rank",
+          "8",
+          "--lora-modules",
+          "all-r4=/root/vms/data/serving/lora/all-r4"
+        ],
+        "env": {},
+        "request_extra": {
+          "chat_template_kwargs": {
+            "enable_thinking": false
+          }
+        },
+        "lora": {
+          "all-r4": {
+            "path": "models/lora/lora-plan-a40-b-all-r4.tar",
+            "sha256": "21412c6e55779d99affa44006a749676bbdb6a2648ef0dc8214fc90b9d35213c",
+            "rank": 4
+          }
+        },
+        "info": {
+          "startup_s": 258.1935435110354,
+          "version": {
+            "version": "0.31.0"
+          }
+        },
+        "gpu_memory_used_mib_idle": [
+          40559
+        ],
+        "variants": {
+          "base-full": {
+            "response_format": "json_schema",
+            "record": {
+              "items": 142,
+              "outcomes": {
+                "planned": 129,
+                "failed_validation": 13,
+                "unavailable": 0
+              },
+              "wall_s": 113.634,
+              "call_latency_ms": {
+                "p50": 2628.832,
+                "p95": 5747.9,
+                "p99": 7506.025,
+                "mean": 2798.181,
+                "max": 9817.662
+              },
+              "model": "qwen3.5-4b",
+              "prompt": "configs/prompts/planner.v1.txt",
+              "system_prompt_chars": 14672,
+              "replies": {
+                "cc5b2db55c06cf15ca57fb4e5e49a36e84cac63fb26908277cf0433d10b7098d": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 49,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 5761.76362100523
+                },
+                "b5cb9e3aba511cf421a4fef312a832a5e37d3b6de851b1e70cfdb9bb5659563c": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"dog\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 49,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 5799.938415992074
+                },
+                "887ce08121a015f0b6fdd1996472cbfe48655736d5e7e7c8769960ee6f5b3e20": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"last\", \"amount\": 30, \"unit\": \"minutes\"}}}",
+                  "prompt_tokens": 4170,
+                  "completion_tokens": 49,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 5997.518625983503
+                },
+                "49725314870b1e52efbe778764259e8fecd166c2fff60acf8ca8d47c5596ebbf": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 56,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 7031.4787270035595
+                },
+                "1606ccd487fc86373f094bc3b9465ca4e9d5ae410f45b2f542783f02f2fdb125": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"umbrella\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 48,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2214.607182017062
+                },
+                "96151d944f140202aea1734f6fb80066761f34cc3b16dcdf1bcfef3788f3aa6c": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\", \"truck\", \"motorcycle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 4167,
+                  "completion_tokens": 56,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2613.844300969504
+                },
+                "5f2489fc3341554706f40fbed3810a3c33233ec3205b479a30a9c73b51e695f0": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"last\", \"amount\": 1, \"unit\": \"hours\"}}}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 47,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2043.8270840095356
+                },
+                "02d5cd18c9e2f8cf5fb6b20569d0c46102f25403fe8e8d2c88be5acdb26d78d8": {
+                  "text": "{\n  \"intent\": \"count\",\n  \"target\": \"events\",\n  \"filters\": {\n    \"cameras\": [\"checkout\"],\n    \"zones\": [\"register_1\", \"register_2\"],\n    \"event_types\": [\"zone_exit\"],\n    \"time_range\": {\n      \"kind\": \"named\",\n      \"name\": \"this_morning\"\n    }\n  },\n  \"group_by\": [\"zone\"]\n}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 100,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4398.9342949935235
+                },
+                "1eef1290f29a0331639d8fa35ba0ce69a4d5465cf260177eece9dd83214b1206": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 49,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2239.9519449681975
+                },
+                "daf3a06a6d4342f2b659cc1649746facb1eb71619e540d4c8c2beb2165329a44": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"]}, \"measure\": {\"op\": \"avg\", \"field\": \"n_frames\"}}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 48,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2073.774850985501
+                },
+                "f8a645a216c380238d51addea37fb53287b7eeed6f0150528f338a79607ff475": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 63,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3280.849960981868
+                },
+                "04bb482e6171e5e5ff13e07b0ce27214bd6fa9d50f60d83480fbbb8e22d5f23c": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}, \"group_by\": [\"class_name\"]}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 65,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2751.5174340223894
+                },
+                "60aceed6eb1e6bc477b6edf34c8d98d96c3557b48cd832f3ed111b29c5a493df": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"]}, \"order\": {\"by\": \"time\", \"direction\": \"desc\"}, \"limit\": 3}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 53,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1821.761052007787
+                },
+                "ac01b6276b2b8aa74a07139757612845bc9dff9eefce73d52467a835a1cb0bfe": {
+                  "text": "{\n  \"intent\": \"list\",\n  \"target\": \"events\",\n  \"filters\": {\n    \"cameras\": [\n      \"lobby\"\n    ]\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"desc\"\n  },\n  \"limit\": 5\n}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 76,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2963.2006980245933
+                },
+                "6882bfc339ba207e74e2c5b7bd2bc799f8953eec6f1679c14a5f19897b4cb8d6": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\", \"entrance\", \"loading_dock\", \"lobby\", \"parking_lot\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 3, \"unit\": \"days\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4169,
+                  "completion_tokens": 92,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4143.8102690153755
+                },
+                "4a54f9d85022e18c3053594ca70ac6adf2fa3005a1fd4b1cef51a707398ddcbc": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 48,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1373.4242180362344
+                },
+                "3db52cf9e5ac431ce528904052b897233a5e23cc119838822485618a8cc43572": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00-04:00\", \"end\": \"2026-03-31T09:15:00-04:00\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4172,
+                  "completion_tokens": 122,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4195.163769996725
+                },
+                "8eabb216b8ad473dde001374eb36574a48579d2a8096a84af37396beff82f478": {
+                  "text": "{\n  \"intent\": \"list\",\n  \"target\": \"detections\",\n  \"filters\": {\n    \"cameras\": [\"lobby\"],\n    \"classes\": [\"suitcase\"],\n    \"time_range\": {\n      \"kind\": \"last\",\n      \"amount\": 4,\n      \"unit\": \"days\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"desc\"\n  },\n  \"limit\": 4\n}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 115,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3707.1539349853992
+                },
+                "a3d6aaaa54024101ae24a798e2c07aaf4e9223dea02984d82a0888e32a4315d5": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-27T08:00:00-04:00\", \"end\": \"2026-03-27T10:00:00-04:00\"}}}",
+                  "prompt_tokens": 4176,
+                  "completion_tokens": 102,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3194.958875013981
+                },
+                "33b3e972f51e531e358f1dcb88df421f61ec2f220143d45a11c2699fbcb902aa": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 49,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2457.0531630306505
+                },
+                "b5f500ff27c655dd80a3e45b09c419839b61744c032813e61dd3836d67aa9b88": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 57,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2605.3946660249494
+                },
+                "d1ad4044786dc5ecfe0b27d62ac39353a8565284e25c81ffa646e39af0d16652": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-27T08:00:00-04:00\", \"end\": \"2026-03-27T10:00:00-04:00\"}}}",
+                  "prompt_tokens": 4333,
+                  "completion_tokens": 102,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3733.177639020141
+                },
+                "db78c2cd6dcd9645aaf33267ee4ab415ef86022d88054019cb06e8e8a03ad7bb": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-28T23:00:00-04:00\", \"end\": \"2026-03-29T03:00:00-04:00\"}}}",
+                  "prompt_tokens": 4184,
+                  "completion_tokens": 95,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2630.1762880175374
+                },
+                "403e0a8bea883a7a31499915faadf368f3e0dbb46b6b6e15efcab1917cebd516": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 54,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2196.2497729691677
+                },
+                "f6c5c7fa302bae8eca8ba10b4f2f111c32650b251e6fa74503dc5354d8b226a9": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00-04:00\", \"end\": \"2026-03-31T09:15:00-04:00\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4349,
+                  "completion_tokens": 122,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4899.301788012963
+                },
+                "2eea36cc2981f15db0396b778d7a557c470463282332154cc50b39b9318a27c3": {
+                  "text": "{\"intent\": \"count\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"truck\"], \"min_confidence\": 0.8, \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}}",
+                  "prompt_tokens": 4172,
+                  "completion_tokens": 58,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1895.3586870338768
+                },
+                "33c40bbbb0cc1e8da97a7fc0fe74f191d3163a3af1850f141282ade19c5bd0b6": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"event_type\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 58,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1885.338630003389
+                },
+                "83d2605cd4463507fceaa73142f7b3d27667bc23b115f43b599fa4e0552d36a0": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"zones\": [\"register_1\", \"register_2\"], \"classes\": [\"person\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"zone\"]}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 75,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3009.338514006231
+                },
+                "ea469f59cfd5e305a11e1dab233c498d183610ca526a9cf909549876ed36f82d": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-28T23:00:00Z\", \"end\": \"2026-03-29T03:00:00Z\"}}}",
+                  "prompt_tokens": 4334,
+                  "completion_tokens": 85,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4169.237282010727
+                },
+                "c1bf26a611324c7899d3b10b209a6c7741a346bcb8be9f69a22fcbe37b711164": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"event_type\"], \"bucket\": \"day\", \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 4264,
+                  "completion_tokens": 64,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2729.291749012191
+                },
+                "bdc8dfa1174e041d715b213773a5470023c4e87d76c57e24c982281a666fa235": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"zones\": [\"register_1\", \"register_2\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"zone\"]}",
+                  "prompt_tokens": 4286,
+                  "completion_tokens": 69,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3115.2116309967823
+                },
+                "f7863e240b56973c6296e7dbe1d7d966943ff7848cc7a99b5652f0380686a0e7": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 75,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2638.1736610201187
+                },
+                "ac7424a86376316a0bdfe5d7af05e11891553edcd3d69b27d2338b58777364d8": {
+                  "text": "{\n  \"intent\": \"trend\",\n  \"target\": \"tracks\",\n  \"filters\": {\n    \"cameras\": [\n      \"lobby\"\n    ],\n    \"classes\": [\n      \"person\"\n    ],\n    \"time_range\": {\n      \"kind\": \"named\",\n      \"name\": \"this_morning\"\n    }\n  },\n  \"bucket\": \"hour\",\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  }\n}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 119,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4887.746399035677
+                },
+                "c595d0402f3af0e9eea37c1de15ec0be5895657668da6afc21cd3e10f01689c2": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"events\", \"filters\": {\"cameras\": [\"entrance\"], \"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 78,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3069.602767005563
+                },
+                "155b12a4792019e21f1ac0004807e94dff1ec073866106c281f4053a08e460b8": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"last\", \"amount\": 1, \"unit\": \"weeks\"}}, \"bucket\": \"week\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 75,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2731.448119971901
+                },
+                "57e62503b45d09f3676d444036c589cdc1b6ca2867724c92c03f2c072d55e8de": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\", \"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"group_by\": [\"camera\"], \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 78,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3045.1826770440675
+                },
+                "4e97db139c76b909042a57b816f78ba4b48c54a7d315328612c34e7b6433e4ab": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"count\", \"direction\": \"desc\"}, \"limit\": 1}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 75,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2992.0228139963
+                },
+                "34b935d5837281c2c6f6511145007f19f9aee5149a3163584fdfd6866eff5d20": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"last\", \"amount\": 3, \"unit\": \"days\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 3}",
+                  "prompt_tokens": 4168,
+                  "completion_tokens": 71,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2771.9290269888006
+                },
+                "dfe9b62a37d19b3e0d021b0c07e6b7700c1b374a3301fe5966899c1720932583": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"events\", \"filters\": {\"event_types\": [\"loiter\"]}, \"group_by\": [\"zone\"], \"order\": {\"by\": \"count\", \"direction\": \"desc\"}, \"limit\": 2}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 54,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2256.9534460199066
+                },
+                "26361097b20e738242ce03eab22e807df663c55d03d369969ec1151bf93449c6": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"loading_dock\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-25T00:00:00Z\", \"end\": \"2026-03-26T23:59:59Z\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4171,
+                  "completion_tokens": 107,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4318.524077010807
+                },
+                "1e9f242612db89abbb7a8e9dcf064b9f093d4e1a2a75d5de293771e6a824ce71": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\", \"entrance\", \"loading_dock\", \"lobby\", \"parking_lot\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_afternoon\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}, \"limit\": 3}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 83,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3144.7812170372345
+                },
+                "23ad41156404b4e58c2140c8d69bd6eaee1b2eb4da2c3b2a2bb909fd1802afd4": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"register_2\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"max\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 66,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2826.868958014529
+                },
+                "23feba205253282115c1fb57a6aaa8bcb11ca47864ec1d2b977037848de6481b": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 66,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2825.916667992715
+                },
+                "bd03c3203cefa84855c8570703c4561778d19bd8d4d0989bb21e5403dc44a95f": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 59,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2316.174731007777
+                },
+                "8d3749c7d5ea37326cfd0bbe154d52336a3983669d0a3588dbf62b90ae6cb742": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"front_door\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"min\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 59,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2320.0043669785373
+                },
+                "0ecc68ee0e7718ed21bb7bb3cd72469227ce27c88699150bcad98766a6edc18f": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"loading_dock\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-25T00:00:00Z\", \"end\": \"2026-03-26T23:59:59Z\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4333,
+                  "completion_tokens": 107,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4325.340303010307
+                },
+                "90d69e55bd392df7dca3a04f55f3e56612a484cce0ce3e125a3bff60f52bf7ed": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\n      \"loading_dock\"\n    ],\n    \"classes\": [\n      \"truck\"\n    ]\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"desc\"\n  },\n  \"limit\": 5\n}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 92,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3301.9018979975954
+                },
+                "6e7eaf59fb9cea1d4cb96d8551f25798fda43eec541ab04b57015d132aaf7fa5": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"dog\"]}, \"order\": {\"by\": \"time\", \"direction\": \"desc\"}, \"limit\": 1}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 52,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2569.2115189740434
+                },
+                "4eb285283ba7fc837c30886640235796b1140711ef284c4660d413b4a1a8dfa7": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 4156,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1180.5509940022603
+                },
+                "ba67f8c193b041c1427624133784fb42c1073cbd3df6daf8c1785df900aa7bd3": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4155,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1203.6894129705615
+                },
+                "4730931b07c22fce17fbc61135df85b5a6e2b549ca9b86c8b680ebc72e6af1ee": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 4155,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1179.3109530117363
+                },
+                "cee52eef45cf20a2565a27c086c71d2d29edd43cd4340f90619f6f65f880c976": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 4155,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1179.0169189916924
+                },
+                "22c1e006fefc1a241709d573053694b68f3cf8af231462636792800d11312efc": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 4155,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1183.4709790418856
+                },
+                "f3d0f9e2ba2050d53eabdf6f2c6a1b93c86db8c75eaad62a6521671376ed3ca0": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 20,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1223.8217809936032
+                },
+                "a9bd9da87c87f41cf2d4672b53fde63ea9340997c382d0647fad434b031899dd": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 20,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1221.9388050143607
+                },
+                "d9512a9bb4bb232c864da9e9e4b3741ed4c03980cdd50971f611aa3f35ef73cc": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\n      \"entrance\"\n    ],\n    \"classes\": [\n      \"person\"\n    ],\n    \"time_range\": {\n      \"kind\": \"last\",\n      \"amount\": 15,\n      \"unit\": \"minutes\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  },\n  \"limit\": 100\n}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 128,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 6194.082011003047
+                },
+                "210fa49a9c5cf522d30b5af8df7f7377f04981d535aa7e1fa93fb89e7e58f2eb": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 20,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1220.6723910057917
+                },
+                "4c622f6fc66de09c4e218ca3e7021c2cf803f683a2e55108b5891983b7fb22ee": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1507.0041099679656
+                },
+                "c668e2381a492e9c04c43368f34f8556699a3a5fd09297e35556d0d586fcb1ae": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\"checkout\"],\n    \"classes\": [\"cell phone\"],\n    \"time_range\": {\n      \"kind\": \"absolute\",\n      \"start\": \"2026-03-31T11:00:00-04:00\",\n      \"end\": \"2026-03-31T12:00:00-04:00\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  },\n  \"limit\": 20\n}",
+                  "prompt_tokens": 4168,
+                  "completion_tokens": 162,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 8248.265086964238
+                },
+                "2cb64121c15e2b88da92c1186f646c292d2019e7ae0959625c99ca70e1ba877b": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4168,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1176.1412359774113
+                },
+                "51d39f799b1a728714d69c22a0f1c11c1d4cb54f6d5c00ef278aeafffc0302d3": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 61,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3052.431421005167
+                },
+                "21217212c7f6520383751dc6abf5e60e9a10ce591be26f886d8b48106b92cf11": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 57,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1932.9397400142625
+                },
+                "2b043c234bdf9143d2faf5b82b3af77d74b39dd92ef1cc3322ee3b20c1df9564": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}}",
+                  "prompt_tokens": 4286,
+                  "completion_tokens": 60,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1986.0853939899243
+                },
+                "3bb52e9456bcd0cd8e3cd36ab30fe06bd9d318e4c721d70514d58631004407aa": {
+                  "text": "{\n  \"intent\": \"trend\",\n  \"target\": \"tracks\",\n  \"filters\": {\n    \"cameras\": [\n      \"lobby\"\n    ],\n    \"classes\": [\n      \"person\"\n    ],\n    \"time_range\": {\n      \"kind\": \"last\",\n      \"amount\": 7,\n      \"unit\": \"days\"\n    }\n  },\n  \"bucket\": \"hour\",\n  \"order\": {\n    \"by\": \"count\",\n    \"direction\": \"desc\"\n  },\n  \"limit\": 1\n}",
+                  "prompt_tokens": 4170,
+                  "completion_tokens": 132,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 5484.4906609505415
+                },
+                "6214dd2fa981ddec5d8711562f07347f52af33ee34c7df894824fbc060ef58f3": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4168,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1182.439785974566
+                },
+                "026c09cce5fd213eb6f45ce6c10bad85062ae9b7275a8ce3664c21e3a2a63302": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4171,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1181.70973402448
+                },
+                "a2c4b5a5b3bd7b356cde5e758781455ca47b6f3b0efca9c324da89286c16292e": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\"checkout\"],\n    \"classes\": [\"cell phone\"],\n    \"time_range\": {\n      \"kind\": \"absolute\",\n      \"start\": \"2026-03-31T11:00:00Z\",\n      \"end\": \"2026-03-31T12:00:00Z\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  },\n  \"limit\": 20\n}",
+                  "prompt_tokens": 4385,
+                  "completion_tokens": 152,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 5927.217074960936
+                },
+                "1ea47e196919f40ba4111603a5d807305b7d00367f5294141b1a83fc2389cc59": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1206.3655230449513
+                },
+                "ed70259c65c575f6c9455d363fcf6c88709470bdc5b55b03bfecf922ae4e200a": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"n_frames\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 76,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3378.7267570151016
+                },
+                "39b307d25243f9a4b311d51295d18bcc816c279777654dd3af13a2f9fd67b92a": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1227.1384539781138
+                },
+                "3c658798a9680309de91aad7d32e69ecb76f72a634d45fbe6bfac2c7dd79c710": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1852.2118090186268
+                },
+                "f117785765129361994ba4b963ed29217da14455effbca3a856c7e901d0e33f6": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1894.2533149966039
+                },
+                "57c2263486cf3c2e615da65ba1b8cb23951a2b2373bd38680fc6e39215d9be35": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1945.8827289636247
+                },
+                "c55fb9366f7d6a0884bf26afcb69de36bdd167d4789e0263c7ee5664aa86dfb4": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1835.0550509640016
+                },
+                "8518d11f77fc72167cfa61dc6005dd8163631dbfa6d69cdc902dccc901cc3cff": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"loading_dock\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 45,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2229.8871289822273
+                },
+                "8de6bf0bd86501902144e11c1a0959edb37cd0b2c3f73b61bcc0cce16881441c": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 50,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2411.7890530033037
+                },
+                "65bc68e219451a39c67d38536f2166231efbd29cc862c4b018926a0ff883039e": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"register_2\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"last\", \"amount\": 3, \"unit\": \"hours\"}}}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 55,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2813.9216429553926
+                },
+                "61ebf806ca809283227e779e38dbc32ccb51f8a5192deea7eceb108aa1e18174": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4168,
+                  "completion_tokens": 75,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3955.1390670239925
+                },
+                "04c0f05afd3cb0d68bc9c3c747e60820bc3f46bbafb68a8d57fa28efb7f491a2": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"bottle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 48,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2430.759237962775
+                },
+                "33afb991cdf56c626d2d165d3f75ffc7cb35d124643c74ac72fad27709e8e2e8": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"last\", \"amount\": 4, \"unit\": \"hours\"}}}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 54,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2652.6961699710228
+                },
+                "4284e5d82e1f879eb98476b7826bcc005663838e3857cafad2b52119b70113eb": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\", \"entrance\"], \"classes\": [\"handbag\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4167,
+                  "completion_tokens": 59,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2660.3671640041284
+                },
+                "67aeb1dd38b9812ee863df312e7ec71ba01ed81d5c372395c82ffbbee6e01590": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 49,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2192.0255169970915
+                },
+                "10f836ec1e5c735d4a4bc75fa9a13b2dfd7f538c1a234fe0a23d8f17f0db19d4": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"max\", \"field\": \"confidence\"}, \"group_by\": [\"class_name\"]}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 65,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2617.443962022662
+                },
+                "6fd79362fe35291bceb24b060e0c3cc87ceaa8e854173644bf6ec141b34f7bb4": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"classes\": [\"dog\"]}, \"measure\": {\"op\": \"avg\", \"field\": \"n_frames\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 46,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1687.9282040172257
+                },
+                "46fd608060c7d2c1839c2f3cc686d4e97c655f24490fa16333b2ddbf53b62a19": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\", \"entrance\", \"loading_dock\", \"parking_lot\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 79,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3709.1786849778146
+                },
+                "0be01298d91712fdff0d1bce9caed38739c9d2dda4cc4f5f44a6f8ffe66bf668": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 6, \"unit\": \"hours\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}}",
+                  "prompt_tokens": 4169,
+                  "completion_tokens": 70,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3080.404159030877
+                },
+                "959732dfed62808e2ad46efda0c17e52dbe6224ae6b9fd94dea0ba10afa3dbcd": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"]}, \"order\": {\"by\": \"time\", \"direction\": \"desc\"}, \"limit\": 5}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 45,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2434.4576239818707
+                },
+                "50ad5b7905f095bd64c5726ea7558ecacf60d1ce112b9d50e0551025a3c0b251": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"bicycle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"min\", \"field\": \"n_frames\"}}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 65,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3145.3591029858217
+                },
+                "249b137e6432c3493779666438ea334a82746910e642b022c57f66fde8da6d57": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 65,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2806.1901159817353
+                },
+                "d1322054fe087bd79a520316b2b4cf34e8ca125958939880e481a36c6e55ce4a": {
+                  "text": "{\"intent\": \"list\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"event_types\": [\"loiter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 63,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2762.7909730072133
+                },
+                "27b41af57585adec8f4421a14db40b34436e5d72eb75ba2519d26e95de4ff093": {
+                  "text": "{\"intent\": \"list\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"bicycle\"]}, \"order\": {\"by\": \"time\", \"direction\": \"desc\"}, \"limit\": 6}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 55,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2603.577658010181
+                },
+                "7d2eca4b40f580f19e5af5a8ff3157e262ccce62bc1bfc8633e08a11a69a209b": {
+                  "text": "{\"intent\": \"list\", \"target\": \"events\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"event_types\": [\"zone_exit\"], \"time_range\": {\"kind\": \"last\", \"amount\": 4, \"unit\": \"hours\"}}, \"order\": {\"by\": \"time\", \"direction\": \"desc\"}, \"limit\": 4}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 82,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3108.692220004741
+                },
+                "6f3ac22c1c52f3813684bd3443148442e74146d2aafabe767c494b454fe7b1ef": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"entrance\"], \"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-21T06:00:00-04:00\", \"end\": \"2026-03-21T18:00:00-04:00\"}}}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 110,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3641.474633011967
+                },
+                "2666fb9b9f42c3a6b78af290864158379cc17662fd081cea0527dd5a9d5be724": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-24T07:00:00-04:00\", \"end\": \"2026-03-24T09:00:00-04:00\"}}}",
+                  "prompt_tokens": 4172,
+                  "completion_tokens": 102,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3220.6124179647304
+                },
+                "d2c316b34d6faaf1070ce4a5877697050c565e8bf2436ed025a18f4f83d6fc6c": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T00:00:00Z\", \"end\": \"2026-03-31T06:00:00Z\"}}}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 90,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3247.6058779866435
+                },
+                "5327f224c574fe82a1bd35b366c971319e0bdbdb01c66a20e7cf931c440ed01c": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T13:00:00-04:00\", \"end\": \"2026-03-31T14:00:00-04:00\"}}}",
+                  "prompt_tokens": 4167,
+                  "completion_tokens": 96,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3360.2857820224017
+                },
+                "3d5cc3b34ca584c1b16e29865394b05a9ab4fc45d3930cbb2d9be8ae7000e237": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T00:00:00Z\", \"end\": \"2026-03-31T06:00:00Z\"}}}",
+                  "prompt_tokens": 4310,
+                  "completion_tokens": 90,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2541.006863990333
+                },
+                "d6cfce32dc724ce91866580f41524bd0f92614b8df3778adcda123d89d1fee88": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-24T07:00:00-04:00\", \"end\": \"2026-03-24T09:00:00-04:00\"}}}",
+                  "prompt_tokens": 4329,
+                  "completion_tokens": 102,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3347.6702150073834
+                },
+                "7da13f72e715c51dd062c33818285b05bc150862b9f282a17e40ed3bd9732f9f": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"entrance\"], \"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-21T06:00:00-04:00\", \"end\": \"2026-03-21T18:00:00-04:00\"}}}",
+                  "prompt_tokens": 4329,
+                  "completion_tokens": 110,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4331.844408006873
+                },
+                "90c3e04adb1a002be0dd2b724cca8f8ccbac235c8983bd94322ff722c710b3dc": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 47,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2061.9886980275624
+                },
+                "a93365bfa8a1fe31ce83f5252a278fa8352056dfacfb8d3b55301949e0bf0b52": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T13:00:00-04:00\", \"end\": \"2026-03-31T14:00:00-04:00\"}}}",
+                  "prompt_tokens": 4318,
+                  "completion_tokens": 96,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3441.2961269845255
+                },
+                "66e6f247d00840c32ad82edc56db7a9aba53f2817c4afe1a62637a9248279d41": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"last\", \"amount\": 45, \"unit\": \"minutes\"}}}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 55,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2890.514496015385
+                },
+                "86a67e958573cb1efd09230af8911e595059f60ad76d91ec0817faeac5c5e373": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"register_2\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 48,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1951.1772869736888
+                },
+                "dce8be2e316eef12cba600a385f80695a5c3e188221f723305f30b960fc2f3b0": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 57,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2612.9475130001083
+                },
+                "6300ea8d688a021a37144b879c1d5ee4cac5780ae3bfd61496b7398f1c1c3a3a": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-20T00:00:00+00:00\", \"end\": \"2026-03-22T23:59:59+00:00\"}}}",
+                  "prompt_tokens": 4168,
+                  "completion_tokens": 102,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3815.9512910060585
+                },
+                "40de47dd1b83fbd023d9087adbacf5298d128025676948ff06701adca589083e": {
+                  "text": "{\"intent\": \"count\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"bicycle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 48,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1745.028697012458
+                },
+                "f07a0e337a85b51b6728ab17172a42112903111a44ab54318d618f0bf55bb5ff": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_exit\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 57,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2215.2398269972764
+                },
+                "4c343eecd99555509420fa78859a6c9b45d673039e93d970492913f6f906c948": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 4162,
+                  "completion_tokens": 54,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2215.916378016118
+                },
+                "f40c33154b3b96395da2407895511f9bc79b54c013456396f8904ca09ad4bf03": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-20T00:00:00Z\", \"end\": \"2026-03-22T23:59:59Z\"}}}",
+                  "prompt_tokens": 4325,
+                  "completion_tokens": 92,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3598.37255399907
+                },
+                "c2f1d88e107e4bafa7c5e90209055598df2e87cdf088477c3958010fc26db69c": {
+                  "text": "{\n  \"intent\": \"trend\",\n  \"target\": \"events\",\n  \"filters\": {\n    \"cameras\": [\n      \"lobby\"\n    ],\n    \"time_range\": {\n      \"kind\": \"named\",\n      \"name\": \"this_week\"\n    }\n  },\n  \"group_by\": [\n    \"event_type\"\n  ],\n  \"order\": {\n    \"by\": \"count\"\n  }\n}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 104,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4170.421180024277
+                },
+                "16aa10fc555d404a0d319b91d5e012f6c0d2a119ee8c027fab872b22259575a6": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"register_1\", \"register_2\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"zone\"]}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 62,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2684.2542600352317
+                },
+                "e70b6a17db4941b8c0375415974eab761f6a36b3690563edb2fe566befcaa8c2": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"min_confidence\": 0.9, \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}}",
+                  "prompt_tokens": 4173,
+                  "completion_tokens": 61,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2685.2717230212875
+                },
+                "f9623c84781acfbfba51418d233aff1845e0036e4cd5631aec848c846843f86e": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 73,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2890.5732150305994
+                },
+                "2ec95e86e4d72cce73aba155a3ee9f0292adfb74e6602319afd6839b9172791e": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"sum\", \"field\": \"n_frames\"}, \"group_by\": [\"zone\"]}",
+                  "prompt_tokens": 4158,
+                  "completion_tokens": 71,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2519.9466780177318
+                },
+                "0b9e9e24c8cb2f296e23f82039a9309108fad0dca1c31791a042fc0e8f361040": {
+                  "text": "{\n  \"intent\": \"trend\",\n  \"target\": \"events\",\n  \"filters\": {\n    \"cameras\": [\n      \"lobby\"\n    ],\n    \"time_range\": {\n      \"kind\": \"named\",\n      \"name\": \"this_week\"\n    }\n  },\n  \"group_by\": [\n    \"event_type\"\n  ],\n  \"bucket\": \"day\",\n  \"order\": {\n    \"by\": \"count\"\n  }\n}",
+                  "prompt_tokens": 4311,
+                  "completion_tokens": 112,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4344.476211001165
+                },
+                "ab54d8840ee9d2a0d02bbb39c9b040024acaee19efcea36c5318fbc7b9ad3351": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00-04:00\", \"end\": \"2026-03-31T12:00:00-04:00\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 117,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4141.284596000332
+                },
+                "9a6138f8618b7006951b5e7407d0ecb73d01198a7034a761831ef9511cb5fea6": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"zone\"], \"order\": {\"by\": \"count\", \"direction\": \"desc\"}, \"limit\": 1}",
+                  "prompt_tokens": 4158,
+                  "completion_tokens": 71,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2559.304697031621
+                },
+                "be596adf9b92016dd1b9de59559a44ce00701aa3a8638d1fd3fecd4f3cbadbb2": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 2}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 66,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2797.952634980902
+                },
+                "f92399c55e2498db107577a003af3d25a9742f61c78bf46526065b26bb5ec0e1": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 65,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2779.4640220236033
+                },
+                "f2e4cd52461d6d05dc8ee34b26079ae313f500eb9acf1a8722d2169717193a26": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 58,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2680.217924003955
+                },
+                "5def4f00eed69927c3aed2915d37d487e21b13d1d7574900ba9ec0e1a2c482d8": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"event_type\"], \"order\": {\"by\": \"count\", \"direction\": \"desc\"}}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 65,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2435.7807519845665
+                },
+                "1549791ef552b6c5e3277e7f069fdb36a2603911eec9bd09218084000ca6ff5d": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"min\", \"field\": \"confidence\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 57,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1916.8096120120026
+                },
+                "f53089577f0ca4ec2e5381534faf9b368668eaa62fce8f30c35240f53c77d0f9": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00Z\", \"end\": \"2026-03-31T12:00:00Z\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 4338,
+                  "completion_tokens": 107,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4637.603499053512
+                },
+                "eb08576bf0b7c4599520fe2232e0d5e7acfc57d8efeca120d25d6d4abb078050": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\", \"direction\": \"asc\"}, \"limit\": 1}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 73,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2932.394105999265
+                },
+                "543c437df644d41e70fb73b69447b3208f8fc7a73b281d877aecc82c57593972": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"tracks\", \"filters\": {\"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 4}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 58,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2627.4869830231182
+                },
+                "c6a225e9e5e84cf67d4ea2fb3bfff62cda459695207a9c847714e51bb6ca8edf": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"event_type\"], \"order\": {\"by\": \"count\", \"direction\": \"desc\"}, \"limit\": 10}",
+                  "prompt_tokens": 4281,
+                  "completion_tokens": 72,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3277.3280280525796
+                },
+                "957058199302c3727218fe09a7aa4496b8dab6b09c665a7ae109513bd0bf714e": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"max\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 67,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2842.5007819896564
+                },
+                "2259eb0ff614a57b7e4a58efef2d6efd4f5828f1cf81e6ad30cda0d4e7012201": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"max\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 66,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2813.388249021955
+                },
+                "783ddcc417d02c6ef2cdeb70d8dab372ab0ec93f74ef75eb1e2abce02f97da0a": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"register_1\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 49,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2125.687209016178
+                },
+                "1ff5cff77660127488f14b901893e07a9ae441e67235c5fcf8dcb621add4a7c6": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}, \"group_by\": [\"class_name\"]}",
+                  "prompt_tokens": 4169,
+                  "completion_tokens": 67,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2976.823119970504
+                },
+                "9291f54883971dad1f78a02504a7f7e1bec919d46924f7edd72c24000b414364": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"register_1\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 4257,
+                  "completion_tokens": 66,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2080.010494973976
+                },
+                "9c800bb37f45f3046f8755f590a5d0089463678eb3f8d7af5203ee73f229b2d4": {
+                  "text": "{\n  \"intent\": \"dwell\",\n  \"target\": \"tracks\",\n  \"filters\": {\n    \"classes\": [\n      \"person\"\n    ],\n    \"time_range\": {\n      \"kind\": \"named\",\n      \"name\": \"yesterday\"\n    }\n  },\n  \"measure\": {\n    \"op\": \"max\",\n    \"field\": \"dwell_seconds\"\n  },\n  \"group_by\": [\n    \"camera\"\n  ]\n}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 113,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 3858.3166799508035
+                },
+                "72baab75499fc6cf073fb5ad337c94b9e1bc5048e898fd73319556b68bf4245c": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}, \"group_by\": [\"class_name\"]}",
+                  "prompt_tokens": 4285,
+                  "completion_tokens": 68,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2085.4835879872553
+                },
+                "dc75ca5d18a9a2d3d0380164887ef5756621a1323c9f1b232c7838cb34414e2c": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"classes\": [\"dog\"]}, \"order\": {\"by\": \"time\", \"direction\": \"desc\"}, \"limit\": 4}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 44,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1999.2787120281719
+                },
+                "59f4da58e495bdf2ff61ab7545595c1489a6f96708a900f2774f07109b9fa04c": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 4154,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 814.3606680096127
+                },
+                "f3c2b603c51d585d0f8b4e7d887ad6e375be362963255e219aa95597cb6b7dd7": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 4154,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 819.8292289744131
+                },
+                "a1de243da5710818f72f687ca2724c0e573aa624901e6e3a102da21f5092c672": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\n      \"loading_dock\"\n    ],\n    \"classes\": [\n      \"car\"\n    ],\n    \"time_range\": {\n      \"kind\": \"absolute\",\n      \"start\": \"2026-03-30T06:00:00-04:00\",\n      \"end\": \"2026-03-30T08:00:00-04:00\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  },\n  \"limit\": 100\n}",
+                  "prompt_tokens": 4167,
+                  "completion_tokens": 176,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 6305.15568703413
+                },
+                "710486226e8356fb76edb1a29270c5bdbb91c3098879db464de88b8965184f47": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\"lobby\"],\n    \"classes\": [\"suitcase\"],\n    \"time_range\": {\n      \"kind\": \"named\",\n      \"name\": \"this_morning\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  },\n  \"limit\": 20\n}",
+                  "prompt_tokens": 4159,
+                  "completion_tokens": 108,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4472.71376097342
+                },
+                "3efff499c19f2da8df782b06a99cfddacc1c36700640e7f581ab116fd90c0210": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\n      \"parking_lot\"\n    ],\n    \"classes\": [\n      \"bicycle\"\n    ],\n    \"time_range\": {\n      \"kind\": \"named\",\n      \"name\": \"this_week\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  }\n}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 113,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4532.879056001548
+                },
+                "f7e1b6fcf365eca242ce8b63260f21005e9e5a2788f20408094a6dbdd0237402": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 4158,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1159.0003119781613
+                },
+                "3f13a0b32e01590fe19aeea6af95abc9d62a40e41d24ad9a7af85767c64e484d": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 20,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1521.7080829897895
+                },
+                "7e7ec959b2b792613c7f290a0b028b2abfa492ee3fb0345c6a8b281b454f2b5d": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 20,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1512.2549980296753
+                },
+                "3bcdbf13bc06cf729ca1ad56f080ca86888d3462380adec01da6bba534f453ec": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 20,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1633.7643439765088
+                },
+                "a3355b9428be99749e11459941bf54d9151448436a47df4a52b7d3112b761486": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 20,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1528.539996012114
+                },
+                "52b1c505995fd0bb308d287d6c8f716430fba8ccb222c8e5f5d90faefb9d18a2": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4160,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1483.1212070421316
+                },
+                "75dc6fea431bc94e1b9c617bfbbcd3feb3e04b61471e16bb33332cd8b783ccdf": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1392.9461860097945
+                },
+                "56b269f9dceaa5bef30d845a96274f31d327a064447693501c9b88a9800e207e": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1490.1231789845042
+                },
+                "d643edeab2badcf16fd3ac488b01170f8c39123dfcc069d1a731e91e23c43fea": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 825.4635430057533
+                },
+                "7b72bd3699e3cd4c3bb4bc598fee4d931013018ee7157b0d5390d1e406d9a9c0": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"zones\": [\"front_door\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 4166,
+                  "completion_tokens": 55,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 2970.8793610334396
+                },
+                "340b46f2323d5d96430fcc1e1840e7cc2c217d679b1af053d6e70038e7115494": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4172,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1190.8058340195566
+                },
+                "df87f4eb1958c0ee7f0e7c5370fb5782dab2889df823427b093c178d81fc7fe7": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4167,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1188.1408370099962
+                },
+                "ef717b113643315f9cbc89511f840b86b69ce1d81a2ae6394fa3bb88bae98072": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 4170,
+                  "completion_tokens": 81,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4291.177901031915
+                },
+                "692eb06b02bbbb809c9cd24d3a1fa0a19786666bf44107b29ce33dfd05d2a7cd": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 18,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1530.4518470074981
+                },
+                "682cebbb05dceb5b6df5cea1257a715a749614fbaf4724ca8707d474298cfa5b": {
+                  "text": "{\n  \"intent\": \"frames\",\n  \"target\": \"frames\",\n  \"filters\": {\n    \"cameras\": [\n      \"loading_dock\"\n    ],\n    \"classes\": [\n      \"car\"\n    ],\n    \"time_range\": {\n      \"kind\": \"absolute\",\n      \"start\": \"2026-03-30T06:00:00-04:00\",\n      \"end\": \"2026-03-30T08:00:00-04:00\"\n    }\n  },\n  \"order\": {\n    \"by\": \"time\",\n    \"direction\": \"asc\"\n  },\n  \"limit\": 100\n}",
+                  "prompt_tokens": 4398,
+                  "completion_tokens": 176,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 9817.661505017895
+                },
+                "2e8acd002b0915491e8c76581dd8df7d3fc5930c9621bbab12fb9857bc4460ca": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4156,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1539.6389590459876
+                },
+                "53b4d4d089b127b28db2c06a90360f3153541f538b3a288673197e3aed7353f6": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1531.1978649697267
+                },
+                "9d4993fc0c87746ff28220109c66e414e190a4c2de4e422e287a71ec4763de26": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4163,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1534.972416004166
+                },
+                "f2aa98bb1a2c85f331a5b39e7c287a113917d5749df2abcd63fe237e97cd8697": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4161,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1561.0130080021918
+                },
+                "4ee883c0d5bf93f418e003c7ae76972bfe680db6e702f40342cfc855ba82f08a": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1534.5139980199747
+                },
+                "5c467125b5ed4e53269d948aec986c15a8b68215ae173679ca9a2f953657f615": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4164,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1168.7315889867023
+                },
+                "6c8737fa52400f3ab499fc34b17ac1380f9dcf0a6cefcffdbfd93c6c2d3a5018": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 4165,
+                  "completion_tokens": 19,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 1161.3442989764735
+                },
+                "74466f8dcc07da06c528570361e8a75d7feef3868aec29b9d7db058d1f38cc49": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 4328,
+                  "completion_tokens": 80,
+                  "model": "qwen3.5-4b",
+                  "latency_ms": 4309.969911992084
+                }
+              }
+            }
+          },
+          "all-r4": {
+            "response_format": "json_schema",
+            "record": {
+              "items": 142,
+              "outcomes": {
+                "planned": 131,
+                "failed_validation": 11,
+                "unavailable": 0
+              },
+              "wall_s": 91.369,
+              "call_latency_ms": {
+                "p50": 1501.146,
+                "p95": 4714.478,
+                "p99": 24804.315,
+                "mean": 2271.086,
+                "max": 26581.455
+              },
+              "model": "all-r4",
+              "prompt": "configs/prompts/planner.compact.v1.txt",
+              "system_prompt_chars": 3025,
+              "replies": {
+                "72b0636f4e2961dbbc6e70981ea5742e0bb3bb68e35088c1ae34fd1c13e38ac3": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 49,
+                  "model": "all-r4",
+                  "latency_ms": 4550.486330001149
+                },
+                "8189f64af0a2051634e2a62e5fcc7a3d42c110c496bb0a3929c704553db88719": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"last\", \"amount\": 30, \"unit\": \"minutes\"}}}",
+                  "prompt_tokens": 841,
+                  "completion_tokens": 49,
+                  "model": "all-r4",
+                  "latency_ms": 4960.465326032136
+                },
+                "7666d3ec7ff7aa71af23ca5757658f453ef88894172bd1168031a18badf0e881": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"dog\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 49,
+                  "model": "all-r4",
+                  "latency_ms": 5080.267264973372
+                },
+                "9a01546439729923535f12dc815eedaf222297ade138c325d9cf5be0960a3e08": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 56,
+                  "model": "all-r4",
+                  "latency_ms": 5369.1591279930435
+                },
+                "c809fd3f4c9c3be90fef5f204d00bbf2c99cc35d4ab3ab78932b9a47683ffa94": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"umbrella\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 48,
+                  "model": "all-r4",
+                  "latency_ms": 1274.5312210172415
+                },
+                "6cf706f494aea5fd33c402d367ee987ce825268763112c3b731f28e4ce608459": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\", \"truck\", \"motorcycle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 838,
+                  "completion_tokens": 56,
+                  "model": "all-r4",
+                  "latency_ms": 2029.428782989271
+                },
+                "d53eac397298ceb4e9414d1b4f0ff4a1c21e6dc000cc08766866b640a47367e4": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"last\", \"amount\": 1, \"unit\": \"hours\"}}}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 47,
+                  "model": "all-r4",
+                  "latency_ms": 1211.6324679809622
+                },
+                "31622432f0eccf95225d6a403cd6da871c06cf79ad776d440e4256fa93855046": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"event_types\": [\"zone_exit\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"group_by\": [\"zone\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 66,
+                  "model": "all-r4",
+                  "latency_ms": 2034.083214995917
+                },
+                "235da95c3c8576024af914310db1028e273217972206d2c837a8f3536824f6eb": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 49,
+                  "model": "all-r4",
+                  "latency_ms": 1445.7634480204433
+                },
+                "062ffed6c1e37c4a6b72e551ca6496d3809db887247a1df5266e27c68f878336": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"]}, \"measure\": {\"op\": \"avg\", \"field\": \"n_frames\"}}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 48,
+                  "model": "all-r4",
+                  "latency_ms": 1435.6403260026127
+                },
+                "e5993ad04a1bcf07bd0a3160a41ed4201e5d51b10d364e493f19abe5bc4eb535": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 63,
+                  "model": "all-r4",
+                  "latency_ms": 1859.4399589928798
+                },
+                "d11b93fc276e53a37e97a09ff3f38a381cada3d28d55533dd04485c56f2b4eb9": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}, \"group_by\": [\"class_name\"]}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1801.7989979707636
+                },
+                "8ec199e39a1ad8d59492753699d415cac2a1717270a301e864d979a2dab88261": {
+                  "text": "{\"intent\": \"list\", \"target\": \"events\", \"filters\": {\"cameras\": [\"lobby\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 5}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 39,
+                  "model": "all-r4",
+                  "latency_ms": 1172.310248017311
+                },
+                "b3f353ffd6056371dee78b65fc1e87c40b91045ac5570813c471ddd10be4ce56": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 3, \"unit\": \"days\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 840,
+                  "completion_tokens": 68,
+                  "model": "all-r4",
+                  "latency_ms": 1987.2934189625084
+                },
+                "101472512d5e1ef43e13c1e95e2b5cf287a2f8c3dfc97c86a238e92bcda3f16a": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 3}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 47,
+                  "model": "all-r4",
+                  "latency_ms": 1351.7300300300121
+                },
+                "44377621ad901a6c226e834bb94f819a3d9a5098713f21d3730b850366139736": {
+                  "text": "{\"intent\": \"list\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"suitcase\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 4}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 47,
+                  "model": "all-r4",
+                  "latency_ms": 1321.5141840046272
+                },
+                "3eb48d84178e0cdadca24912ebc0b981b0541ee1594ff3e80a33eaa2a24471b7": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 48,
+                  "model": "all-r4",
+                  "latency_ms": 1347.9578139958903
+                },
+                "e7948b0dd821c101853d88d59d796d5ce8123445c47e3ca9074cc7ef7090fe51": {
+                  "text": "{\"intent\": \"list\", \"target\": \"events\", \"filters\": {\"zones\": [\"elevators\"], \"classes\": [\"person\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00Z\", \"end\": \"2026-03-31T09:15:00Z\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 843,
+                  "completion_tokens": 113,
+                  "model": "all-r4",
+                  "latency_ms": 2983.65054797614
+                },
+                "352ebc9b0f1115bb79f9a37be59811c2881e0b70ff91dcc4d64f9d5e6f6e67fc": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 49,
+                  "model": "all-r4",
+                  "latency_ms": 1271.3245989871211
+                },
+                "1bf4ab13ea754d1773bc67a3f35e7521a68512a2d2b25252889facddac912128": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-27T08:00:00Z\", \"end\": \"2026-03-27T10:00:00Z\"}}}",
+                  "prompt_tokens": 847,
+                  "completion_tokens": 92,
+                  "model": "all-r4",
+                  "latency_ms": 2540.8922790084034
+                },
+                "d7b1e3845a47960c3578c3ba8a3f84f148a320aa1a30dad39c1560286a842dcf": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 57,
+                  "model": "all-r4",
+                  "latency_ms": 1648.6512219998986
+                },
+                "d2b67add4af14f122f73daaaf8ef5791e37d007e370041b44588854f5651b77e": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"elevators\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 47,
+                  "model": "all-r4",
+                  "latency_ms": 1097.484148980584
+                },
+                "ab7a424e22b9874378e94dec453011a5e4f77530dc95494a9bf13a1af6cca794": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-28T23:00:00Z\", \"end\": \"2026-03-29T03:00:00Z\"}}}",
+                  "prompt_tokens": 855,
+                  "completion_tokens": 85,
+                  "model": "all-r4",
+                  "latency_ms": 2326.7864219960757
+                },
+                "d03dc88e1120e47a18c25a163ccd0bbe1a9d8f9fb28c007f2a9d61d6b99a52a3": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"person\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"zone\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 71,
+                  "model": "all-r4",
+                  "latency_ms": 1702.8161230264232
+                },
+                "82f4eb893db14e6c898e228033f8eeb59e318eb1f6a154601634a2d56cf4a216": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-28T23:00:00Z\", \"end\": \"2026-03-29T03:00:00Z\"}}}",
+                  "prompt_tokens": 995,
+                  "completion_tokens": 85,
+                  "model": "all-r4",
+                  "latency_ms": 1994.9297449784353
+                },
+                "fb0412bee97d05bc8a4bdedee08bcb334c544d0e0544ca020b2734b80bed0635": {
+                  "text": "{\"intent\": \"count\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"truck\"], \"min_confidence\": 0.8, \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}}",
+                  "prompt_tokens": 843,
+                  "completion_tokens": 58,
+                  "model": "all-r4",
+                  "latency_ms": 1459.892280981876
+                },
+                "ac1fbe7cfc2972cb6ae46e421ad87d41c991991143b11fae80f09cc3cb2ddcbe": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"event_type\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 58,
+                  "model": "all-r4",
+                  "latency_ms": 1462.3492769896984
+                },
+                "fa503ed79ad2821255531bd95674c468765858c3cba86e1842e31c8d3ea273be": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 69,
+                  "model": "all-r4",
+                  "latency_ms": 1677.9638589941896
+                },
+                "de006c83cd2bc627c23014dd3f8af2bbbd6223e6b8744356d7d1d60c5c39f1c9": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 75,
+                  "model": "all-r4",
+                  "latency_ms": 1794.1738410154358
+                },
+                "9a62bd5aa12b20855f072eedffbca763e706025f44e910fbd3712606387d9d7f": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 70,
+                  "model": "all-r4",
+                  "latency_ms": 1683.0418389872648
+                },
+                "1a923248fbeaff963a805169eb2799509d72f08424e31b419be205501e02bd2f": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"bucket\": \"week\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 70,
+                  "model": "all-r4",
+                  "latency_ms": 1701.8151140073314
+                },
+                "c4addb74dea66db93883e03aa2e109d50a60b96518ec2aec8590ddfe17355a8e": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\", \"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"group_by\": [\"camera\"], \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 78,
+                  "model": "all-r4",
+                  "latency_ms": 1853.7669620127417
+                },
+                "9f2c644a1c1c3493dda02065b9c92f31ab005ea808ccfb7cfb2c49e680d80be9": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 69,
+                  "model": "all-r4",
+                  "latency_ms": 1679.14926802041
+                },
+                "5a9c508f664d9c9aad9fa57f2008d3638ac657e692db996351facf397e8c68f4": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 842,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 650.0196250271983
+                },
+                "0bfc9cba5caab4b549ac1df6c8f69a0ce32d57c8fe090c86459fb6dc03686bc4": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"events\", \"filters\": {\"event_types\": [\"loiter\"]}, \"group_by\": [\"zone\"], \"order\": {\"by\": \"count\"}, \"limit\": 2}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 48,
+                  "model": "all-r4",
+                  "latency_ms": 1145.8588590030558
+                },
+                "0adfdc6c8c1c654a5337dc7282782f6b7d3e288e00ca554e11bd4c23e4056133": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"last\", \"amount\": 3, \"unit\": \"days\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 3}",
+                  "prompt_tokens": 839,
+                  "completion_tokens": 71,
+                  "model": "all-r4",
+                  "latency_ms": 1814.1776010161266
+                },
+                "ec789dcd37b6b39e529f3511701d9f778122d051ae71f0e6457a2a9058ea1176": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"time_range\": {\"kind\": \"named\", \"name\": \"this_afternoon\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}, \"limit\": 3}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 59,
+                  "model": "all-r4",
+                  "latency_ms": 1474.0147610427812
+                },
+                "bf85fcc44efe80166924e5f704d995dcc607863d14c661770249ccfa680d2e7c": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"register_2\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"max\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 60,
+                  "model": "all-r4",
+                  "latency_ms": 1501.1456389911473
+                },
+                "34642b689aa24bd95d8ac2fe890cb56a246214e245ba3242a8350a4d24a2a07a": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 66,
+                  "model": "all-r4",
+                  "latency_ms": 1632.3270529974252
+                },
+                "7a58817d94f8ae1c2264e9dd70c249c4f05809aeeae111bc14bb3df389e5bff2": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"zones\": [\"register_1\", \"register_2\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 72,
+                  "model": "all-r4",
+                  "latency_ms": 1754.3094839784317
+                },
+                "9bc8bc692b6c458ad860666ab5116c57edcdabb3cf7b3e97c322d06f7c85134c": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"front_door\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"min\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1606.6425429889932
+                },
+                "6d1108a5ec605d35f786b29e0e7fec5ccc9b59f08cc349d4062b26746192d7d6": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 5}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 47,
+                  "model": "all-r4",
+                  "latency_ms": 1229.0742240147665
+                },
+                "ef11092c46cf91bf8c18ff38f2ef1a796845ad1b31b29694d5418053559a1dd0": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"dog\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 1}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 46,
+                  "model": "all-r4",
+                  "latency_ms": 1207.6884750276804
+                },
+                "eaf2843e0f66270dc162b5ecbf081da4b56a0f33fe7b8312973d5dd93265e169": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"cell phone\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T11:00:00Z\", \"end\": \"2026-03-31T12:00:00Z\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}, \"limit\": 20}",
+                  "prompt_tokens": 839,
+                  "completion_tokens": 113,
+                  "model": "all-r4",
+                  "latency_ms": 2571.792527975049
+                },
+                "787438d36f18838f95b75b2ededd804a1a662b6728fccf925fedd8b385aecdf3": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"last\", \"amount\": 15, \"unit\": \"minutes\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}, \"limit\": 20}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 76,
+                  "model": "all-r4",
+                  "latency_ms": 1822.974254959263
+                },
+                "35d6084411b56a77d987edc48cc41b70e387f81ecb503b8870246165e6f91f10": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 827,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 521.4770070160739
+                },
+                "44fb78a378c0320324947f046ec1c3d7d6bc79ef89c012dc48bb819fecf2cf99": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 826,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 538.5992139927112
+                },
+                "a680bdcc4460a124c6b3a87419385b5a88650119f2df0ccf6d281820ce44e202": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 826,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 539.762728032656
+                },
+                "fc3cd6c4d9543f2af50924d55abfbd05a0b07832dbd8069123d82be11b1713fe": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 826,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 546.0795959807001
+                },
+                "9137cf72eca6eb13aae97646ba095eca740582c8409c5c2a5eb0646e5ca07a47": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 826,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 539.9690530030057
+                },
+                "5e0f9d5d1c1b0be94b3074f0b22bc8fbad55bb45b4be8e82da6bad2738b516a5": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 580.5016389931552
+                },
+                "95a0b44af652429aff31e4293d41736d42e676ad46855403a5f38aa98f6ff04b": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 583.45117198769
+                },
+                "4e7a887ddfd4a2f6b4482c56964cda6b013de35103957ce4fb131692fa12bb03": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 582.6123750302941
+                },
+                "d35b22d8284419614ed2e9d3094caf2d24d24aaf38f5ada5c76ed8e438f8c153": {
+                  "text": "{\"intent\": \"list\", \"target\": \"events\", \"filters\": {\"zones\": [\"elevators\"], \"classes\": [\"person\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "prompt_tokens": 1011,
+                  "completion_tokens": 1024,
+                  "model": "all-r4",
+                  "latency_ms": 24793.33180899266
+                },
+                "cfb84a0c61da15677ccbcd0472745b8b3185afc69a58994ba3c06e46d0bb0c31": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 654.3754749582149
+                },
+                "429a200069873b44a75b26163b911563d8ae1e219bd952a261dc5cbd198b1ecb": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"front_door\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-27T08:00:00.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "prompt_tokens": 994,
+                  "completion_tokens": 1024,
+                  "model": "all-r4",
+                  "latency_ms": 24816.212613950484
+                },
+                "3d7c84cefb9449801b630cddaeecdf85e206d0a3c04ea1b3972c9b052b007246": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 750.6883720052429
+                },
+                "890b4d44a997381f9f841354c038a0a18245098700851c0f420665fefbe9d19c": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 839,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 619.857840007171
+                },
+                "0338128c28d5b7256426a8de3aca2a45b3bc685f61cfd5132c0bbbef01aa0bcd": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 632.5125300209038
+                },
+                "5c7a4d9ec34644f293e32c057eef606ab1a6c533674129159e94cab438ea20a3": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 839,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 519.0021460293792
+                },
+                "6d9af260ed41165738278794008910825444219dbcb8ffd5e6b4dd43770833c2": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 842,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 532.3211409850046
+                },
+                "0e8917e1ffda4c68def7367512cbb3581c94f2d913627b8860f65d1c83b7908b": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 841,
+                  "completion_tokens": 73,
+                  "model": "all-r4",
+                  "latency_ms": 2288.821796013508
+                },
+                "4c770ed7bd281d4c9b128f657db28e836d960e0f1a4726da1e5ed1d731be8f2e": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 662.589757994283
+                },
+                "98c2fb21ba66a83b82d842330d42edfbfdc40b8ac19a134218a343ed0204479e": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 69,
+                  "model": "all-r4",
+                  "latency_ms": 2111.40329297632
+                },
+                "0b84aed204a4314959cf44575b7891586197d95585881b8ebe7569d7fddea881": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 680.1498249988072
+                },
+                "1fa037f8c2c61b077b57cde53af55e807173334031ec745331c08fed11dfd19f": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 748.3457119669765
+                },
+                "072cb7192394d0ef35c1dafb2bbc3ef8ad52f647e20b6c6da31b9981e8d7c142": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 736.3037209725007
+                },
+                "2ab8c19a70b40fa4d9969c142add7f774315f67d3aee0ff0050c750e223168e5": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 765.5207719653845
+                },
+                "67ce8bc24725c8e7c8508f43f2d9925c3131d33537848d0fafb290362de029c0": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 739.5597060094588
+                },
+                "20fcfbe2fdabaeff54ac9f7b1cf641074ecb654449a8c198d84481abe4fe80ef": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 50,
+                  "model": "all-r4",
+                  "latency_ms": 1363.192187040113
+                },
+                "e31d94283698969869f4c437724a22bc8eacb946cab0f010e1eaa0e53331d1d6": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"loading_dock\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 45,
+                  "model": "all-r4",
+                  "latency_ms": 1199.687284999527
+                },
+                "def123a8881cd332b4554532e6124464d24fa2e0b9841406bf5927af09d81dd0": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 7, \"unit\": \"days\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 839,
+                  "completion_tokens": 75,
+                  "model": "all-r4",
+                  "latency_ms": 2104.982246994041
+                },
+                "a885b958c43c4f059622060e046db314f431d8fcf2dca5799c6b37f0e0582b35": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 578.9241649908945
+                },
+                "c9c3afb25d13aa8a35bd147ccf1add2fb85d2857d34a09069b33ad703a1ae4af": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"register_2\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"last\", \"amount\": 3, \"unit\": \"hours\"}}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 55,
+                  "model": "all-r4",
+                  "latency_ms": 1631.9630339858122
+                },
+                "17239783ce0e5cff29393411b249cb4092a9f1a6b7d6aa030390593312c7d18e": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"last\", \"amount\": 4, \"unit\": \"hours\"}}}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 54,
+                  "model": "all-r4",
+                  "latency_ms": 1609.732591023203
+                },
+                "556410884a521efd64dc5ed87f9a334af0d9637d0a05c9ab80c5500d8f3bbed2": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 49,
+                  "model": "all-r4",
+                  "latency_ms": 1277.6796219986863
+                },
+                "0135e2324d215c5bd7ecabfd526e351c5802a8a68d37737b0c86fb01b46aa306": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\", \"entrance\"], \"classes\": [\"handbag\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 838,
+                  "completion_tokens": 68,
+                  "model": "all-r4",
+                  "latency_ms": 1890.9115900169127
+                },
+                "d551cb57d856924472529f5bf43cfc227a5a03f1a280b3a159fdbea919c144ca": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 58,
+                  "model": "all-r4",
+                  "latency_ms": 1567.3291260027327
+                },
+                "83dd4e25025a0c4aa6a865638ee01ecfcc95ab0022d6075747d91139e2f53197": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"classes\": [\"dog\"]}, \"measure\": {\"op\": \"avg\", \"field\": \"n_frames\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 46,
+                  "model": "all-r4",
+                  "latency_ms": 1212.4286919715814
+                },
+                "8da1f2ec738c50ab488ccbda073dccfab3daf3918e5b714fe6466649eab51024": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"max\", \"field\": \"confidence\"}, \"group_by\": [\"class_name\"]}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1820.8138900226913
+                },
+                "cddcde0944aa95e36afca565e652c13bc64b78b2f168683283b41715b327de37": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"last\", \"amount\": 6, \"unit\": \"hours\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"confidence\"}}",
+                  "prompt_tokens": 840,
+                  "completion_tokens": 70,
+                  "model": "all-r4",
+                  "latency_ms": 1816.4454130455852
+                },
+                "59caaa438cc7cca4cbcb894863139f0685f86688d26b09c3bfde66be118c567e": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 5}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 39,
+                  "model": "all-r4",
+                  "latency_ms": 1077.618203999009
+                },
+                "dafb70983e222c7cd449d8d34d75a06150e1bafcfb0ebec1c7201bce513951b1": {
+                  "text": "{\"intent\": \"aggregate\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"bicycle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"min\", \"field\": \"n_frames\"}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1830.5451379856095
+                },
+                "73e1980b5982a24c7945f2b1ff47b2275f4a339e54a4c2aabf48b1a54b431478": {
+                  "text": "{\"intent\": \"list\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1721.4812070014887
+                },
+                "889deb8b914f2dca44fedbbaeafad8e3a2adb6f88509a78dfcc6ac400ff007d9": {
+                  "text": "{\"intent\": \"list\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"event_types\": [\"loiter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 63,
+                  "model": "all-r4",
+                  "latency_ms": 1681.1032859841362
+                },
+                "b622d44e2ec5401bcd52d7021b3757b5f6e2b8100110907d1d596b824bd87493": {
+                  "text": "{\"intent\": \"list\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"bicycle\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 6}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 49,
+                  "model": "all-r4",
+                  "latency_ms": 1304.4373719603755
+                },
+                "7c6eb64153e3c55ab767652de800cfb3d7aa3254a4e372e6a213faef41a211e3": {
+                  "text": "{\"intent\": \"list\", \"target\": \"events\", \"filters\": {\"zones\": [\"elevators\"], \"event_types\": [\"zone_exit\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 4}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 47,
+                  "model": "all-r4",
+                  "latency_ms": 1335.7623699703254
+                },
+                "baeff583aa012595d4987250b40a9f96f8f3b38ad5b37be88becf843b07a7421": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-24T07:00:00Z\", \"end\": \"2026-03-24T09:00:00Z\"}}}",
+                  "prompt_tokens": 843,
+                  "completion_tokens": 92,
+                  "model": "all-r4",
+                  "latency_ms": 2228.4441799856722
+                },
+                "1fea11c9beb76d63bc51eafa808441cfc2d5967279eea92bb23a45bc20aa7d6a": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"entrance\"], \"zones\": [\"front_door\"], \"classes\": [\"person\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-21T00:00:00Z\", \"end\": \"2026-03-22T00:00:00Z\"}}}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 106,
+                  "model": "all-r4",
+                  "latency_ms": 2651.2678600265644
+                },
+                "e31ef440385174837e81c79053bba621574c1f04edad79af203fbb7230d60d41": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T00:00:00Z\", \"end\": \"2026-03-31T06:00:00Z\"}}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 90,
+                  "model": "all-r4",
+                  "latency_ms": 2232.1895160130225
+                },
+                "b17ded275a90c1d39a6915003585b56e4f9cde141598214fb1fa78cd0d3acd1f": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-24T07:00:00Z\", \"end\": \"2026-03-24T09:00:00Z\"}}}",
+                  "prompt_tokens": 990,
+                  "completion_tokens": 92,
+                  "model": "all-r4",
+                  "latency_ms": 2274.1978300036862
+                },
+                "e87f30ba30666125a42c8bb68aeb507c80e91a8b04762c1ff63ac5b9e0872db1": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"entrance\"], \"zones\": [\"front_door\"], \"classes\": [\"person\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-21T00:00:00Z\", \"end\": \"2026-03-22T00:00:00Z\"}}}",
+                  "prompt_tokens": 996,
+                  "completion_tokens": 106,
+                  "model": "all-r4",
+                  "latency_ms": 2559.2154060141183
+                },
+                "57cf9d7bd8791b3cfbf79b3ed3409559fa33a4e3dbeeb4ddad8725e7ecc5f50a": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 47,
+                  "model": "all-r4",
+                  "latency_ms": 1128.396567015443
+                },
+                "061984b52cdabd498359528e1f2394dff6f8797da8641407d54795553a067f35": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T13:00:00Z\", \"end\": \"2026-03-31T14:00:00Z\"}}}",
+                  "prompt_tokens": 838,
+                  "completion_tokens": 86,
+                  "model": "all-r4",
+                  "latency_ms": 2151.5797169995494
+                },
+                "9c79ae33e166a8a174214af4a743dae6092ea886fb95909a560e34e30c10d82f": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"last\", \"amount\": 45, \"unit\": \"minutes\"}}}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 55,
+                  "model": "all-r4",
+                  "latency_ms": 1405.9514409746043
+                },
+                "4ef658ea7ecd97807071c7dfca80b317da12db8aa3799d45063f35b6ba734839": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"cell phone\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T11:00:00.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "prompt_tokens": 1007,
+                  "completion_tokens": 1024,
+                  "model": "all-r4",
+                  "latency_ms": 26581.45480696112
+                },
+                "65cce9a134446540704a471b626648de5d45cc7cb4e507e7c43294bc962a2f7f": {
+                  "text": "{\"intent\": \"count\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T13:00:00Z\", \"end\": \"2026-03-31T14:00:00Z\"}}}",
+                  "prompt_tokens": 979,
+                  "completion_tokens": 86,
+                  "model": "all-r4",
+                  "latency_ms": 2042.5846459693275
+                },
+                "15135cb0a09da0d87e4aaf5e2ef146490168f39eb4952ff584af80b581bf870f": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"register_2\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 48,
+                  "model": "all-r4",
+                  "latency_ms": 1226.0675290017389
+                },
+                "fcbe6d821115db37cb68bae47ebed0e5db2f8d36f42a322795eeb0cc880d7662": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-20T00:00:00Z\", \"end\": \"2026-03-23T00:00:00Z\"}}}",
+                  "prompt_tokens": 839,
+                  "completion_tokens": 92,
+                  "model": "all-r4",
+                  "latency_ms": 2264.8341610329226
+                },
+                "7b8e169335ce4aaf415271731e71e01859a21379ad16b1c73d5c726d245aeb95": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"lobby\"], \"zones\": [\"elevators\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 57,
+                  "model": "all-r4",
+                  "latency_ms": 1642.9587170132436
+                },
+                "7af98100792be829bcee5adca59432b6ecc7cb99a75f1fb6831b5827f0f97c0e": {
+                  "text": "{\"intent\": \"count\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"bicycle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 48,
+                  "model": "all-r4",
+                  "latency_ms": 1344.00129300775
+                },
+                "210e937d8825e074d168cf83770f7c5c5e3d69ea59f26a3b4741ea2cae53064f": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"lobby\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"event_type\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 58,
+                  "model": "all-r4",
+                  "latency_ms": 1448.8371110055596
+                },
+                "21da5452324770b6e5ef37fdeadb359470b50018cb98989eefffc7a027f5c39c": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"truck\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-20T00:00:00Z\", \"end\": \"2026-03-23T00:00:00Z\"}}}",
+                  "prompt_tokens": 986,
+                  "completion_tokens": 92,
+                  "model": "all-r4",
+                  "latency_ms": 2441.4151860401034
+                },
+                "6f20811f8af3ca4d2a9da995e9aa721e7413496fc6110c7be199d5d475606002": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_exit\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 57,
+                  "model": "all-r4",
+                  "latency_ms": 1558.3508840063587
+                },
+                "d16ff52a0ac0799bcdf3b51322e5237b4c252d1c80dca36c62488a0277e1be7e": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"elevators\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 833,
+                  "completion_tokens": 63,
+                  "model": "all-r4",
+                  "latency_ms": 1677.6025060098618
+                },
+                "28e4fdffc91a52c55ca5b913d505e25f5cc5af4bce6efb5f82ff07d584bf9cfb": {
+                  "text": "{\"intent\": \"count\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"min_confidence\": 0.9, \"time_range\": {\"kind\": \"named\", \"name\": \"last_night\"}}}",
+                  "prompt_tokens": 844,
+                  "completion_tokens": 60,
+                  "model": "all-r4",
+                  "latency_ms": 1502.8984500095248
+                },
+                "31a7339e7081850782a15b26df0aa6fa84a8ea6c3cd9ef95342d5a83ff255028": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"zones\": [\"register_1\", \"register_2\"], \"classes\": [\"person\"], \"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"zone\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 77,
+                  "model": "all-r4",
+                  "latency_ms": 1965.0833660271019
+                },
+                "9f1add6852bf2172fb446518b24ca78c1661537865f6694f9430334582a273ee": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"bucket\": \"day\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 68,
+                  "model": "all-r4",
+                  "latency_ms": 1765.7259220140986
+                },
+                "0d1f1963ed16ef03c6d04311b0290f0b21f396c0e9d0f4088e5dab685b48afee": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"bucket\": \"week\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 829,
+                  "completion_tokens": 69,
+                  "model": "all-r4",
+                  "latency_ms": 1784.6435639658011
+                },
+                "8c7a72f80c9b3958c8d55d42139c1bd33769c4574039ffe8c8dec6b363a14486": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"events\", \"filters\": {\"event_types\": [\"zone_enter\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"zone\"], \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 829,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1605.5197339737788
+                },
+                "ff0764d8c9863be38727ea4d242abc3a1cf0d74dd9b45b2bac8d10c88c0f8c3d": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00Z\", \"end\": \"2026-03-31T12:00:00Z\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 107,
+                  "model": "all-r4",
+                  "latency_ms": 2761.7002550396137
+                },
+                "c7a91844de181308d123b2960360e7ecd5c7030bfe47f6ddf0b7f889bdddc243": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 2}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 66,
+                  "model": "all-r4",
+                  "latency_ms": 1744.1833189805038
+                },
+                "42ebc1cd22e5fd21639533e3b7ea71828e7ba40f22cd5ac248f7df52c57c3ba4": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1721.208295028191
+                },
+                "d4269ebbb04f82ab990596e66c6233069b449cf741e6d08202f1b8b56cb0d983": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"detections\", \"filters\": {\"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"group_by\": [\"camera\"], \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 58,
+                  "model": "all-r4",
+                  "latency_ms": 1463.6004560161382
+                },
+                "10c52ecdf290815e7e0201f9e8895ab1a7b58c0920fda68252660bd3152e996a": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 567.8575490019284
+                },
+                "b206776ab28b455cbf788091e1874adbdcbc08279ac6d39e4e2da06c69a28dd7": {
+                  "text": "{\"intent\": \"count\", \"target\": \"events\", \"filters\": {\"cameras\": [\"checkout\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"event_type\"], \"order\": {\"by\": \"count\"}}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 58,
+                  "model": "all-r4",
+                  "latency_ms": 1556.2632830115035
+                },
+                "3b75763e3c98f803aa014c0de623dd549729ee520a8d845afe518192bf56bdf6": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"tracks\", \"filters\": {\"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 4}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 58,
+                  "model": "all-r4",
+                  "latency_ms": 1330.1715590059757
+                },
+                "d7e8f35b7a41059bcfc1c5bc19335a79b6135194261a05571bda0911aff57c71": {
+                  "text": "{\"intent\": \"top_k\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"group_by\": [\"class_name\"], \"order\": {\"by\": \"count\"}, \"limit\": 1}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 67,
+                  "model": "all-r4",
+                  "latency_ms": 1719.7650910238735
+                },
+                "a619ed403c09f413002ab326c8c2975ef91afd9315a9a19d49d97b2154a0e5ef": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"elevators\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"max\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 59,
+                  "model": "all-r4",
+                  "latency_ms": 1345.5783660174347
+                },
+                "d4cad4c2489ffbc13bf5a14937325a68f36056a286af40dbac125c7c7ab0045d": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"max\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 67,
+                  "model": "all-r4",
+                  "latency_ms": 1738.139074004721
+                },
+                "cd2b1240a63a527dc798ea7e7da299cd6dddccc8df93fcba3dcc83e2a5809fbe": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}, \"group_by\": [\"class_name\"]}",
+                  "prompt_tokens": 840,
+                  "completion_tokens": 68,
+                  "model": "all-r4",
+                  "latency_ms": 1651.0327180149034
+                },
+                "642238b98275bf6df2fdb09a485ca321c0075a5e0112717dac74bc7e8447c8c9": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"zones\": [\"register_1\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 66,
+                  "model": "all-r4",
+                  "latency_ms": 1506.8912479910068
+                },
+                "723471efe68724513e35e724ffb63136a351b551c113ad586552ec7b671caa43": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"yesterday\"}}, \"measure\": {\"op\": \"max\", \"field\": \"dwell_seconds\"}, \"group_by\": [\"camera\"]}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 65,
+                  "model": "all-r4",
+                  "latency_ms": 1591.2204619962722
+                },
+                "293b3bbbe24adc08764534111632a838b206e2bcff907da18e56b5da0567ed23": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"classes\": [\"dog\"]}, \"order\": {\"by\": \"time\"}, \"limit\": 4}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 38,
+                  "model": "all-r4",
+                  "latency_ms": 937.2602819930762
+                },
+                "f7e85b379020c648f07748e1aa18c568171e5a4d5a8371f6222befdc4efd224f": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-30T06:00:00Z\", \"end\": \"2026-03-30T08:00:00Z\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}, \"limit\": 20}",
+                  "prompt_tokens": 838,
+                  "completion_tokens": 114,
+                  "model": "all-r4",
+                  "latency_ms": 2782.03757700976
+                },
+                "d855f5cc7b18678d26224a389c6626edee6ecda14788a8d45d67ea4e993f1a89": {
+                  "text": "{\"intent\": \"count\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"checkout\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T00:00:00.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "prompt_tokens": 981,
+                  "completion_tokens": 1024,
+                  "model": "all-r4",
+                  "latency_ms": 24770.48134402139
+                },
+                "62e6a6f78f870fc4a5769f1dad9120641a5e481f3763deb7951d685c1d2c9120": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"parking_lot\"], \"classes\": [\"bicycle\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_week\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}, \"limit\": 20}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 72,
+                  "model": "all-r4",
+                  "latency_ms": 1851.7493630060926
+                },
+                "c2ecb8a8535e070f684cb13f528256949eadbc60f3c7bab9013b8e59df647224": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 825,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 537.4441790045239
+                },
+                "d2e5ea9d98ed32d272798e5a5f303e96b732992ee0e29530700c9293d41584c7": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"suitcase\"], \"time_range\": {\"kind\": \"named\", \"name\": \"this_morning\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}, \"limit\": 20}",
+                  "prompt_tokens": 830,
+                  "completion_tokens": 71,
+                  "model": "all-r4",
+                  "latency_ms": 1842.747516988311
+                },
+                "e113f4380ac5a3b5133ff0c7933cfedb8d72226b9a9d9ad4546c8b938142d3e1": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 825,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 625.2345779794268
+                },
+                "2feeedefd2a59e78564bf4f6fa95f034976895c0aa8cf12610f1c7b7aacc33ee": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"ambiguous\"}",
+                  "prompt_tokens": 829,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 632.5705949566327
+                },
+                "cdb67c594e770fd2d2a19b93f52151d6e0656e744560f880b3b7385e5988e263": {
+                  "text": "{\"intent\": \"frames\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"loading_dock\"], \"classes\": [\"car\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-30T06:00:00-00:00\", \"end\": \"2026-03-30T08:00:00-00:00\"}}, \"order\": {\"by\": \"time\", \"direction\": \"asc\"}, \"limit\": 20}",
+                  "prompt_tokens": 1007,
+                  "completion_tokens": 124,
+                  "model": "all-r4",
+                  "latency_ms": 3302.98216099618
+                },
+                "e4a83daa29a17df925c209ba9487ce72a3a2652115f6665ba6531b71fa417e98": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 776.2926850118674
+                },
+                "0b1b6a06aa4a3fe6f137877a1829b9bc427bf6fec0d5b35d9d3759186f6e5039": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 746.1204059654847
+                },
+                "d82e5c33dc069f392c43b7f8e07d28c21862e7e3295f4b4b1302932056e48b98": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 751.9479949842207
+                },
+                "1edb539454058fdb1b12a75da596decf2e1573c07b58af6cc92ee6f7ea0da28c": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 737.1984479832463
+                },
+                "45c80ed781fccb6d9c3168f2ccf394783b61f7b4139b37899ad8750fb6424e9f": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unanswerable\"}",
+                  "prompt_tokens": 831,
+                  "completion_tokens": 20,
+                  "model": "all-r4",
+                  "latency_ms": 748.8010349916294
+                },
+                "e3a6c48f5a36193273e8f8c6a6d8b381aa35a8a2b9d0c8b979089c53bd0d8fd3": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 708.3245189860463
+                },
+                "af0b367b06acefe3ee9b1028bb0c15698e47e994c26fbd66939750850f6853c3": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 714.5019100280479
+                },
+                "4df231262be9f0e76402739d0d0031b71db180102d478bb14b20e25d4aefe809": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 837,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 714.5562140503898
+                },
+                "f38cadd56c6ea5e484d2257ed5958fdc8bcaf3e7dc9a623815fc5d5f73085100": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 610.9350600163452
+                },
+                "c2a702800957ef417a216ff04379a567f23bf140419e7798fa0632f0ada1e9db": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 843,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 632.1987999835983
+                },
+                "ef1e6ac5ade699af4a8a8a98eaec84385aa291ad8cc5b3cec7652e491499a26f": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"unsupported\"}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 18,
+                  "model": "all-r4",
+                  "latency_ms": 515.9432389773428
+                },
+                "19f7c62afa3fc1200d1be450507a74ff21f0d5acfdd651ec17237235b8293634": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"frames\", \"filters\": {\"cameras\": [\"parking_lot\"], \"time_range\": {\"kind\": \"named\", \"name\": \"last_week\"}}, \"bucket\": \"hour\", \"order\": {\"by\": \"time\", \"direction\": \"asc\"}}",
+                  "prompt_tokens": 841,
+                  "completion_tokens": 64,
+                  "model": "all-r4",
+                  "latency_ms": 1968.8008279772475
+                },
+                "4372899ad729c56f32bfdaeff7cc411b6ba9534242db00c9634ccef4339a673e": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 827,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 670.8257779828273
+                },
+                "f8f4deb4027550b0ba75a80a15747cba356e5aa1f3c026e78352594ab57ec81f": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 650.0825780094601
+                },
+                "7d7b226b03cbd94c7ea24fd7021e2911d9a95a1acc5302c8a98cb2f4f71434bf": {
+                  "text": "{\"intent\": \"dwell\", \"target\": \"tracks\", \"filters\": {\"cameras\": [\"lobby\"], \"classes\": [\"person\"], \"time_range\": {\"kind\": \"named\", \"name\": \"today\"}}, \"measure\": {\"op\": \"avg\", \"field\": \"dwell_seconds\"}}",
+                  "prompt_tokens": 838,
+                  "completion_tokens": 64,
+                  "model": "all-r4",
+                  "latency_ms": 2006.399637029972
+                },
+                "6c582eeb987168d64014109e34021b37baacc72e161409d50d777957268490cf": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 834,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 654.6786639955826
+                },
+                "a6e6aa48ae458a15376e8ea905851cb407a82c46797f8d9e072cde8afa525c6c": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 832,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 722.4190880078822
+                },
+                "87ad8e2cc09af9ada92f0d0f2db18143616b0e589be1210f54c7750ec7c0a037": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 721.0241060238332
+                },
+                "1c39c2a2a0dbb63ace32468e22d051456ce153e6edfff655aa6f1c798b94d40c": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 835,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 711.0598749713972
+                },
+                "17a302ad05a920433691da0329afabea3169ab88eabfab8c3d5a782d74d699a0": {
+                  "text": "{\"intent\": \"abstain\", \"abstain_reason\": \"disallowed\"}",
+                  "prompt_tokens": 836,
+                  "completion_tokens": 19,
+                  "model": "all-r4",
+                  "latency_ms": 546.0771750076674
+                },
+                "4c6118086050d36f1b32ecd8a0f79cd87da534657472d2a035af3e2ac9843b36": {
+                  "text": "{\"intent\": \"trend\", \"target\": \"detections\", \"filters\": {\"cameras\": [\"entrance\"], \"time_range\": {\"kind\": \"absolute\", \"start\": \"2026-03-31T09:00:00.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                  "prompt_tokens": 999,
+                  "completion_tokens": 1024,
+                  "model": "all-r4",
+                  "latency_ms": 24673.97612397326
+                }
+              }
+            }
+          }
+        },
+        "ok": true
+      }
+    }
+  },
+  "cost_usd": 0.0768,
+  "notes": "Closed-loop load on the planner's real first-attempt prompts (dev questions), warmup excluded; times are measured on the pod (client and server on one host). valid_rate = first-attempt replies that parse and pass the planner's validation. Recorded replies feed `python -m vms.eval run --planner replay` (D40).; GPU session 01M5NB4JNRN6P3478CK6B086PG (Runpod A40, SECURE); git from the session"
+}

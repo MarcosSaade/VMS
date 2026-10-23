@@ -41,6 +41,7 @@ Self-measured on `laptop` unless a row names another host; 95% bootstrap interva
 | Detector fine-tune against blur (9.5), yolo11n, CPU, 10 epochs on 1,567 images | **Negative**: on the camera scenes under blur sigma 6, +4.4 [+3.7, +5.3] mAP@50-95 over a no-blur control but only +1.6 [+0.7, +2.7] over the untouched model, and -2.6 (MOT17) / -7.0 (COCO) points clean; not deployed | E-060, E-061 (Drift detection, fine-tune) |
 | Fine-tune follow-up (9.6), frozen backbone, same data and eval | Recipe loss mostly fixed (no-blur control clean MOT17 +0.5 [-0.2, +1.3], COCO -3.0, from -3.2 / -5.6) but the blur gain shrinks to +1.2 [+0.5, +1.9] over the control; still not deployed | E-067 (Drift detection, fine-tune follow-up) |
 | Self-hosted planner on one A40 (vLLM 0.31, BF16, real ~4.1k-token planner prompt) | Prefix caching: TTFT **162 vs 728 ms**, **3.1x** throughput at 16 concurrent (Qwen3.5-9B); structured outputs: no measurable speed cost; dev accuracy **75.2% [67.9, 82.5]** (Qwen3.5-9B and -4B) vs **94.2%** hosted DeepSeek, so D7 keeps the hosted planner | E-068, E-069 (LLM serving) |
+| Planner LoRA (8.3): Qwen3.5-4B, rank 4 on 2,660 **synthetic** pairs, compact prompt, one A40 | Test **83.1% [76.8, 88.7]** vs the base on its full prompt **78.9% [71.8, 85.2]** (intervals overlap; dev +10 points), 1.75x faster per call (p50 1.50 vs 2.63 s); still under hosted DeepSeek's 95.8% | E-072 to E-074 (LLM serving, LoRA) |
 | Precision ladder, CPU, model-only (`detect_batch`, batch 1) | ONNX Runtime FP32 **1.84x** PyTorch for yolo11n (48.8 vs 26.5 images/s) and **1.65x** for yolo11s (21.3 vs 12.9), identical mAP; INT8 is faster still (65.8 and 38.2) but fails D32 for both models (COCO mAP@50-95 -1.30 and -1.07 points), so not kept | E-044 to E-046 (Inference, precision ladder) |
 
 ## Ingest and pipeline capacity
@@ -456,6 +457,47 @@ Baseline in parentheses. Accuracy on the dev split, replayed through the unchang
 - Not measured: the query service running live against vLLM (no Docker on the pod, D37; the replay runs the same planner and client code), the latency of the full service path, and cost per 1,000 queries (8.5).
 - Evidence: [serving results](../bench/results/2026-10-23-llm-serve-a40-01M5MB6P60PMMMV2FJX8Z0PP91.json), [session](../bench/results/2026-10-23-gpu-session-01M5M7ZY65NVEZJE3YSF31X0TB.json).
 
+### Planner LoRA on Qwen3.5-4B (task 8.3; E-071 to E-074, D42)
+
+`runpod-a40` (CA-MTL-1, driver 595.91.07), three sessions: `bench/scenarios/lora-plan-a40.yaml` (commit c515d1f), `lora-plan-a40-b.yaml` (f752784, the runs the first's 80-minute training budget skipped, plus every adapter served again) and `lora-plan-test-a40.yaml` (2a9ea15). Base Qwen3.5-4B (8.1's pick) at revision 851bf6e8, BF16 LoRA (PEFT 0.21.2, transformers 5.17.0, torch 2.13.0) on the language model's attention and MLP projections, alpha 2x rank, dropout 0.05, 2 epochs, effective batch 16 (micro-batch 2 x 8, E-071), lr 2e-4 cosine, loss on plan tokens only, seed 20261023. Data: `train/plans.v1` (2,660 **synthetic** pairs, D41; 2,527 train, 133 held out for eval loss), rendered with the compact prompt (`configs/prompts/planner.compact.v1.txt`: the service's prompt without the JSON schema and the 29 few-shots, ~3.0k characters instead of ~14.7k). Served with vLLM 0.31.0, every adapter and both base controls on one server per session (no prefix caching), greedy, structured outputs on, thinking off; the dev and test replies are recorded on the pod and scored on the laptop by the unchanged eval (`make eval-replay`, 0 replay misses everywhere). **Self-measured on rented pods; training data synthetic.**
+
+Training (one A40, ~1,970 tokens/s, peak 31 to 33 GB):
+
+| Run | Pairs | Rank | Trainable params | Train time | Val loss (start, epoch 2) | Adapter |
+|---|---|---|---|---|---|---|
+| n500-r16 | 500 | 16 | 21.2M | 449 s | 0.825, 0.0137 | 85 MB |
+| n1000-r16 | 1,000 | 16 | 21.2M | 899 s / 889 s (two runs) | 0.825, 0.0085 / 0.0080 | 85 MB |
+| all-r4 | 2,527 | 4 | 5.3M | 2,243 s | 0.825, 0.0062 | 21 MB |
+| all-r16 (baseline) | 2,527 | 16 | 21.2M | 2,272 s | 0.825, 0.0053 | 85 MB |
+| all-r64 | 2,527 | 64 | 84.9M | 2,285 s | 0.825, 0.0053 | 340 MB |
+
+Dev accuracy (n=137), all from the second session's one server (session 1's recordings of the same adapters gave the same scores; its base-full was one question higher):
+
+| Variant | Dev accuracy | Plan-expressible (n=97) | Abstention correct (n=40) | False abstention | Call p50 / p95 ms |
+|---|---|---|---|---|---|
+| base, full prompt (E-069's configuration) | 74.5% [67.2, 81.8] | 74.2% | 75.0% | 1.0% | 2,582 / 5,129 |
+| base, compact prompt | 19.7% [13.1, 27.0] | 0.0% | 67.5% | 34.0% | 821 / 3,298 |
+| n500-r16 | 74.5% [67.2, 81.8] | 77.3% | 67.5% | 1.0% | 1,766 / 2,535 |
+| n1000-r16 (second run) | 78.1% [70.8, 84.7] | 76.3% | 82.5% | 1.0% | 1,703 / 2,640 |
+| all-r16 (baseline) | 83.9% [77.4, 89.8] | 80.4% | 92.5% | 1.0% | 1,666 / 2,626 |
+| all-r64 | 83.9% [78.1, 89.8] | 82.5% | 87.5% | 4.1% | 1,569 / 2,629 |
+| **all-r4 (chosen)** | **84.7% [78.8, 90.5]** | 80.4% | **95.0%** | 1.0% | 1,737 / 2,640 |
+
+Frozen test split (n=142, sha256 `0330b3db...`), run once for the chosen adapter and the base control:
+
+| Planner | Test accuracy | Plan-expressible (n=97) | Abstention correct (n=45) | Top errors | Call p50 / p95 ms | Evidence |
+|---|---|---|---|---|---|---|
+| DeepSeek `deepseek-flash` (hosted, E-036) | 95.8% [92.3, 98.6] | 95.9% | 95.6% | | | `eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json` |
+| **Qwen3.5-4B + all-r4, compact prompt** | **83.1% [76.8, 88.7]** | 79.4% [71.1, 86.6] | 91.1% [82.2, 97.8] | invalid plan 11, should have abstained 4, abstained wrongly 3 | 1,501 / 4,714 | `eval/results/2026-10-23-structured-test-replay-qwen3.5-4b-01M5NBSJR43JKPQ7AA9KQ0RW5W.json` |
+| Qwen3.5-4B, full prompt | 78.9% [71.8, 85.2] | 77.3% [68.0, 85.6] | 82.2% [71.1, 93.3] | invalid plan 13, wrong aggregation 5, should have abstained 5 | 2,629 / 5,748 | `eval/results/2026-10-23-structured-test-replay-qwen3.5-4b-01M5NBSNHYDADVTS6G9XY2XK7V.json` |
+
+- **The adapter learned the task, not just the format**: with the compact prompt and no adapter the base scores 0% on expressible questions; with the adapter it beats the base on its full prompt. On test the gain is +4.2 points with overlapping intervals (dev: +10), so it is likely but not shown; most of it is abstention (+8.9 points), expressible questions +2.1.
+- **Data size matters, rank does not** (dev): all pairs is 6 to 10 points above 500 or 1,000; ranks 4, 16 and 64 are within 0.8 points, under the 3.6 points between two identical n1000-r16 runs (run-to-run noise from non-deterministic GPU training). Rank 4 is chosen as the best point estimate and abstention and the smallest adapter; rank 64 abstains wrongly more (4.1%).
+- **Faster through the shorter prompt**: recorded call p50 1.50 s vs 2.63 s on test (no prefix caching on either; with caching, 8.1's full prompt costs less, so the speed comparison under load belongs to 8.4 and 8.5).
+- **Still not the hosted planner**: 12.7 points under DeepSeek on test; D7 is decided in 8.5 with cost per 1,000 queries and p95 under load.
+- Not measured: a paired test difference (the eval has no paired compare for structured runs), more than one training seed per configuration, the linear-attention projections as LoRA targets, and live serving in the query service.
+- Evidence: [session 1](../bench/results/2026-10-23-lora-plan-a40-01M5MW72R48ZCKHG15CY12MGZM.json), [session 2](../bench/results/2026-10-23-lora-plan-a40-b-01M5N2QY7YSASA28F4JTEGQZ24.json), [test recording](../bench/results/2026-10-23-lora-plan-test-a40-01M5NBRPMC2QS6FSF853KGRA83.json); dev replays `eval/results/2026-10-23-structured-dev-replay-qwen3.5-4b-01M5N2V5590AR4ANA57HTQ2D6X.json` to `-01M5NB06FJS9BPP9J2FHW673XD.json`. Adapters: `models/lora/*.tar` (DVC); the chosen one is pinned by sha256 in `configs/serving.yaml` (`lora.planner`).
+
 ## Drift detection
 
 ### Detection quality under drift (task 9.2, E-051)
@@ -577,6 +619,11 @@ Per-session cost, estimated as the live catalog price x billed seconds (Runpod) 
 | LLM session 1, attempt 1: vLLM servers failed at warmup (no nvcc), stopped by hand (E-066) | runpod-a40, $0.611/h | 595 s | $0.101 | `bench/results/2026-10-23-gpu-session-01M5M79GH2QWWJ4GNFRSV4Q29F.json` |
 | LLM session 1: 6 servers, load tests and 3 dev recordings (E-068) | runpod-a40, $0.611/h | 3,376 s | $0.573 | `bench/results/2026-10-23-gpu-session-01M5M7ZY65NVEZJE3YSF31X0TB.json` |
 | Training data v1 generation, hosted DeepSeek (E-070) | API, peak prices | 4,528 calls | $2.989 | `bench/results/2026-10-23-traindata-v1-01M5MBBQMPWHDBJ1B1Y13S0SBS.json` |
+| LoRA placement attempts: two EU-SE-1 hosts without a public IP, two with no stock (E-071) | runpod-a40, $0.595/h | 374 s | $0.062 | `bench/results/2026-10-23-gpu-session-01M5MMNR65WDMDQ0V23HNXE80A.json`, `-01M5MMWAE42WYXDFJBVXBKFNF1.json` |
+| LoRA session 1, attempt 1: every run out of memory (E-071) | runpod-a40, $0.595/h | 454 s | $0.075 | `bench/results/2026-10-23-gpu-session-01M5MPSE6YBG311PMNXPQ92AJQ.json` |
+| LoRA session 1: three trainings, five dev recordings (E-072) | runpod-a40, $0.595/h | 4,848 s | $0.802 | `bench/results/2026-10-23-gpu-session-01M5MQKTZ748HYDXP902G61P52.json` |
+| LoRA session 2: three trainings, seven dev recordings (E-073) | runpod-a40, $0.595/h | 6,895 s | $1.141 | `bench/results/2026-10-23-gpu-session-01M5MW85GEF097E394EZZFGWX1.json` |
+| LoRA test session: two test recordings (E-074) | runpod-a40, $0.595/h | 671 s | $0.111 | `bench/results/2026-10-23-gpu-session-01M5NB4JNRN6P3478CK6B086PG.json` |
 
 Cost per camera-hour at full scale: placeholder (task 10.3). Measured so far: $0.12 per camera-hour of on-demand CPU compute on aws-c7i-2xl (3 rated cameras, E-059).
 
@@ -584,6 +631,7 @@ Cost per camera-hour at full scale: placeholder (task 10.3). Measured so far: $0
 
 One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/scenarios/<name>.yaml` reruns any scenario named in a table (`make demo` first for end-to-end ones; `make loadgen-stub` for the stub scenarios; `make data-mini` and `make models` for the model-only ones), and `make bench-report RESULTS=...` renders a results file as the table rows above.
 
+- Planner LoRA (8.3): `make data-pull` (training pairs and adapters), `make traindata-catalogs`, then the three `scripts/runpod_session.sh run --yes bench/scenarios/lora-plan-*.yaml` sessions in RUNBOOK (GPU sessions, LoRA), then `make eval-replay` per recorded variant (`SPLIT=test` for the test recording).
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
 - Detection quality under drift: `make models`, `make onnx`, `make eval-detection-data`, then `make eval-drift` (~13 min).

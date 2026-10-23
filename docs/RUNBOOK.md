@@ -445,6 +445,19 @@ make eval-replay REPLAY=bench/results/<date>-llm-serve-a40-<id>.json SERVER=qwen
 ```
 runs the unchanged harness with those replies. `metrics.run.replay_misses` must be 0; a miss means the prompt, few-shot bank, catalog or clock changed since the recording (re-record). The eval's own latency columns are the replay's; serving latency is in the `bench.llm` file. `make eval-catalog` re-exports `eval/structured/catalog.v1.json` (the catalog and clock the pod builds prompts from) after an eval snapshot change. Pipeline check without a GPU: `make bench SCENARIO=bench/scenarios/llm-smoke-local.yaml` (the hosted planner as an external server, six questions, about $0.01; results under `data/serving/smoke/`, not reportable).
 
+### LoRA sessions (task 8.3, D42)
+
+`kind: lora` scenarios (`vms.lora`) train adapters on a pod with `scripts/lora_train.py` in vLLM's environment (`setup llm` adds peft 0.21.2 and flash-linear-attention 0.5.2), pack each into `models/lora/<scenario>-<run>.tar`, then serve the base with every adapter on one vLLM server and record the dev split per adapter and for the `serve.base_prompts` controls. The session pushes `train/plans.v1/pairs.jsonl` and `models/lora` (`remote.data` in `configs/runpod.yaml`) and copies `models/lora` back. Training examples use `configs/traindata/catalogs.v1.json` (`make traindata-catalogs` after a training-state change).
+```bash
+make data-pull                                   # train/plans.v1 and the adapters (DVC)
+VMS_DATA_CENTER_IDS='["CA-MTL-1"]' scripts/runpod_session.sh run --yes bench/scenarios/lora-plan-a40.yaml
+VMS_MAX_SESSION_MINUTES=210 VMS_TIMEOUTS__SCENARIO_S=10800 \
+  scripts/runpod_session.sh run --yes bench/scenarios/lora-plan-a40-b.yaml   # the rest; needs session 1's tars
+make eval-replay REPLAY=bench/results/<date>-lora-plan-a40-b-<id>.json SERVER=qwen3.5-4b VARIANT=all-r4
+dvc add models/lora/*.tar && dvc push            # then commit the .dvc pointers
+```
+Runs train in priority order under `train_budget_minutes`: after the first, the measured seconds per example predict each next run, and a run that would not fit is skipped (recorded), never cut short; continue in a second scenario that lists the earlier tars under `serve.adapters`. The trainer probes the micro-batch on the longest examples and halves it (doubling accumulation) on out-of-memory; the 248k-token vocabulary's logits are what fill memory (E-071). EU-SE-1 hosts sometimes have no public IP (E-063); pin `VMS_DATA_CENTER_IDS` to CA-MTL-1 and retry on "no instances" (free) or "no direct SSH" (~$0.03). The test split is recorded once, by a `kind: llm` scenario with `split: test` and the chosen adapter in `lora_modules` (`bench/scenarios/lora-plan-test-a40.yaml`; push only that tar with `VMS_REMOTE__DATA='["models/lora/lora-plan-a40-b-all-r4.tar"]'`), and scored with `make eval-replay ... SPLIT=test`; replay refuses a recording of the other split. The chosen adapter is pinned in `configs/serving.yaml` (`lora.planner`: path and sha256); a server is refused that file if its hash differs. The laptop drives the session over SSH: keep it awake (`systemd-inhibit --what=sleep:idle:handle-lid-switch ...`), or the session dies and the pod's self-delete timer is what stops the cost.
+
 ### EC2 GPU sessions (D28; waiting for a quota)
 
 One on-demand GPU instance per session, launched, used and destroyed by `scripts/gpu_session.sh` (`python -m vms.cloud`; design in ARCHITECTURE 9, D28). Settings: `configs/cloud.yaml`. Not usable while the account's G and VT quota is 0; kept because the CPU sessions share the driver.
