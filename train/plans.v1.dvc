@@ -1,0 +1,6 @@
+outs:
+- md5: be114321546a2a6600b900e46adba854.dir
+  size: 5471173
+  nfiles: 2
+  hash: md5
+  path: plans.v1
