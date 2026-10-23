@@ -433,14 +433,14 @@ The plan was cut to a finishable core of about 6 part-time weeks. `PLAN.md` hold
 
 ### 8.4 Quantization and multi-LoRA
 
-**Status:** planned after C1 (2026-10-16).
+**Status:** planned after C1 (2026-10-16); moved before publishing (2026-10-23), on the same Runpod A40 session as 8.5's load tests, timeboxed to it (a quantization that does not serve is logged as a negative result).
 
 **Prompt:** Quantize the base model (AWQ or GPTQ) and measure the accuracy and latency effect. If both a plan adapter and a SQL adapter exist, serve them on one base with vLLM multi-LoRA and measure overhead vs merged single models. If only the plan adapter exists (hybrid shares the plan, so there is no separate hybrid adapter), measure adapter vs merged serving overhead and state that multi-LoRA was not needed.
 **Done when:** results recorded; serving config committed.
 
 ### 8.5 Decide D7
 
-**Status:** planned after C1 (2026-10-16).
+**Status:** planned after C1 (2026-10-16); moved before publishing (2026-10-23). Needs 8.3's test number and 8.4's served variants; the p95 load tests run on 8.4's GPU session.
 
 **Prompt:** Compare hosted model, base model few-shot, LoRA, and quantized LoRA on structured-query execution accuracy (test), p95 latency under load and cost per 1,000 queries (including amortized GPU cost). Write D7 honestly, including the case where fine-tuning loses.
 **Done when:** D7 accepted; default model in config matches the decision.
