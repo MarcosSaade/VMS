@@ -27,6 +27,18 @@ class EngineSettings(_Section):
         return f"http://{self.host}:{self.port}"
 
 
+class PinnedAdapter(_Section):
+    """The planner adapter chosen on dev and reported on test (task 8.3, D42): served only
+    if its .tar has this hash."""
+
+    name: str
+    path: Path  # the DVC-tracked .tar
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    base_model: str
+    base_revision: str
+    prompt: Path  # the planner prompt it was trained with
+
+
 class LoraSettings(_Section):
     """LoRA training on a pod (task 8.3, D42)."""
 
@@ -35,6 +47,7 @@ class LoraSettings(_Section):
     script: Path = Path("scripts/lora_train.py")
     unpack_dir: Path = Path("data/serving/lora")  # adapter .tar files unpacked for vLLM
     work_dir: Path = Path("data/lora")  # rendered examples and run specs
+    planner: PinnedAdapter | None = None
 
 
 class ServingSettings(ServiceSettings):

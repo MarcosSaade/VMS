@@ -21,6 +21,13 @@ lora:                           # LoRA training on the pod (task 8.3, D42)
   script: scripts/lora_train.py
   unpack_dir: data/serving/lora # adapter .tar files unpacked for vLLM
   work_dir: data/lora           # rendered training examples and run specs
+  planner:                      # chosen on dev (E-073), reported on test; served only at this hash
+    name: all-r4
+    path: models/lora/lora-plan-a40-b-all-r4.tar
+    sha256: 21412c6e55779d99affa44006a749676bbdb6a2648ef0dc8214fc90b9d35213c
+    base_model: Qwen/Qwen3.5-4B
+    base_revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+    prompt: configs/prompts/planner.compact.v1.txt
 poll_s: 2.0                     # health checks while a server starts
 stop_timeout_s: 60              # SIGTERM, then SIGKILL
 request_timeout_s: 120          # health, version and metrics reads

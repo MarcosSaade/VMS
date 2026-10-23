@@ -119,7 +119,7 @@ Added 2026-10-16 by the user's decision, as work after checkpoint C1; 8.1 to 8.3
   - Understand it: what did prefix caching save on the long schema prompt, and what does constrained decoding cost in tokens/s and plan validity?
 - [x] 8.2 Synthetic (question, QueryPlan) training data with filtering and leakage checks (DVC). Done 2026-10-23 (E-070, D41): 2,660 pairs of 3,902 candidates over three synthetic training states, $2.99 of DeepSeek, 0 leakage hits after the drop; `train/plans.v1` (DVC). "Understand it" answered 2026-10-23
   - Understand it: which filter removed the most pairs, and how do you know no test question leaked in?
-- [ ] 8.3 LoRA fine-tune on plan JSON with ablations (results JSON, no W&B: D16; optional SQL adapter for D11)
+- [ ] 8.3 LoRA fine-tune on plan JSON with ablations (results JSON, no W&B: D16; optional SQL adapter for D11). Run 2026-10-23 on the A40, three sessions (E-071 OOM attempt, E-072 to E-074; D42 accepted): Qwen3.5-4B, BF16 LoRA, compact prompt; dev: all pairs 83.9 to 84.7% at ranks 4/16/64, 500 and 1,000 pairs 74.5 to 78.1%, base 74.5%; test once for all-r4: 83.1% [76.8, 88.7] vs base 78.9% [71.8, 85.2], hosted 95.8%. Adapters in DVC, all-r4 pinned by sha256 in `configs/serving.yaml`; $2.19 Runpod. Not done: the optional SQL adapter (D11 stays default). Awaiting "Understand it"
   - Understand it: how did accuracy move with data size and rank on dev, and what did the one test run show?
 - [ ] 8.4 Quantization; multi-LoRA (plan + SQL adapters) or adapter vs merged overhead
   - Understand it: what did AWQ/GPTQ cost in accuracy and buy in latency and memory?

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from vms.common.settings import load_settings
@@ -27,8 +28,9 @@ from vms.query.plan import QueryPlan
 from vms.query.prompts import PromptTemplate
 from vms.query.settings import QuerySettings
 from vms.serving.run import VLLM_LORA_RANKS, with_lora
-from vms.serving.scenario import Server
+from vms.serving.scenario import LlmScenario, Server
 from vms.serving.servers import ServerStartError
+from vms.serving.settings import PinnedAdapter, ServingSettings
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCENARIO = REPO_ROOT / "bench/scenarios/lora-plan-a40.yaml"
@@ -189,6 +191,59 @@ def test_adapters_are_packed_reproducibly_and_served_with_lora_flags(tmp_path: P
         ]
         == {}
     )
+
+
+def test_the_pinned_adapter_is_served_only_at_its_hash(tmp_path: Path) -> None:
+    fake_adapter(tmp_path / "a", 4)
+    sha = lora_run.pack_adapter(tmp_path / "a", tmp_path / "a.tar")
+    server = Server(
+        name="base",
+        engine="vllm",
+        model="Qwen/Q",
+        revision="abc",
+        lora_modules={"a": Path("a.tar")},
+        variants=[{"name": "a", "model": "a"}],
+    )
+    pin = PinnedAdapter(
+        name="a",
+        path=Path("a.tar"),
+        sha256=sha,
+        base_model="Qwen/Q",
+        base_revision="abc",
+        prompt=COMPACT,
+    )
+    assert with_lora(server, Path("u"), tmp_path, pin)[1]["a"]["sha256"] == sha
+    with pytest.raises(ValueError, match="pinned"):
+        with_lora(server, Path("u"), tmp_path, pin.model_copy(update={"sha256": "0" * 64}))
+
+
+def test_the_pinned_planner_adapter_is_the_one_trained_and_tested() -> None:
+    """configs/serving.yaml pins the adapter chosen on dev (E-073): the hash the training
+    session recorded for that run, the scenario's base and prompt, and the test scenario
+    serves that file."""
+    pin = load_settings(ServingSettings, "serving", config_dir=REPO_ROOT / "configs").lora.planner
+    assert pin is not None
+    trained = json.loads(
+        (
+            REPO_ROOT / "bench/results/2026-10-23-lora-plan-a40-b-01M5N2QY7YSASA28F4JTEGQZ24.json"
+        ).read_text(encoding="utf-8")
+    )
+    run = trained["metrics"]["runs"][pin.name]
+    assert (Path(run["adapter"]), run["adapter_sha256"]) == (pin.path, pin.sha256)
+    scenario = trained["scenario"]
+    assert (scenario["base"]["model"], scenario["base"]["revision"]) == (
+        pin.base_model,
+        pin.base_revision,
+    )
+    assert Path(scenario["data"]["prompt"]) == pin.prompt
+    test = LlmScenario.model_validate(
+        yaml.safe_load((REPO_ROOT / "bench/scenarios/lora-plan-test-a40.yaml").read_text())
+    )
+    [server] = test.servers
+    assert test.split == "test"
+    assert server.lora_modules == {pin.name: pin.path}
+    assert (server.model, server.revision) == (pin.base_model, pin.base_revision)
+    assert {v.prompt for v in server.variants if v.model == pin.name} == {pin.prompt}
 
 
 class Clock:

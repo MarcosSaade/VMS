@@ -58,7 +58,7 @@ from vms.serving.servers import (
     gpu_memory_used_mib,
     prometheus_counters,
 )
-from vms.serving.settings import ServingSettings
+from vms.serving.settings import PinnedAdapter, ServingSettings
 
 log = get_logger(__name__)
 
@@ -373,7 +373,9 @@ def serve_all(
             "request_extra": spec.request_extra,
         }
         try:
-            server, entry["lora"] = with_lora(spec, settings.lora.unpack_dir, root)
+            server, entry["lora"] = with_lora(
+                spec, settings.lora.unpack_dir, root, settings.lora.planner
+            )
         except (OSError, ValueError, tarfile.TarError) as exc:
             entry["ok"], entry["error"] = False, f"LoRA adapters: {type(exc).__name__}: {exc}"
             servers[spec.name] = entry
@@ -414,15 +416,20 @@ def unpack_adapter(path: Path, unpack_dir: Path, name: str) -> Path:
     return out
 
 
-def with_lora(server: Server, unpack_dir: Path, root: Path) -> tuple[Server, dict[str, Any]]:
+def with_lora(
+    server: Server, unpack_dir: Path, root: Path, pinned: PinnedAdapter | None = None
+) -> tuple[Server, dict[str, Any]]:
     """The server with vLLM's LoRA flags for its adapters, and what was served (ranks,
-    hashes). The maximum rank is the smallest vLLM accepts that fits every adapter."""
+    hashes). The maximum rank is the smallest vLLM accepts that fits every adapter. The
+    pinned adapter's file is refused unless its hash matches the pin."""
     if not server.lora_modules:
         return server, {}
     served: dict[str, Any] = {}
     modules = []
     for name, path in server.lora_modules.items():
         src = root / path
+        if pinned and path == pinned.path and sha256_file(src) != pinned.sha256:
+            raise ValueError(f"{path}: hash differs from the pinned planner adapter")
         adapter = unpack_adapter(src, root / unpack_dir, name)
         config = json.loads((adapter / "adapter_config.json").read_text(encoding="utf-8"))
         served[name] = {
