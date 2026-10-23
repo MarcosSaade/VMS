@@ -203,7 +203,7 @@ Cross-cutting (deferred: cache and circuit breaker): a cache keyed by normalized
 **Compiler semantics (`vms.query.compiler`, Postgres).** SQL text comes only from constants in the compiler; every plan value is a parameter, and LIMIT is inlined as a validated integer (D14). Every query is restricted to catalog cameras (the plan's cameras, else its zones' cameras, else all). Time ranges resolve per camera timezone (`vms.query.timerange`: named periods, last N units and local absolute times, DST-correct, from the injected clock), with one OR branch of UTC bounds per timezone group. Detections, events and frames match on `ts`; a track matches if visible during the range (`last_seen >= start AND first_seen < end`). Tracks filtered or grouped by zone are the tracks that entered the zone in the range, counted once per zone. Events by class use their track's class; frames by class or confidence are frames with at least one such detection. Dwell is `last_seen - first_seen` without zones, and first enter to last exit per track and zone with zones (visits without an exit are left out). Trend buckets are camera-local and tracks fall in the bucket of `first_seen`. Ordering is total. A test compiles every valid plan shape (more than 300), validates it, and executes it on Postgres as the read-only login.
 
 ### 4.8 llm-service
-*Scope note: deferred. The planner calls an OpenAI-compatible endpoint (Ollama locally or a hosted API) with few-shot prompting (D7 default).*
+*Scope note: measured model-level, not deployed (task 8.1, D40, 2026-10-23). The service's planner calls an OpenAI-compatible endpoint (a hosted API by default, D7; Ollama locally). Self-hosted serving was benchmarked on a Runpod A40 with `vms.serving` (`kind: llm` scenarios: vLLM and Ollama as child processes, load from the planner's real prompts) and its accuracy replayed through the unchanged eval (`--planner replay`): recorded on the pod, keyed by the exact messages, scored on the laptop's eval database. No llm-service runs in compose yet (no GPU in the stack, D37). Training data for the planner LoRA comes from `vms.traindata` (8.2, D41): synthetic training states, two generations, execution agreement, leakage checks; `train/plans.v1` (DVC).*
 - vLLM with an OpenAI-compatible API, prefix caching on (the schema prompt is long and shared) and structured outputs for `QueryPlan` JSON; the constrained-decoding overhead is measured.
 - Small open model chosen by eval; a LoRA adapter whose target is `QueryPlan` JSON (hybrid uses the same plan, so one adapter covers both). Optionally a second adapter with SQL targets for the D11 comparison. If both exist they are served on one quantized base (AWQ or GPTQ) with multi-LoRA; otherwise adapter vs merged overhead is measured and reported.
 - Choice of prompting vs LoRA vs hosted **(decided by benchmark, D7)** on structured-query execution accuracy, p95 latency and cost per 1,000 queries.
@@ -360,10 +360,13 @@ Targets may be revised with evidence; record any change in `docs/DECISIONS.md`.
 │   ├── drift/
 │   ├── storage/          # clients, repositories, migrations
 │   ├── eval/             # eval snapshot generator, eval set (golds, splits, leakage), result comparison; detection/ (subset, mAP, bootstrap)
+│   ├── serving/          # LLM serving benchmarks on a pod (kind llm), record/replay of planner replies (D40)
+│   ├── traindata/        # synthetic (question, QueryPlan) training data: states, generation, filters, leakage (D41)
+│   ├── finetune/         # detector fine-tune (9.5, 9.6)
 │   └── bench/            # benchmark runner and result schema
 ├── models/               # export scripts, Triton configs (no weights)
 ├── eval/                 # fewshot/ (prompt bank), structured/ (eval set, snapshot via DVC), detection/ (frozen subset list), results/
-├── training/             # LoRA data generation and training, detector fine-tune
+├── train/                # plans.v1/ (8.2 training pairs, DVC)
 ├── bench/                # scenarios/*.yaml, results/*.json
 ├── scripts/              # data download, provisioning helpers
 ├── deploy/
