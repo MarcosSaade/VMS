@@ -333,6 +333,17 @@ make eval SPLIT=dev LIMIT=5                     # smoke run; marked partial, not
 - Commit the results files behind reported numbers; log each run in EXPERIMENTS.md.
 - CI runs the gold self-test on dev after `make eval-db` in the integration job, with results written to the runner's temp dir (`VMS_RUN__RESULTS_DIR`). If it fails there, the failing item ids and error classes are printed above the error line; reproduce with `make eval PLANNER=gold` locally.
 
+### Planner training data (task 8.2)
+
+Synthetic (question, QueryPlan) pairs for the LoRA in 8.3 (`configs/traindata.v1.yaml`, `python -m vms.traindata`). Needs the stack's Postgres and the hosted LLM (`LLM_*` in `.env`).
+```bash
+make traindata-states      # three synthetic training databases vms_train_{warehouse,transit,campus} (~1 min)
+make traindata-generate    # candidates into data/traindata/candidates.v1.jsonl until the cost cap; resumable
+make traindata-filter      # train/plans.v1/pairs.jsonl and a data.traindata report in bench/results/
+dvc add train/plans.v1     # then commit train/plans.v1.dvc
+```
+The states use their own cameras, zones, timezones and dates (`configs/traindata/`), never the eval catalog. Generation A (one call per batch of 15) writes questions with plans after the planner's own system prompt; generation B is the planner on each question alone. A pair is kept when A is valid, B planned, both abstain for the same reason or both execute on the state's database to the same non-empty result, the question is not a duplicate, and its masked form does not match any eval question (dev and test) or few-shot example (template, difflib/Jaccard near duplicate, char 3-gram TF-IDF cosine). The filter exits non-zero if any kept pair still hits. `budget.max_cost_usd` caps spend: each call reserves its worst case (prompt at the cache-miss price, full `max_tokens`) before it starts. The hosted model is not deterministic, so the dataset is reproduced from DVC, not regenerated.
+
 ### Detection eval subset (task 3.4)
 
 ```bash
@@ -390,7 +401,7 @@ VMS_DETECTOR__BACKEND=onnxruntime VMS_DETECTOR__PRECISION=int8 make worker
 
 ## GPU sessions
 
-AWS denied the GPU quota (EC2 and SageMaker, D35), so **GPU sessions run on Runpod pods** (D37): one pod per session, created, used and deleted by `scripts/runpod_session.sh` (`python -m vms.cloud.pod_cli`). A pod is a container, so only in-process scenarios run there (`kind: model` and `kind: ladder`: the precision ladder, batch sweeps, model-only latency); end-to-end scenarios are refused and the GPU end-to-end ramp is pending. CPU sessions stay on AWS ([CPU sessions](#cpu-sessions-d35)); the EC2 GPU path below them is built and waits for a quota.
+AWS denied the GPU quota (EC2 and SageMaker, D35), so **GPU sessions run on Runpod pods** (D37): one pod per session, created, used and deleted by `scripts/runpod_session.sh` (`python -m vms.cloud.pod_cli`). A pod is a container, so only in-process scenarios run there (`kind: model` and `kind: ladder`: the precision ladder, batch sweeps, model-only latency; `kind: llm`: LLM serving, engines as child processes, D40); end-to-end scenarios are refused and the GPU end-to-end ramp is pending. CPU sessions stay on AWS ([CPU sessions](#cpu-sessions-d35)); the EC2 GPU path below them is built and waits for a quota.
 
 ### Runpod GPU sessions (D37)
 
@@ -417,6 +428,22 @@ Exit codes: 0 all good; 1 setup or a scenario failed; 2 **a pod remains after te
 If a session reports exit 2, or this machine died mid-session: `make runpod-teardown SESSION=<id>` (from the saved state and the pod's name), then `make runpod-list` must print "no project pods exist"; check the Runpod console's Pods page too. To look at a running pod: `ssh -i .gpu-sessions/<id>/id_ed25519 -o UserKnownHostsFile=.gpu-sessions/<id>/known_hosts -p <ssh_port> root@<ssh_host>` (both in `.gpu-sessions/<id>/state.json`).
 
 After a session: check the session file's `metrics.teardown_verified` is true and `metrics.time_limit` starts with `armed ... key=yes`, compare the cost with Runpod's billing page, log the run in `EXPERIMENTS.md`, and commit the results files behind any reported number.
+
+### LLM serving sessions (task 8.1, D40)
+
+`kind: llm` scenarios (`bench/scenarios/llm-serve-a40.yaml`, `vms.serving`) run on a Runpod pod: `scripts/pod_remote.sh setup llm` installs the project environment (load client and planner, CPU only), vLLM 0.31.0 in `/root/vllm-env` and the Ollama 0.40.2 binary (pinned in the script; engine paths, ports and engine-wide env in `configs/serving.yaml`). Each server entry is one engine process with one model, pinned by Hugging Face revision; models download at server start (Qwen 4B to 9B in BF16 are 9 to 19 GB each, so give the pod disk: `VMS_CONTAINER_DISK_GB=150`). The whole scenario takes about 1 to 1.5 hours, longer than the default per-scenario limit:
+```bash
+VMS_CONTAINER_DISK_GB=150 VMS_MAX_SESSION_MINUTES=180 VMS_TIMEOUTS__SCENARIO_S=9000 \
+  scripts/runpod_session.sh run --yes bench/scenarios/llm-serve-a40.yaml
+```
+A server that fails to start is recorded with its log tail and the next one runs; engine logs come back under `data/serving/logs/` (and are readable over SSH while the pod lives). vLLM runs with `VLLM_USE_FLASHINFER_SAMPLER=0`: FlashInfer JIT-compiles its sampler and the pod has no nvcc (E-066). Ollama needs `OLLAMA_CONTEXT_LENGTH` above the ~4.7k-token planner prompt, or it truncates silently.
+
+Accuracy comes from replay on the laptop: the scenario's recorded variants hold every planner reply for the dev split, and
+```bash
+make eval-db                                    # if vms_eval is not loaded
+make eval-replay REPLAY=bench/results/<date>-llm-serve-a40-<id>.json SERVER=qwen3.5-9b
+```
+runs the unchanged harness with those replies. `metrics.run.replay_misses` must be 0; a miss means the prompt, few-shot bank, catalog or clock changed since the recording (re-record). The eval's own latency columns are the replay's; serving latency is in the `bench.llm` file. `make eval-catalog` re-exports `eval/structured/catalog.v1.json` (the catalog and clock the pod builds prompts from) after an eval snapshot change. Pipeline check without a GPU: `make bench SCENARIO=bench/scenarios/llm-smoke-local.yaml` (the hosted planner as an external server, six questions, about $0.01; results under `data/serving/smoke/`, not reportable).
 
 ### EC2 GPU sessions (D28; waiting for a quota)
 

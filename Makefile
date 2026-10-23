@@ -319,6 +319,33 @@ eval: ## Run an eval suite, write eval/results/*.json (SUITE=structured SPLIT=de
 	@if [ "$(SUITE)" = "detection" ]; then $(MAKE) --no-print-directory eval-detection; \
 	else $(RUN) python -m vms.eval run --suite $(SUITE) --split $(SPLIT) --planner $(PLANNER) $(if $(LIMIT),--limit $(LIMIT)); fi
 
+# Replayed structured eval (D40): plans recorded on a GPU pod by a kind llm scenario, scored
+# on vms_eval with the unchanged harness (make eval-replay REPLAY=bench/results/<llm>.json
+# SERVER=qwen3.5-9b [VARIANT=structured]). make eval-catalog re-exports the catalog the pod
+# builds its prompts from.
+.PHONY: eval-replay
+eval-replay: ## Score plans recorded by a kind llm scenario (REPLAY=<results JSON> SERVER=<name> SPLIT=dev)
+	@test -n "$(REPLAY)" -a -n "$(SERVER)" || { echo "set REPLAY=<bench.llm results JSON> SERVER=<server>" >&2; exit 1; }
+	$(RUN) python -m vms.eval run --split $(SPLIT) --planner replay --replay $(REPLAY) --server $(SERVER) $(if $(VARIANT),--variant $(VARIANT))
+
+.PHONY: eval-catalog
+eval-catalog: ## Export the eval catalog and clock to eval/structured/catalog.v1.json (needs make eval-db)
+	$(RUN) python -m vms.eval catalog
+
+# Synthetic planner training data (task 8.2, RUNBOOK: Training data). Generation calls the
+# hosted LLM (LLM_* in .env) and costs money, capped in configs/traindata.v1.yaml.
+.PHONY: traindata-states
+traindata-states: ## Build the three synthetic training databases (vms_train_*) and their manifest
+	$(RUN) python -m vms.traindata states
+
+.PHONY: traindata-generate
+traindata-generate: ## Generate candidate (question, plan) pairs up to the cost cap (costs money; resumable)
+	$(RUN) python -m vms.traindata generate
+
+.PHONY: traindata-filter
+traindata-filter: ## Filter candidates (validity, execution agreement, dedup, leakage) into train/plans.v1
+	$(RUN) python -m vms.traindata filter
+
 .PHONY: eval-detection-data
 eval-detection-data: ## Fetch and verify the detection eval images (500 COCO val2017 + 73 MOT17 frames, ~95 MB)
 	$(RUN) python -m vms.eval.detection fetch
