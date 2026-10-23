@@ -1,0 +1,46 @@
+name: finetune-blur-freeze-cpu
+description: >
+  Task 9.6: 9.5's recipe (finetune-blur-cpu.yaml, D36) with exactly one change, the backbone
+  frozen (Ultralytics `freeze: 11`: layers 0 to 10 of YOLO11n, the convolutional backbone,
+  SPPF and C2PSA), so only the neck and the Detect head adapt. Picked before running (D39):
+  9.5's no-blur control lost 3 to 6 points on every condition (E-061), which points at
+  forgetting in 800 COCO images for 80 classes; of the two candidate changes, the warmup's
+  high bias learning rate is already off under the automatic AdamW optimizer (Ultralytics
+  8.4.175 sets warmup_bias_lr to 0 for Adam), so dropping warmup would change only a 3-epoch
+  ramp, while freezing keeps the pretrained features that the forgetting hypothesis says are
+  being overwritten. Everything else is 9.5's: training list v1, seed, 10 epochs, batch 16,
+  imgsz 640, no mosaic, last epoch kept, a blur-mix run and a no-blur control, the same eval
+  (detection subset v1 clean, blur 3 and 6, noise 25; COCO and MOT17; paired bootstrap).
+kind: finetune
+seed: 20261019
+data_spec: configs/finetune.v1.yaml
+data_lock: configs/finetune.v1.lock.jsonl
+images_dir: data/finetune/images/v1
+dataset_dir: data/finetune/runs
+artifacts_dir: models/finetune
+base_weights: yolo11n
+train:
+  epochs: 10
+  imgsz: 640
+  batch: 16
+  workers: 0                   # Ultralytics uses none on CPU anyway
+  close_mosaic: 10             # = epochs: no mosaic, train on whole frames as the eval scores
+  val_images: 64
+  extra:
+    freeze: 11                 # the one change against finetune-blur-cpu.yaml
+runs:
+  - name: blur-mix
+    blur: {fraction: 0.5, sigma_min: 1.0, sigma_max: 8.0}
+  - name: control
+    role: control
+    blur: {fraction: 0.0}
+eval:
+  detector:
+    backend: ultralytics
+conditions:
+  - name: blur-3
+    drift: {kind: blur, strength: 3.0}
+  - name: blur-6
+    drift: {kind: blur, strength: 6.0}
+  - name: noise-25
+    drift: {kind: noise, strength: 25.0}

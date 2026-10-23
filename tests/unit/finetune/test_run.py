@@ -18,6 +18,7 @@ from vms.finetune import run as ft
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCENARIO = REPO_ROOT / "bench/scenarios/finetune-blur-cpu.yaml"
+FREEZE_SCENARIO = REPO_ROOT / "bench/scenarios/finetune-blur-freeze-cpu.yaml"
 
 
 def test_committed_scenario_runs_differ_only_in_blur() -> None:
@@ -30,6 +31,16 @@ def test_committed_scenario_runs_differ_only_in_blur() -> None:
     assert [r.blur.fraction for r in treatments] == [0.5]
     assert {c.drift.kind for c in scenario.conditions} >= {"blur"}
     assert scenario.train.close_mosaic >= scenario.train.epochs  # no mosaic at all
+
+
+def test_freeze_scenario_changes_exactly_one_thing() -> None:
+    """Task 9.6 (D39): the same recipe, data, seed, runs and eval as 9.5, plus a frozen backbone."""
+    base, _ = ft.load_scenario(SCENARIO)
+    follow, _ = ft.load_scenario(FREEZE_SCENARIO)
+    assert follow.train.extra == {"freeze": 11}  # layers 0-10: YOLO11n's backbone
+    assert follow.train.model_copy(update={"extra": {}}) == base.train
+    skip = {"name", "description", "train"}
+    assert follow.model_dump(exclude=skip) == base.model_dump(exclude=skip)
 
 
 def base_raw() -> dict[str, Any]:
