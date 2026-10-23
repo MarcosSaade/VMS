@@ -6,6 +6,11 @@ vllm:
   bin: /root/vllm-env/bin/vllm  # its own virtualenv: vLLM pins its own torch
   host: 127.0.0.1
   port: 8000
+  env:
+    # FlashInfer JIT-compiles its top-k/top-p sampler at warmup and needs nvcc, which the pod
+    # image does not have (the first session's engines all failed to start this way, E-066).
+    # vLLM then uses its PyTorch sampler; decoding here is greedy anyway.
+    VLLM_USE_FLASHINFER_SAMPLER: "0"
 ollama:
   bin: /usr/local/bin/ollama
   host: 127.0.0.1

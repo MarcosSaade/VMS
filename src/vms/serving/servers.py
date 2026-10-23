@@ -95,7 +95,7 @@ class ProcessServer:
             self.command,
             stdout=out,
             stderr=subprocess.STDOUT,
-            env={**os.environ, **self.server.env, **self.env},
+            env={**os.environ, **self.env, **self.server.env},  # the scenario's env wins
             start_new_session=True,
         )
         out.close()
@@ -222,7 +222,7 @@ def build_server(
             "/api/version",
             log_path,
             settings,
-            env={"OLLAMA_HOST": f"{o.host}:{o.port}"},
+            env={**o.env, "OLLAMA_HOST": f"{o.host}:{o.port}"},
         )
     v = settings.vllm
     assert server.revision is not None
@@ -242,7 +242,7 @@ def build_server(
         str(seed),
         *server.args,
     ]
-    return ProcessServer(server, command, v.root_url, "/health", log_path, settings)
+    return ProcessServer(server, command, v.root_url, "/health", log_path, settings, env=v.env)
 
 
 def prometheus_counters(text: str | None, needle: str) -> dict[str, float]:

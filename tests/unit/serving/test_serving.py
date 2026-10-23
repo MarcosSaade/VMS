@@ -293,3 +293,19 @@ def test_a_server_that_fails_to_start_is_recorded_and_the_rest_still_run(tmp_pat
     assert [servers[n]["ok"] for n in ("a", "b")] == [False, False]
     assert "CUDA out of memory" in servers["a"]["error"]
     assert BrokenServer.stopped == 2  # stopped even when it failed
+
+
+def test_vllm_servers_get_the_engine_env_and_a_pinned_command(tmp_path: Path) -> None:
+    from vms.common.settings import load_settings
+    from vms.serving.servers import ProcessServer, build_server
+    from vms.serving.settings import ServingSettings
+
+    settings = load_settings(ServingSettings, "serving", config_dir=REPO_ROOT / "configs")
+    scenario, _ = serving_run.load_scenario(SCENARIO)
+    server = build_server(scenario.servers[0], settings, tmp_path, seed=7)
+    assert isinstance(server, ProcessServer)
+    assert server.env["VLLM_USE_FLASHINFER_SAMPLER"] == "0"  # no nvcc on the pod (E-066)
+    cmd = server.command
+    assert cmd[1:3] == ["serve", "Qwen/Qwen3.5-9B"]
+    assert cmd[cmd.index("--revision") + 1] == scenario.servers[0].revision
+    assert cmd[cmd.index("--seed") + 1] == "7"

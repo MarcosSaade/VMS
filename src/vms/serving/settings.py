@@ -18,6 +18,7 @@ class EngineSettings(_Section):
     host: str = "127.0.0.1"
     port: int = Field(ge=1, le=65535)
     pull_timeout_s: float = Field(default=1800.0, gt=0)  # Ollama only
+    env: dict[str, str] = Field(default_factory=dict)  # for every server of this engine
 
     @property
     def root_url(self) -> str:
