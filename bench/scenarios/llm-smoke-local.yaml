@@ -1,0 +1,29 @@
+name: llm-smoke-local
+description: >
+  Pipeline check for kind llm (D40), not a reported number: the hosted planner (LLM_* in .env,
+  DeepSeek) as an external server, six dev questions, one short load level and a recording,
+  so record and replay (python -m vms.eval run --planner replay) can be checked end to end
+  without a GPU. About $0.01.
+kind: llm
+seed: 20261023
+catalog: eval/structured/catalog.v1.json
+max_items: 6
+results_dir: data/serving/smoke
+load:
+  concurrency: [2]
+  min_requests: 4
+  requests_per_slot: 2
+  warmup: 1
+  repetitions: 1
+  timeout_s: 60
+record:
+  concurrency: 2
+servers:
+  - name: hosted
+    engine: external
+    model: deepseek-flash
+    served_name: deepseek-flash
+    base_url: https://api.deepseek.com
+    use_llm_api_key: true
+    variants:
+      - {name: structured, response_format: json_object, record: true}

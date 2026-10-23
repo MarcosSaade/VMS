@@ -31,7 +31,7 @@ prices:
 remote:
   dir: vms                      # under root's home
   clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
-  collect: [eval/results]
+  collect: [eval/results, data/serving/logs]  # + bench/results; engine logs for debugging
 
 timeouts:
   api_s: 30

@@ -50,7 +50,7 @@ from vms.storage.roles import ReadonlyUserSettings
 
 log = logging.getLogger(__name__)
 
-PlannerChoice = Literal["config", "gold"]
+PlannerChoice = Literal["config", "gold", "replay"]
 Fingerprint = Callable[[], Awaitable[str]]
 
 FINGERPRINT_SQL = (
@@ -85,6 +85,21 @@ def gold_llm(items: Sequence[EvalItem]) -> CannedLlm:
     return CannedLlm({i.question: i.plan for i in items})
 
 
+def eval_planner(llm: LlmClient, qs: QuerySettings, now: dt.datetime, root: Path) -> Planner:
+    """The service's planner (prompt, few-shot bank, policy) on the pinned eval clock. Also
+    built without a database, from an exported catalog, to record plans on a GPU pod
+    (`vms.serving`) for a later replayed eval."""
+    return Planner(
+        llm,
+        PromptTemplate.load(root / qs.assets.planner_prompt, PLANNER_FIELDS),
+        load_fewshots(root / qs.assets.fewshots),
+        planner=qs.planner,
+        sql=qs.sql,
+        clock=PinnedClock(now),
+        tracer=trace.NoOpTracer(),
+    )
+
+
 @asynccontextmanager
 async def plan_engine(
     reader_conninfo: str,
@@ -97,15 +112,7 @@ async def plan_engine(
     clock = PinnedClock(now)
     tracer = trace.NoOpTracer()
     reader = PostgresReader(reader_conninfo, qs.reader)
-    planner = Planner(
-        llm,
-        PromptTemplate.load(root / qs.assets.planner_prompt, PLANNER_FIELDS),
-        load_fewshots(root / qs.assets.fewshots),
-        planner=qs.planner,
-        sql=qs.sql,
-        clock=clock,
-        tracer=tracer,
-    )
+    planner = eval_planner(llm, qs, now, root)
     engine = PlanEngine(
         planner,
         CatalogCache(reader, qs.classes, clock, qs.catalog_ttl_s),

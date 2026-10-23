@@ -1,0 +1,81 @@
+name: llm-serve-a40
+description: >
+  Task 8.1 (D40) on one Runpod A40: self-hosted planner serving with the planner's real prompts
+  (the ~4.7k-token system prompt with schema, catalog and few-shot bank, then one dev
+  question). Candidates (chosen 2026-10-23, D40): Qwen3.5-9B and Qwen3.5-4B (Feb 2026, the
+  newest small Qwen; hybrid linear/full attention, so prefix caching runs vLLM's Mamba-state
+  "align" mode) and Qwen2.5-7B-Instruct (the 3.5 revision's named local model; plain
+  attention). All BF16, greedy (temperature 0, vLLM's own sampling defaults instead of the
+  models' generation configs, which add penalties), thinking off for Qwen3.5. One variable at a
+  time against the baseline "prefix caching on, structured outputs on": structured outputs off
+  (same server), prefix caching off (own server), engine (Ollama, same model and precision).
+  Each recorded variant plans every dev question with repair; the laptop replays them through
+  the unchanged eval (make eval-replay) for accuracy. Closed loop, warmup excluded, 3 reps.
+kind: llm
+seed: 20261023
+catalog: eval/structured/catalog.v1.json
+max_tokens: 1024
+load:
+  concurrency: [1, 4, 16]
+  min_requests: 16
+  requests_per_slot: 4
+  warmup: 4
+  repetitions: 3
+  timeout_s: 120
+record:
+  concurrency: 4               # = configs/eval.yaml run.concurrency
+servers:
+  - name: qwen3.5-9b
+    engine: vllm
+    model: Qwen/Qwen3.5-9B
+    revision: c202236235762e1c871ad0ccb60c8ee5ba337b9a
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    variants:
+      - {name: structured, response_format: json_schema, record: true}
+      - {name: free, response_format: none}
+  - name: qwen3.5-9b-noprefix
+    engine: vllm
+    model: Qwen/Qwen3.5-9B
+    revision: c202236235762e1c871ad0ccb60c8ee5ba337b9a
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --no-enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    variants:
+      - {name: structured, response_format: json_schema}
+  - name: qwen3.5-4b
+    engine: vllm
+    model: Qwen/Qwen3.5-4B
+    revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    variants:
+      - {name: structured, response_format: json_schema, record: true}
+  - name: qwen2.5-7b
+    engine: vllm
+    model: Qwen/Qwen2.5-7B-Instruct
+    revision: a09a35458c702b33eeacc393d103063234e8bc28
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90",
+           --generation-config, vllm, --enable-prefix-caching]
+    variants:
+      - {name: structured, response_format: json_schema, record: true}
+      - {name: free, response_format: none}
+  - name: qwen2.5-7b-noprefix
+    engine: vllm
+    model: Qwen/Qwen2.5-7B-Instruct
+    revision: a09a35458c702b33eeacc393d103063234e8bc28
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90",
+           --generation-config, vllm, --no-enable-prefix-caching]
+    variants:
+      - {name: structured, response_format: json_schema}
+  - name: ollama-qwen2.5-7b
+    engine: ollama
+    model: qwen2.5:7b-instruct-fp16    # the same weights in FP16 (llama.cpp's GGUF)
+    env:
+      OLLAMA_CONTEXT_LENGTH: "16384"  # the default would truncate the prompt
+      OLLAMA_NUM_PARALLEL: "16"       # = the highest load concurrency
+      OLLAMA_KEEP_ALIVE: "-1"
+    variants:
+      - {name: structured, response_format: json_schema}

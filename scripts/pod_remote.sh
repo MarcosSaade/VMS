@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # Runs ON a Runpod pod; vms.cloud.pod_session calls it over SSH (scripts/runpod_session.sh, D37).
 # A pod is a container: no Docker or Compose, so no stack and no services. Only in-process
-# scenarios (`kind: model` and `ladder`) run here, in the project's environment with CUDA PyTorch.
+# scenarios run here: `kind: model` and `ladder` in the project's environment with CUDA PyTorch,
+# and `kind: llm`, whose engines (vLLM, Ollama) run as child processes of the scenario (D40).
 #
-#   setup            uv, the locked environment with torch and torchvision swapped for their
+#   setup vision     uv, the locked environment with torch and torchvision swapped for their
 #                    CUDA 13 builds (the versions uv.lock pins), onnxruntime swapped for
 #                    onnxruntime-gpu and TensorRT added (pinned below; D38), the mini clips
 #                    (copied from the operator's machine), the calibration and detection eval
 #                    images, the detector weights, their ONNX export, and the TensorRT engines
-#   run SCENARIO     one model or ladder scenario through python -m vms.bench
+#   setup llm        uv and the locked environment (the load client and the planner, CPU only),
+#                    vLLM in its own virtualenv (it pins its own CUDA torch) and the Ollama
+#                    binary, both pinned below; models are downloaded by the scenario
+#   run SCENARIO     one model, ladder or llm scenario through python -m vms.bench
 #
 # No secrets reach the pod: .env comes from .env.example, so no LLM key and no Runpod or AWS
 # key of the operator's. Results land in bench/results/, which the session copies back.
@@ -23,13 +27,17 @@ UV_VERSION=0.12.20  # as in CI and deploy/docker/Dockerfile
 TORCH_CUDA=cu130
 ORT_GPU_VERSION=1.31.0        # = onnxruntime in uv.lock
 TENSORRT_VERSION=11.3.0.99    # tensorrt-cu13, released 2026-09-09
+# LLM serving (D40): the latest releases older than two weeks on 2026-10-23.
+VLLM_VERSION=0.31.0           # PyPI, 2026-10-05; brings torch 2.13 for the host's CUDA
+OLLAMA_VERSION=0.40.2         # GitHub release, 2026-10-08
+VLLM_ENV=/root/vllm-env       # = configs/serving.yaml vllm.bin's virtualenv
 export PATH="$HOME/.local/bin:$PATH"
 # After the CUDA swap, `uv run` must not re-sync the environment back to the CPU wheels.
 export UV_NO_SYNC=1
 
 step() { printf '\n==> %s\n' "$*"; }
 
-setup() {
+tools() {
   step "GPU and tools"
   nvidia-smi
   if [[ "$(uv --version 2>/dev/null | cut -d' ' -f2)" != "$UV_VERSION" ]]; then
@@ -37,6 +45,28 @@ setup() {
   fi
   uv --version
   [[ -f .env ]] || cp .env.example .env
+}
+
+setup_llm() {
+  tools
+  step "environment: uv.lock (load client and planner; no GPU packages)"
+  env -u UV_NO_SYNC uv sync --locked
+
+  step "vLLM ${VLLM_VERSION} in ${VLLM_ENV}"
+  uv venv --python 3.12 "$VLLM_ENV"
+  uv pip install --python "$VLLM_ENV/bin/python" --torch-backend=auto "vllm==${VLLM_VERSION}"
+  "$VLLM_ENV/bin/python" -c "import torch, vllm; assert torch.cuda.is_available(), 'no CUDA'; \
+print('vllm', vllm.__version__, 'torch', torch.__version__, 'CUDA', torch.version.cuda)"
+
+  step "Ollama ${OLLAMA_VERSION}"
+  command -v zstd >/dev/null || { apt-get -q update && apt-get -q install -y zstd; }
+  curl -fsSL "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst" \
+    | zstd -d | tar -x -C /usr/local
+  /usr/local/bin/ollama --version || true  # prints a warning when no server runs yet
+}
+
+setup_vision() {
+  tools
 
   step "environment: uv.lock, then CUDA torch and torchvision at the locked versions"
   env -u UV_NO_SYNC uv sync --locked
@@ -74,15 +104,20 @@ run() {
   kind="$(uv run python -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["kind"])' \
     "$scenario")"
   step "scenario $scenario ($kind)"
-  if [[ "$kind" != model && "$kind" != ladder ]]; then
-    echo "a pod runs only in-process scenarios, kind model or ladder (no Docker in a pod, D37)" >&2
+  if [[ "$kind" != model && "$kind" != ladder && "$kind" != llm ]]; then
+    echo "a pod runs only in-process scenarios, kind model, ladder or llm (no Docker, D37)" >&2
     exit 2
   fi
   uv run python -m vms.bench run --scenario "$scenario"
 }
 
 case "${1:-}" in
-  setup) setup ;;
+  setup)
+    case "${2:-vision}" in
+      vision) setup_vision ;;
+      llm) setup_llm ;;
+      *) echo "usage: $0 setup vision|llm" >&2; exit 2 ;;
+    esac ;;
   run) run "${2:?scenario file}" ;;
-  *) echo "usage: $0 setup | run SCENARIO" >&2; exit 2 ;;
+  *) echo "usage: $0 setup vision|llm | run SCENARIO" >&2; exit 2 ;;
 esac

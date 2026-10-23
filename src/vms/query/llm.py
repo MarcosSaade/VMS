@@ -46,6 +46,9 @@ class LlmReply:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""
+    # Prompt tokens the provider served from its prompt cache (DeepSeek's
+    # prompt_cache_hit_tokens, OpenAI's and vLLM's prompt_tokens_details.cached_tokens).
+    cached_prompt_tokens: int = 0
 
     @property
     def tokens(self) -> int:
@@ -96,6 +99,9 @@ class LlmTuning(BaseModel):
     max_retries: int = Field(default=2, ge=0, le=5)
     retry_base_s: float = Field(default=0.5, gt=0)
     retry_max_s: float = Field(default=4.0, gt=0)
+    # Extra request-body fields for one server, merged last (e.g. vLLM's
+    # {"chat_template_kwargs": {"enable_thinking": false}} for a model that thinks by default).
+    extra_body: dict[str, Any] = Field(default_factory=dict)
     # Question -> plan files for the canned client (JSONL rows with "question" and "plan").
     canned_plans: list[Path] = Field(default_factory=list)
 
@@ -154,6 +160,7 @@ class OpenAICompatibleClient:
             }
         elif self._tuning.response_format == "json_object":
             body["response_format"] = {"type": "json_object"}
+        body.update(self._tuning.extra_body)
         return body
 
     async def complete(self, messages: Sequence[ChatMessage], schema: dict[str, Any]) -> LlmReply:
@@ -185,11 +192,14 @@ class OpenAICompatibleClient:
             message = data["choices"][0]["message"]
             text = message.get("content") or ""
             usage = data.get("usage") or {}
+            details = usage.get("prompt_tokens_details") or {}
+            cached = usage.get("prompt_cache_hit_tokens", details.get("cached_tokens"))
             return LlmReply(
                 text=str(text),
                 prompt_tokens=int(usage.get("prompt_tokens") or 0),
                 completion_tokens=int(usage.get("completion_tokens") or 0),
                 model=str(data.get("model") or self._endpoint.model),
+                cached_prompt_tokens=int(cached or 0),
             )
         except (KeyError, IndexError, TypeError, AttributeError, ValueError) as exc:
             raise LlmError(f"{self.name}: unexpected response shape: {exc!r}") from exc

@@ -1,0 +1,17 @@
+# LLM serving benchmarks (task 8.1, D40; python -m vms.bench run on a `kind: llm` scenario).
+# Overrides configs/common.yaml; VMS_* environment variables override this file. The engines
+# are installed on the pod by scripts/pod_remote.sh (setup llm) at the versions pinned there.
+
+vllm:
+  bin: /root/vllm-env/bin/vllm  # its own virtualenv: vLLM pins its own torch
+  host: 127.0.0.1
+  port: 8000
+ollama:
+  bin: /usr/local/bin/ollama
+  host: 127.0.0.1
+  port: 11434
+  pull_timeout_s: 1800
+poll_s: 2.0                     # health checks while a server starts
+stop_timeout_s: 60              # SIGTERM, then SIGKILL
+request_timeout_s: 120          # health, version and metrics reads
+log_tail_lines: 40              # of a server's log, into the results on a failed start

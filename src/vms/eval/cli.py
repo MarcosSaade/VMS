@@ -16,6 +16,10 @@ review     print a split for human review: question, gold plan, gold SQL, expect
 run        ask every question of a split, score it and write a results JSON to eval/results/
            (task 3.2; see vms.eval.harness). --planner gold answers with the gold plans: a
            self-test that exits non-zero unless every item is correct with no breach.
+           --planner replay --replay FILE --server NAME answers with replies recorded on a GPU
+           pod by a `kind: llm` scenario (D40); latency is then the replay's, not the model's.
+catalog    write the eval catalog (cameras, zones, classes, eval clock) from the eval database
+           to eval/structured/catalog.v1.json, so the planner runs without a database (D40).
 report     Markdown tables of results files, for BENCHMARKS.md.
 """
 
@@ -28,6 +32,7 @@ import json
 import sys
 import tempfile
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -73,14 +78,25 @@ from vms.eval.harness import (
 from vms.eval.report import render
 from vms.eval.scorer import METRIC_NOTES, ItemScore, summarize
 from vms.eval.settings import EvalSettings
+from vms.query.catalog import CAMERAS_SQL, ZONES_SQL
 from vms.query.fewshots import load_fewshots
-from vms.query.llm import LlmEndpointSettings
+from vms.query.llm import LlmClient, LlmEndpointSettings
 from vms.query.settings import QuerySettings
+from vms.serving.catalog_file import CATALOG_FILE, catalog_json, write_catalog
+from vms.serving.replay import ReplayLlm
 from vms.storage.catalog import load_catalog, sync_catalog
 from vms.storage.config import PostgresSettings
 from vms.storage.roles import ReadonlyUserSettings, ensure_query_login
 
 log = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class Replay:
+    llm: ReplayLlm
+    source: dict[str, Any]
+
+
 REPO_ROOT = Path.cwd()
 
 
@@ -103,7 +119,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     run = commands.add_parser("run", help="evaluate an engine on a split; write results JSON")
     run.add_argument("--suite", choices=["structured", "detection"], default="structured")
     run.add_argument("--split", choices=[s.value for s in Split], default=Split.DEV.value)
-    run.add_argument("--planner", choices=["config", "gold"], default="config")
+    run.add_argument("--planner", choices=["config", "gold", "replay"], default="config")
+    run.add_argument("--replay", type=Path, help="a bench.llm results file (--planner replay)")
+    run.add_argument("--server", help="the server whose recorded replies to use")
+    run.add_argument("--variant", help="its recorded variant (default: the only recorded one)")
+    commands.add_parser("catalog", help="export the eval catalog for database-free planning")
     run.add_argument("--limit", type=int, help="first N items only (smoke runs; not reportable)")
     run.add_argument("--ids", nargs="*", help="these item ids only (debugging; not reportable)")
     report = commands.add_parser("report", help="Markdown tables of results files")
@@ -123,7 +143,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             from vms.eval.detection.cli import main as detection_main
 
             return detection_main(["--log-level", args.log_level, "run"])
-        return cmd_run(settings, Split(args.split), args.planner, args.limit, args.ids)
+        replay = None
+        if args.planner == "replay":
+            if args.replay is None or args.server is None:
+                parser.error("--planner replay needs --replay FILE and --server NAME")
+            replay = load_replay(args.replay, args.server, args.variant)
+        return cmd_run(
+            settings, Split(args.split), args.planner, args.limit, args.ids, replay=replay
+        )
+    if args.command == "catalog":
+        return cmd_catalog(settings)
     if args.command == "report":
         results = [json.loads(p.read_text(encoding="utf-8")) for p in args.files]
         sys.stdout.write(render(results))
@@ -438,12 +467,60 @@ def select_items(
     return items, actual
 
 
+def load_replay(path: Path, server: str, variant: str | None) -> Replay:
+    """The recorded replies of one server and variant in a `bench.llm` results file."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("kind") != "bench.llm":
+        raise SystemExit(f"{path} is not a bench.llm results file")
+    entry = data["metrics"]["servers"].get(server)
+    if entry is None or not entry.get("ok"):
+        raise SystemExit(f"{path}: no successful server {server!r}")
+    recorded = {k: v["record"] for k, v in entry["variants"].items() if "record" in v}
+    if variant is None and len(recorded) == 1:
+        variant = next(iter(recorded))
+    if variant not in recorded:
+        raise SystemExit(f"{path}: {server} recorded variants {sorted(recorded)}; pick --variant")
+    record = recorded[variant]
+    return Replay(
+        llm=ReplayLlm(record["replies"], server),
+        source={
+            "file": str(path),
+            "run_id": data["run_id"],
+            "git": data["git"],
+            "server": server,
+            "variant": variant,
+            "engine": entry["engine"],
+            "model": entry["model"],
+            "revision": entry["revision"],
+            "hardware": data["hardware"],
+            "pod_call_latency_ms": record["call_latency_ms"],
+        },
+    )
+
+
+def cmd_catalog(settings: EvalSettings) -> int:
+    manifest = snap.read_manifest(settings.snapshot.manifest)
+    check_eval_db(settings, manifest)
+    qs = query_settings(REPO_ROOT)
+    with psycopg.connect(owner_conninfo(settings)) as conn:
+        cameras = conn.execute(CAMERAS_SQL).fetchall()
+        zones = conn.execute(ZONES_SQL).fetchall()
+    data = catalog_json(
+        cameras, zones, qs.classes, manifest.now, sha256_file(settings.snapshot.manifest)
+    )
+    write_catalog(REPO_ROOT / CATALOG_FILE, data)
+    sys.stdout.write(f"wrote {CATALOG_FILE} ({len(cameras)} cameras, {len(zones)} zones)\n")
+    return 0
+
+
 def cmd_run(
     settings: EvalSettings,
     split: Split,
     planner: PlannerChoice,
     limit: int | None,
     ids: list[str] | None,
+    *,
+    replay: Replay | None = None,
 ) -> int:
     items, split_sha = select_items(settings, split, limit, ids)
     if split is Split.TEST:
@@ -455,8 +532,12 @@ def cmd_run(
     dotenv = REPO_ROOT / ".env"
     qs = query_settings(REPO_ROOT, env_file=dotenv if dotenv.is_file() else None)
     endpoint = LlmEndpointSettings()
-    llm = build_llm_for(planner, qs, load_items(settings.structured.items), REPO_ROOT)
-    model = "gold" if planner == "gold" else (endpoint.model or "canned")
+    if replay is not None:
+        llm: LlmClient = replay.llm
+        model = f"replay-{replay.source['server']}"
+    else:
+        llm = build_llm_for(planner, qs, load_items(settings.structured.items), REPO_ROOT)
+        model = "gold" if planner == "gold" else (endpoint.model or "canned")
     started = dt.datetime.now(dt.UTC)
     log.info("eval run", extra={"split": split.value, "items": len(items), "llm": model})
 
@@ -521,6 +602,8 @@ def cmd_run(
                 "snapshot_files": manifest.files,
                 "partial": partial,
                 "cost_usd": cost,
+                "replay": replay.source if replay else None,
+                "replay_misses": replay.llm.misses if replay else None,
             },
             "summary": summary,
             "notes": {
@@ -529,7 +612,17 @@ def cmd_run(
             "items": [_item_record(s) for s in scores],
         },
         cost_usd=cost or 0.0,
-        notes="partial run (--limit/--ids): not reportable" if partial else "",
+        notes="; ".join(
+            n
+            for n in (
+                "partial run (--limit/--ids): not reportable" if partial else "",
+                "replayed replies: accuracy is the recorded model's; latency is the replay's "
+                "(see run.replay.pod_call_latency_ms and the bench.llm file)"
+                if replay
+                else "",
+            )
+            if n
+        ),
     )
     path = write_result(REPO_ROOT / settings.run.results_dir, result)
     sys.stdout.write(render([result.model_dump(mode="json")]))

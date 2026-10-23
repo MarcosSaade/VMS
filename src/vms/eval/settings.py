@@ -54,6 +54,20 @@ class Price(_Section):
 
     prompt_per_mtok: float = Field(ge=0)
     completion_per_mtok: float = Field(ge=0)
+    # Prompt tokens served from the provider's cache; None: priced as prompt_per_mtok.
+    prompt_cache_hit_per_mtok: float | None = Field(default=None, ge=0)
+
+    def cost_usd(self, prompt: int, completion: int, cached: int = 0) -> float:
+        hit = (
+            self.prompt_per_mtok
+            if self.prompt_cache_hit_per_mtok is None
+            else (self.prompt_cache_hit_per_mtok)
+        )
+        return (
+            (prompt - cached) * self.prompt_per_mtok
+            + cached * hit
+            + completion * self.completion_per_mtok
+        ) / 1e6
 
 
 class EvalSettings(ServiceSettings):

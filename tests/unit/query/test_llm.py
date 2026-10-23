@@ -101,6 +101,31 @@ def test_response_format_is_configurable(fmt: str, expected: dict[str, str] | No
     assert http.requests[0][1].get("response_format") == expected
 
 
+def test_extra_body_is_merged_into_the_request() -> None:
+    http = FakeHttp((200, OK_BODY))
+    extra = {"chat_template_kwargs": {"enable_thinking": False}}
+    complete(client(http, LlmTuning(extra_body=extra)))
+    body = http.requests[0][1]
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+    assert body["response_format"]["type"] == "json_schema"  # the rest is unchanged
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        {"prompt_tokens": 120, "completion_tokens": 8, "prompt_cache_hit_tokens": 100},
+        {
+            "prompt_tokens": 120,
+            "completion_tokens": 8,
+            "prompt_tokens_details": {"cached_tokens": 100},
+        },
+    ],
+)
+def test_cached_prompt_tokens_are_read_from_either_usage_shape(usage: dict[str, Any]) -> None:
+    http = FakeHttp((200, {**OK_BODY, "usage": usage}))
+    assert complete(client(http)).cached_prompt_tokens == 100
+
+
 def test_api_key_is_sent_as_bearer() -> None:
     http = FakeHttp((200, OK_BODY))
     complete(client(http, api_key=SecretStr("sk-test")))

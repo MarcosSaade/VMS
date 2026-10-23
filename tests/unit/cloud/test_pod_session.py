@@ -127,6 +127,7 @@ def repo(tmp_path: Path) -> Path:
     (root / "bench/results").mkdir(parents=True)
     (root / "bench/scenarios/worker-model-gpu-n.yaml").write_text("kind: model\n")
     (root / "bench/scenarios/gpu-smoke.yaml").write_text("kind: e2e\n")
+    (root / "bench/scenarios/llm-serve.yaml").write_text("kind: llm\n")
     (root / "bench/results/already-committed.json").write_text("{}")
     (root / "data/clips/mot17-09-mini").mkdir(parents=True)
     git(root, "init", "-q")
@@ -180,6 +181,18 @@ def test_committed_config_prices_the_a40_from_the_catalog(settings: PodSettings)
     assert settings.hourly_usd(0.59) == pytest.approx(0.59 + 40 * 0.10 / 730)
 
 
+def test_setup_installs_what_the_scenarios_need_once_each(make) -> None:  # type: ignore[no-untyped-def]
+    h = make()
+    scenarios = [
+        "bench/scenarios/llm-serve.yaml",
+        "bench/scenarios/worker-model-gpu-n.yaml",
+        "bench/scenarios/llm-serve.yaml",
+    ]
+    assert h.run(scenarios) == 0
+    setups = [c.rsplit(" ", 1)[1] for c in h.remote.commands if "pod_remote.sh setup" in c]
+    assert setups == ["llm", "vision"]  # in first-use order, no repeats
+
+
 def test_a_session_creates_runs_collects_deletes_and_verifies(make) -> None:  # type: ignore[no-untyped-def]
     h = make()
     assert h.run() == 0
@@ -191,7 +204,7 @@ def test_a_session_creates_runs_collects_deletes_and_verifies(make) -> None:  # 
     assert spec.cmd == ["bash", "-c", START_COMMAND]
     assert h.connects == [("203.0.113.9", 40122)]  # direct SSH, not the proxy
     cmds = h.remote.commands
-    assert any("pod_remote.sh setup" in c for c in cmds)
+    assert next(c for c in cmds if "pod_remote.sh setup" in c).endswith("setup vision")
     assert any("pod_remote.sh run bench/scenarios/worker-model-gpu-n.yaml" in c for c in cmds)
     assert "data/clips/mot17-09-mini" in h.remote.pushed
     assert ".git" in h.remote.pushed

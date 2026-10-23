@@ -11,6 +11,8 @@
                                                   (vms.bench.profile)
                                    finetune       detector fine-tune and before/after mAP
                                                   (vms.finetune, task 9.5)
+                                   llm            LLM serving load and plan recording
+                                                  (vms.serving, task 8.1)
     report  FILE [FILE ...]      Markdown tables of results files, for docs/BENCHMARKS.md
 
 `make bench SCENARIO=bench/scenarios/<name>.yaml` runs the first. An e2e scenario needs the
@@ -80,6 +82,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         configure_logging(SERVICE, "INFO")
         run_finetune(args.scenario)
+        return 0
+    if kind == "llm":
+        from vms.serving.run import run_llm
+
+        configure_logging(SERVICE, "INFO")
+        run_llm(args.scenario)
         return 0
     if kind == "profile":
         from vms.bench.profile import run_profile

@@ -65,8 +65,12 @@ log = get_logger(__name__)
 KIND = "cloud.pod_session"
 REMOTE_SCRIPT = "scripts/pod_remote.sh"
 CLIPS_DIR = "data/clips"
-# A pod has no Docker, so only scenarios that run in one Python process run on it (D37).
-POD_SCENARIO_KINDS = frozenset({"model", "ladder"})
+# A pod has no Docker, so only scenarios that run in one Python process run on it (D37):
+# the detector's (model, ladder) and LLM serving (llm: engines as child processes, D40).
+POD_SCENARIO_KINDS = frozenset({"model", "ladder", "llm"})
+# What `pod_remote.sh setup` installs for each kind: CUDA PyTorch, ONNX Runtime and TensorRT
+# for the detector; vLLM and Ollama for LLM serving.
+SETUP_PROFILES = {"model": "vision", "ladder": "vision", "llm": "llm"}
 GONE = frozenset({"TERMINATED"})
 TIMER_LOG = "/var/log/vms-time-limit.log"
 
@@ -216,6 +220,7 @@ class PodSession:
                 "uncommitted changes: commit first so results carry an exact git SHA "
                 "(or pass --allow-dirty for a test session)"
             )
+        profiles: list[str] = []
         for scenario in scenarios:
             path = self.repo / scenario
             if not path.is_file():
@@ -226,6 +231,8 @@ class PodSession:
                     f"{scenario} is kind {kind!r}; a pod runs only "
                     f"{sorted(POD_SCENARIO_KINDS)} scenarios (no Docker inside a pod, D37)"
                 )
+            if SETUP_PROFILES[kind] not in profiles:
+                profiles.append(SETUP_PROFILES[kind])
         pre = self.preflight()
         if not confirm(pre):
             log.info("session not confirmed; nothing was created")
@@ -244,7 +251,8 @@ class PodSession:
             timer = self._check_timer(remote)
             remote_hw = self._bootstrap(remote)
             self._sync(remote)
-            remote.run(self._remote("setup"), self.settings.timeouts.setup_s)
+            for profile in profiles:
+                remote.run(self._remote("setup", profile), self.settings.timeouts.setup_s)
             for scenario in scenarios:
                 runs.append(self._run_scenario(remote, scenario))
             r = self.settings.remote
