@@ -222,6 +222,12 @@ def run_lora(
         runs[run.name] = entry
         log.info("run done", extra={"run": run.name, "wall_s": entry["wall_s"]})
 
+    earlier = {n: p for n, p in scenario.serve.adapters.items() if (root / p).is_file()}
+    missing = sorted(set(scenario.serve.adapters) - set(earlier))
+    if missing:
+        log.error("earlier adapters missing", extra={"adapters": missing})
+    if adapters:  # this session's runs first, then the earlier ones
+        adapters = {**adapters, **earlier}
     servers: dict[str, Any] = {}
     config: dict[str, Any] = {"serving": settings.model_dump(mode="json")}
     if adapters:
@@ -243,6 +249,8 @@ def run_lora(
         metrics={
             "data": data,
             "baseline": scenario.baseline,
+            "baseline_scenario": scenario.baseline_scenario,
+            "earlier_adapters_missing": missing,
             "train_spent_s": round(spent_s, 2),
             "runs": runs,
             "servers": servers,

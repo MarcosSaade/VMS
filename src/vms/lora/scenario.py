@@ -72,6 +72,9 @@ class Serve(_Model):
     # Controls recorded on the same server: the base with the service's prompt, and the base
     # with the adapters' prompt (so prompt and weights are separate variables).
     base_prompts: dict[str, Path] = Field(default_factory=dict)  # variant name -> prompt
+    # Adapters trained by an earlier session (name -> .tar), served and recorded next to this
+    # session's, so every adapter of an ablation is compared on one server.
+    adapters: dict[str, Path] = Field(default_factory=dict)
 
 
 class LoraScenario(_Model):
@@ -83,6 +86,9 @@ class LoraScenario(_Model):
     data: Data
     train: Train = Field(default_factory=Train)
     baseline: str  # the run the ablations change one variable of
+    # Set when the baseline was trained by an earlier scenario (a continued ablation); its
+    # adapter is then one of `serve.adapters`.
+    baseline_scenario: str | None = None
     runs: list[Run] = Field(min_length=1)
     train_budget_minutes: float = Field(gt=0)
     adapters_dir: Path = Path("models/lora")  # one .tar per run (collected, DVC)
@@ -95,9 +101,11 @@ class LoraScenario(_Model):
         names = [r.name for r in self.runs]
         if len(set(names)) != len(names):
             raise ValueError("run names must be unique")
-        if self.baseline not in names:
+        if self.baseline_scenario is None and self.baseline not in names:
             raise ValueError(f"baseline {self.baseline!r} is not a run")
-        clash = set(self.serve.base_prompts) & set(names)
+        if self.baseline_scenario is not None and self.baseline not in self.serve.adapters:
+            raise ValueError(f"baseline {self.baseline!r} is not a served earlier adapter")
+        clash = (set(self.serve.base_prompts) | set(self.serve.adapters)) & set(names)
         if clash:
             raise ValueError(f"control variants clash with run names: {sorted(clash)}")
         return self

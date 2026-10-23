@@ -1,0 +1,60 @@
+name: lora-plan-a40-b
+description: >
+  Continuation of lora-plan-a40 (same base, data, prompt and hyperparameters): the ablation
+  runs its 80-minute training budget skipped (1000 pairs, rank 64, rank 4), trained here, then
+  every adapter of the ablation (these three and its n500-r16 and all-r16, pushed from
+  models/lora) recorded on one server with the base controls. Original description: Task 8.3 (D42) on one Runpod A40: LoRA adapters for the planner on Qwen3.5-4B (the base 8.1
+  chose: as accurate as the 9B on dev at about twice the speed), trained on the 8.2 synthetic
+  pairs (train/plans.v1, 2,660 pairs; 5% held out for eval loss) with the compact planner prompt
+  (the service's prompt without the JSON schema and the few-shot bank; ~3.0k characters instead
+  of ~14.7k). Ablation against the baseline all-r16, one variable at a time: data size (500,
+  1000, all at rank 16) and rank (4, 16, 64 on all pairs). BF16 LoRA (no 4-bit: Unsloth advises
+  against QLoRA on Qwen3.5), attention and MLP projections of the language model, 2 epochs,
+  effective batch 16, loss on the plan tokens only. Then one vLLM server with every adapter
+  records the dev split for each, and two base controls on the same server: the service's full
+  prompt (E-069's configuration) and the compact prompt, so prompt and weights are separate
+  variables. Greedy, structured outputs on, thinking off, as in 8.1. Scored on the laptop by the
+  replayed eval (make eval-replay).
+kind: lora
+seed: 20261023
+base:
+  model: Qwen/Qwen3.5-4B
+  revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+  served_name: qwen3.5-4b
+data:
+  pairs: train/plans.v1/pairs.jsonl
+  catalogs: configs/traindata/catalogs.v1.json
+  prompt: configs/prompts/planner.compact.v1.txt
+  val_fraction: 0.05
+train:
+  epochs: 2
+  learning_rate: 2.0e-4
+  warmup_ratio: 0.03
+  micro_batch: 2                # 4 ran out of memory on the 248k-vocab logits (E-071)
+  grad_accum: 8                 # effective batch 16
+  max_len: 2048
+  alpha_per_rank: 2.0
+  dropout: 0.05
+baseline: all-r16
+baseline_scenario: lora-plan-a40
+# In priority order: the first run also measures throughput for the budget check.
+runs:
+  - {name: n1000-r16, pairs: 1000, rank: 16}
+  - {name: all-r64, rank: 64}
+  - {name: all-r4, rank: 4}
+train_budget_minutes: 140
+serve:
+  # No prefix caching: recording only, and it keeps LoRA off vLLM's Mamba-state cache path.
+  args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+         --generation-config, vllm, --no-enable-prefix-caching]
+  request_extra: {chat_template_kwargs: {enable_thinking: false}}
+  catalog: eval/structured/catalog.v1.json
+  max_tokens: 1024
+  record:
+    concurrency: 4
+  base_prompts:
+    base-full: configs/prompts/planner.v1.txt
+    base-compact: configs/prompts/planner.compact.v1.txt
+  adapters:
+    n500-r16: models/lora/lora-plan-a40-n500-r16.tar
+    all-r16: models/lora/lora-plan-a40-all-r16.tar

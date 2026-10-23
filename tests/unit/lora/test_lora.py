@@ -400,3 +400,32 @@ def test_example_records_are_chat_messages_plus_target(tmp_path: Path, qs: Query
     assert [m["role"] for m in rows[0]["messages"]] == ["system", "user"]
     assert rows[0]["completion"] == '{"intent": "abstain", "abstain_reason": "unanswerable"}'
     assert len(sha) == 64
+
+
+def test_continued_ablation_trains_the_rest_and_serves_every_adapter() -> None:
+    first, _ = lora_run.load_scenario(SCENARIO)
+    second, _ = lora_run.load_scenario(SCENARIO.with_name("lora-plan-a40-b.yaml"))
+    assert second.baseline_scenario == first.name
+    assert (second.base, second.data, second.train) == (first.base, first.data, first.train)
+    trained_first = {"n500-r16", "all-r16"}
+    assert set(second.serve.adapters) == trained_first
+    names = {r.name for r in first.runs}
+    assert {r.name for r in second.runs} | trained_first == names
+    for path in second.serve.adapters.values():
+        assert path.name.startswith(f"{first.name}-")
+
+
+def test_earlier_adapters_are_served_after_this_sessions(tmp_path: Path, qs: QuerySettings) -> None:
+    root = lora_root(tmp_path, qs, 30, [{"name": "new", "pairs": 5, "rank": 8}])
+    raw = json.loads((root / "s.yaml").read_text())
+    raw["baseline"], raw["baseline_scenario"] = "old", "lora-a"
+    raw["serve"]["adapters"] = {"old": "models/lora/lora-a-old.tar", "gone": "models/lora/x.tar"}
+    (root / "s.yaml").write_text(json.dumps(raw))
+    fake_adapter(tmp_path / "old", 16)
+    lora_run.pack_adapter(tmp_path / "old", root / "models/lora/lora-a-old.tar")
+    clock, server = Clock(), NoStart()
+    path = lora_run.run_lora(
+        root / "s.yaml", root, trainer=FakeTrainer(clock, 0.1), factory=server, clock=clock
+    )
+    assert list(server.servers[0].lora_modules) == ["new", "old"]
+    assert json.loads(path.read_text())["metrics"]["earlier_adapters_missing"] == ["gone"]
