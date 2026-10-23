@@ -64,9 +64,9 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: why exclude warmup, how many repetitions, and how is variance reported?
 - [x] 2.4 GPU session by script with verified teardown (SHRINK: no Terraform, k3s, ECR or S3 remote). EC2 driver built 2026-10-13 (D28) but AWS denied the GPU quota; rebuilt on Runpod pods 2026-10-19 (D37: one pod per session, model and ladder scenarios only, teardown verified by pod name, self-delete timer, prepaid balance as the cap). First session 2026-10-19 (E-058): A40, 199 s billed, $0.033, teardown verified
   - Understand it: how do you know nothing is still billing after a session, and what does an hour cost?
-- [ ] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK). CPU part done 2026-10-14 (rated 2 cameras, E-039; query load E-040); the GPU run is deferred (D37: no Docker inside a Runpod pod), so this ticks on its CPU part
+- [x] 2.5 Ingest ramp (rated capacity) on CPU and one GPU run, plus a small structured-query load (SHRINK). CPU part done 2026-10-14 (rated 2 cameras, E-039; query load E-040); the GPU run is deferred (D37: no Docker inside a Runpod pod), so this ticks on its CPU part; "Understand it" answered 2026-10-23
   - Understand it: what is the definition of rated capacity, and where did the ramp break?
-- [ ] 2.6 Baseline report and bottleneck analysis (profiling). CPU part done 2026-10-14 (E-041, E-042; ranked list in BENCHMARKS); the GPU profile is deferred with the GPU ramp (D37), so this ticks on its CPU part
+- [x] 2.6 Baseline report and bottleneck analysis (profiling). CPU part done 2026-10-14 (E-041, E-042; ranked list in BENCHMARKS); the GPU profile is deferred with the GPU ramp (D37), so this ticks on its CPU part; "Understand it" answered 2026-10-23
   - Understand it: rank the top three bottlenecks with evidence, and say which one you would fix first and why.
 
 ## Phase 3: Evaluation harness
@@ -86,7 +86,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: why does INT8 need calibration, what did it cost in mAP, and is that drop inside the CI?
 - [x] 5.3 Batch-size sweep in-process: throughput against latency (SHRINK: no Triton dynamic batching). CPU part done 2026-10-19 (E-057, E-059: operating point batch 4 on the laptop, 8 on AWS c7i.2xlarge; config keeps 4; plot in BENCHMARKS); GPU sweep 2026-10-19 (E-064, E-065): the finding is that CPU-side numpy pre/post caps the exported backends at 250 to 300 images/s (PyTorch with GPU pre/post scales to 366+); no GPU batch size chosen; TensorRT's batch-4 dip unexplained. Closed by the user's decision 2026-10-19; "Understand it" answered 2026-10-19
   - Understand it: why do throughput and latency both rise with batch size, and which point meets the freshness SLO?
-- [ ] 5.5 Worker on the best backend in-process; re-run ramp; decide D5 (SHRINK: no Triton). CPU part done 2026-10-16 (E-047 to E-049: ONNX Runtime FP32, cross-camera batch 4, no thread spinning: rated 2 -> 5 cameras, ceiling 1.8x; D5 accepted for CPU); the GPU ramp is deferred (D37); D5's GPU part decided model-level 2026-10-19 (TensorRT FP16, batch 1 to 2)
+- [x] 5.5 Worker on the best backend in-process; re-run ramp; decide D5 (SHRINK: no Triton). CPU part done 2026-10-16 (E-047 to E-049: ONNX Runtime FP32, cross-camera batch 4, no thread spinning: rated 2 -> 5 cameras, ceiling 1.8x; D5 accepted for CPU); the GPU ramp is deferred (D37); D5's GPU part decided model-level 2026-10-19 (TensorRT FP16, batch 1 to 2); ticks on its CPU part, "Understand it" answered 2026-10-23
   - Understand it: how much of the model-only speedup survived end to end, and why not all of it?
 
 ## Phase 9: Drift detection
