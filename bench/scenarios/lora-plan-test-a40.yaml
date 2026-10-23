@@ -1,0 +1,31 @@
+name: lora-plan-test-a40
+description: >
+  Task 8.3 (D42) test run on one Runpod A40: the adapter chosen on dev (all-r4 from
+  lora-plan-a40-b: all 2,660 synthetic pairs, rank 4, compact prompt) and the base control it
+  is compared against (Qwen3.5-4B with the service's full prompt, E-069's configuration), each
+  recording the frozen test split once on the same server as the dev ablation (BF16, greedy,
+  structured outputs on, thinking off, no prefix caching). No load test: latency under load is
+  8.4 and 8.5. Scored on the laptop by the replayed eval (make eval-replay SPLIT=test).
+kind: llm
+seed: 20261023
+split: test
+catalog: eval/structured/catalog.v1.json
+max_tokens: 1024
+load:
+  concurrency: [1]
+record:
+  concurrency: 4               # = configs/eval.yaml run.concurrency
+servers:
+  - name: qwen3.5-4b
+    engine: vllm
+    model: Qwen/Qwen3.5-4B
+    revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --no-enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    lora_modules:
+      all-r4: models/lora/lora-plan-a40-b-all-r4.tar
+    variants:
+      - {name: base-full, prompt: configs/prompts/planner.v1.txt, load: false, record: true}
+      - {name: all-r4, model: all-r4, prompt: configs/prompts/planner.compact.v1.txt,
+         load: false, record: true}

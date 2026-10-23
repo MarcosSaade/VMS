@@ -1,0 +1,5 @@
+outs:
+- md5: 5b3ec224a7cc706af9183208e5b69491
+  size: 84992000
+  hash: md5
+  path: lora-plan-a40-n500-r16.tar

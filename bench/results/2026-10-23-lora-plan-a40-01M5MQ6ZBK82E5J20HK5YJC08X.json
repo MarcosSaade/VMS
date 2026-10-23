@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5MQ6ZBK82E5J20HK5YJC08X",
+  "name": "lora-plan-a40",
+  "kind": "bench.lora",
+  "started_at": "2026-10-23T15:44:07.878995Z",
+  "ended_at": "2026-10-23T15:48:58.867906Z",
+  "seed": 20261023,
+  "git": {
+    "sha": "33de31c3f3f81ef68b6240cda989ee5cd648109d",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "logical_cpus": 96,
+    "cpu_quota": 7,
+    "ram_bytes": 540644081664,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39",
+    "gpus": [
+      "NVIDIA A40, 595.91.07"
+    ]
+  },
+  "packages": {
+    "python": "3.12.3",
+    "aiohttp": "3.14.3",
+    "pydantic": "2.13.5"
+  },
+  "config": {
+    "serving": {
+      "service": "serving",
+      "env": "local",
+      "seed": 1234,
+      "log": {
+        "level": "INFO"
+      },
+      "telemetry": {
+        "enabled": true,
+        "otlp_endpoint": null,
+        "otlp_insecure": true,
+        "export_timeout_s": 10.0,
+        "sample_ratio": 1.0
+      },
+      "vllm": {
+        "bin": "/root/vllm-env/bin/vllm",
+        "host": "127.0.0.1",
+        "port": 8000,
+        "pull_timeout_s": 1800.0,
+        "env": {
+          "VLLM_USE_FLASHINFER_SAMPLER": "0"
+        }
+      },
+      "ollama": {
+        "bin": "/usr/local/bin/ollama",
+        "host": "127.0.0.1",
+        "port": 11434,
+        "pull_timeout_s": 1800.0,
+        "env": {}
+      },
+      "lora": {
+        "python": "/root/vllm-env/bin/python",
+        "script": "scripts/lora_train.py",
+        "unpack_dir": "data/serving/lora",
+        "work_dir": "data/lora"
+      },
+      "poll_s": 2.0,
+      "stop_timeout_s": 60.0,
+      "request_timeout_s": 120.0,
+      "log_tail_lines": 40
+    }
+  },
+  "scenario": {
+    "name": "lora-plan-a40",
+    "description": "Task 8.3 (D42) on one Runpod A40: LoRA adapters for the planner on Qwen3.5-4B (the base 8.1 chose: as accurate as the 9B on dev at about twice the speed), trained on the 8.2 synthetic pairs (train/plans.v1, 2,660 pairs; 5% held out for eval loss) with the compact planner prompt (the service's prompt without the JSON schema and the few-shot bank; ~3.0k characters instead of ~14.7k). Ablation against the baseline all-r16, one variable at a time: data size (500, 1000, all at rank 16) and rank (4, 16, 64 on all pairs). BF16 LoRA (no 4-bit: Unsloth advises against QLoRA on Qwen3.5), attention and MLP projections of the language model, 2 epochs, effective batch 16, loss on the plan tokens only. Then one vLLM server with every adapter records the dev split for each, and two base controls on the same server: the service's full prompt (E-069's configuration) and the compact prompt, so prompt and weights are separate variables. Greedy, structured outputs on, thinking off, as in 8.1. Scored on the laptop by the replayed eval (make eval-replay).\n",
+    "kind": "lora",
+    "seed": 20261023,
+    "base": {
+      "model": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "served_name": "qwen3.5-4b"
+    },
+    "data": {
+      "pairs": "train/plans.v1/pairs.jsonl",
+      "catalogs": "configs/traindata/catalogs.v1.json",
+      "prompt": "configs/prompts/planner.compact.v1.txt",
+      "val_fraction": 0.05
+    },
+    "train": {
+      "epochs": 2,
+      "learning_rate": 0.0002,
+      "warmup_ratio": 0.03,
+      "micro_batch": 4,
+      "grad_accum": 4,
+      "max_len": 2048,
+      "alpha_per_rank": 2.0,
+      "dropout": 0.05
+    },
+    "baseline": "all-r16",
+    "runs": [
+      {
+        "name": "n500-r16",
+        "pairs": 500,
+        "rank": 16
+      },
+      {
+        "name": "all-r16",
+        "rank": 16
+      },
+      {
+        "name": "n1000-r16",
+        "pairs": 1000,
+        "rank": 16
+      },
+      {
+        "name": "all-r64",
+        "rank": 64
+      },
+      {
+        "name": "all-r4",
+        "rank": 4
+      }
+    ],
+    "train_budget_minutes": 80,
+    "serve": {
+      "args": [
+        "--max-model-len",
+        "16384",
+        "--gpu-memory-utilization",
+        "0.90",
+        "--language-model-only",
+        "--generation-config",
+        "vllm",
+        "--no-enable-prefix-caching"
+      ],
+      "request_extra": {
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "catalog": "eval/structured/catalog.v1.json",
+      "max_tokens": 1024,
+      "record": {
+        "concurrency": 4
+      },
+      "base_prompts": {
+        "base-full": "configs/prompts/planner.v1.txt",
+        "base-compact": "configs/prompts/planner.compact.v1.txt"
+      }
+    }
+  },
+  "metrics": {
+    "data": {
+      "pairs": 2660,
+      "pairs_sha256": "516cc39fbb3313746157f3debd4d8a04ad916a658dd8bdd7320a964cd680ae46",
+      "catalogs_sha256": "0130d522ab78a5f0131d037f8168d269df344269d6ea849272755670165254b8",
+      "prompt": "configs/prompts/planner.compact.v1.txt",
+      "prompt_sha256": "c9e7b69f2cf0ae30ad52724c36052b899ca292508bbc6412ee599c6d52249b8b",
+      "train": 2527,
+      "val": 133,
+      "val_sha256": "f4b7b55f505c734e0ebbfde33501356edc821b6caa0e98360e40adb4cd11d09f",
+      "system_prompt_chars": {
+        "warehouse": 2918,
+        "transit": 3010,
+        "campus": 2984
+      }
+    },
+    "baseline": "all-r16",
+    "train_spent_s": 290.31,
+    "runs": {
+      "n500-r16": {
+        "pairs": 500,
+        "rank": 16,
+        "requested_pairs": 500,
+        "train_sha256": "285ea669c085f94b9e6ac13bc0b13ffeac808c37268121b957c282e776e13ed1",
+        "spec": {
+          "model": "Qwen/Qwen3.5-4B",
+          "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "seed": 20261023,
+          "rank": 16,
+          "alpha": 32.0,
+          "train": {
+            "epochs": 2,
+            "learning_rate": 0.0002,
+            "warmup_ratio": 0.03,
+            "weight_decay": 0.0,
+            "micro_batch": 4,
+            "grad_accum": 4,
+            "max_len": 2048,
+            "alpha_per_rank": 2.0,
+            "dropout": 0.05,
+            "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)",
+            "gradient_checkpointing": false,
+            "max_grad_norm": 1.0
+          },
+          "train_file": "data/lora/lora-plan-a40/n500-r16/train.jsonl",
+          "val_file": "data/lora/lora-plan-a40/val.jsonl",
+          "out_dir": "data/lora/lora-plan-a40/n500-r16/adapter",
+          "metrics_file": "data/lora/lora-plan-a40/n500-r16/metrics.json"
+        },
+        "error": "RuntimeError: trainer exited with 1:\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/peft/tuners/tuners_utils.py\", line 359, in forward\n    return self.model(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/utils/generic.py\", line 939, in wrapper\n    output = func(self, *args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py\", line 1877, in forward\n    loss = self.loss_function(\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 70, in ForCausalLMLoss\n    loss = fixed_cross_entropy(logits, shift_labels, num_items_in_batch, ignore_index, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 40, in fixed_cross_entropy\n    loss = nn.functional.cross_entropy(source, target, ignore_index=ignore_index, reduction=reduction)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/functional.py\", line 3555, in cross_entropy\n    return torch._C._nn.cross_entropy_loss(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.32 GiB. GPU 0 has a total capacity of 44.42 GiB of which 1.01 GiB is free. Including non-PyTorch memory, this process has 43.41 GiB memory in use. Of the allocated memory 42.22 GiB is allocated by PyTorch, and 892.15 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+        "wall_s": 105.59
+      },
+      "all-r16": {
+        "pairs": 2527,
+        "rank": 16,
+        "requested_pairs": null,
+        "train_sha256": "cea285a282f8ed56fb8c82e184527cea1f0b5c771b5eeb6fd1c2446b282c9b67",
+        "spec": {
+          "model": "Qwen/Qwen3.5-4B",
+          "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "seed": 20261023,
+          "rank": 16,
+          "alpha": 32.0,
+          "train": {
+            "epochs": 2,
+            "learning_rate": 0.0002,
+            "warmup_ratio": 0.03,
+            "weight_decay": 0.0,
+            "micro_batch": 4,
+            "grad_accum": 4,
+            "max_len": 2048,
+            "alpha_per_rank": 2.0,
+            "dropout": 0.05,
+            "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)",
+            "gradient_checkpointing": false,
+            "max_grad_norm": 1.0
+          },
+          "train_file": "data/lora/lora-plan-a40/all-r16/train.jsonl",
+          "val_file": "data/lora/lora-plan-a40/val.jsonl",
+          "out_dir": "data/lora/lora-plan-a40/all-r16/adapter",
+          "metrics_file": "data/lora/lora-plan-a40/all-r16/metrics.json"
+        },
+        "error": "RuntimeError: trainer exited with 1:\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/peft/tuners/tuners_utils.py\", line 359, in forward\n    return self.model(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/utils/generic.py\", line 939, in wrapper\n    output = func(self, *args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py\", line 1877, in forward\n    loss = self.loss_function(\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 70, in ForCausalLMLoss\n    loss = fixed_cross_entropy(logits, shift_labels, num_items_in_batch, ignore_index, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 40, in fixed_cross_entropy\n    loss = nn.functional.cross_entropy(source, target, ignore_index=ignore_index, reduction=reduction)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/functional.py\", line 3555, in cross_entropy\n    return torch._C._nn.cross_entropy_loss(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.22 GiB. GPU 0 has a total capacity of 44.42 GiB of which 2.35 GiB is free. Including non-PyTorch memory, this process has 42.07 GiB memory in use. Of the allocated memory 40.90 GiB is allocated by PyTorch, and 878.49 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+        "wall_s": 46.09
+      },
+      "n1000-r16": {
+        "pairs": 1000,
+        "rank": 16,
+        "requested_pairs": 1000,
+        "train_sha256": "cba4ccbec3a7bacf79a4c9e54a4c643f4043c155c3620b2ae7af6421fc9b59b7",
+        "spec": {
+          "model": "Qwen/Qwen3.5-4B",
+          "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "seed": 20261023,
+          "rank": 16,
+          "alpha": 32.0,
+          "train": {
+            "epochs": 2,
+            "learning_rate": 0.0002,
+            "warmup_ratio": 0.03,
+            "weight_decay": 0.0,
+            "micro_batch": 4,
+            "grad_accum": 4,
+            "max_len": 2048,
+            "alpha_per_rank": 2.0,
+            "dropout": 0.05,
+            "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)",
+            "gradient_checkpointing": false,
+            "max_grad_norm": 1.0
+          },
+          "train_file": "data/lora/lora-plan-a40/n1000-r16/train.jsonl",
+          "val_file": "data/lora/lora-plan-a40/val.jsonl",
+          "out_dir": "data/lora/lora-plan-a40/n1000-r16/adapter",
+          "metrics_file": "data/lora/lora-plan-a40/n1000-r16/metrics.json"
+        },
+        "error": "RuntimeError: trainer exited with 1:\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/peft/tuners/tuners_utils.py\", line 359, in forward\n    return self.model(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/utils/generic.py\", line 939, in wrapper\n    output = func(self, *args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py\", line 1877, in forward\n    loss = self.loss_function(\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 70, in ForCausalLMLoss\n    loss = fixed_cross_entropy(logits, shift_labels, num_items_in_batch, ignore_index, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 40, in fixed_cross_entropy\n    loss = nn.functional.cross_entropy(source, target, ignore_index=ignore_index, reduction=reduction)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/functional.py\", line 3555, in cross_entropy\n    return torch._C._nn.cross_entropy_loss(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.21 GiB. GPU 0 has a total capacity of 44.42 GiB of which 2.18 GiB is free. Including non-PyTorch memory, this process has 42.24 GiB memory in use. Of the allocated memory 41.12 GiB is allocated by PyTorch, and 821.70 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+        "wall_s": 43.36
+      },
+      "all-r64": {
+        "pairs": 2527,
+        "rank": 64,
+        "requested_pairs": null,
+        "train_sha256": "cea285a282f8ed56fb8c82e184527cea1f0b5c771b5eeb6fd1c2446b282c9b67",
+        "spec": {
+          "model": "Qwen/Qwen3.5-4B",
+          "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "seed": 20261023,
+          "rank": 64,
+          "alpha": 128.0,
+          "train": {
+            "epochs": 2,
+            "learning_rate": 0.0002,
+            "warmup_ratio": 0.03,
+            "weight_decay": 0.0,
+            "micro_batch": 4,
+            "grad_accum": 4,
+            "max_len": 2048,
+            "alpha_per_rank": 2.0,
+            "dropout": 0.05,
+            "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)",
+            "gradient_checkpointing": false,
+            "max_grad_norm": 1.0
+          },
+          "train_file": "data/lora/lora-plan-a40/all-r64/train.jsonl",
+          "val_file": "data/lora/lora-plan-a40/val.jsonl",
+          "out_dir": "data/lora/lora-plan-a40/all-r64/adapter",
+          "metrics_file": "data/lora/lora-plan-a40/all-r64/metrics.json"
+        },
+        "error": "RuntimeError: trainer exited with 1:\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/peft/tuners/tuners_utils.py\", line 359, in forward\n    return self.model(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/utils/generic.py\", line 939, in wrapper\n    output = func(self, *args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py\", line 1877, in forward\n    loss = self.loss_function(\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 70, in ForCausalLMLoss\n    loss = fixed_cross_entropy(logits, shift_labels, num_items_in_batch, ignore_index, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 40, in fixed_cross_entropy\n    loss = nn.functional.cross_entropy(source, target, ignore_index=ignore_index, reduction=reduction)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/functional.py\", line 3555, in cross_entropy\n    return torch._C._nn.cross_entropy_loss(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.22 GiB. GPU 0 has a total capacity of 44.42 GiB of which 2.03 GiB is free. Including non-PyTorch memory, this process has 42.38 GiB memory in use. Of the allocated memory 41.21 GiB is allocated by PyTorch, and 875.55 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+        "wall_s": 51.49
+      },
+      "all-r4": {
+        "pairs": 2527,
+        "rank": 4,
+        "requested_pairs": null,
+        "train_sha256": "cea285a282f8ed56fb8c82e184527cea1f0b5c771b5eeb6fd1c2446b282c9b67",
+        "spec": {
+          "model": "Qwen/Qwen3.5-4B",
+          "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "seed": 20261023,
+          "rank": 4,
+          "alpha": 8.0,
+          "train": {
+            "epochs": 2,
+            "learning_rate": 0.0002,
+            "warmup_ratio": 0.03,
+            "weight_decay": 0.0,
+            "micro_batch": 4,
+            "grad_accum": 4,
+            "max_len": 2048,
+            "alpha_per_rank": 2.0,
+            "dropout": 0.05,
+            "target_modules": ".*language_model.*\\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)",
+            "gradient_checkpointing": false,
+            "max_grad_norm": 1.0
+          },
+          "train_file": "data/lora/lora-plan-a40/all-r4/train.jsonl",
+          "val_file": "data/lora/lora-plan-a40/val.jsonl",
+          "out_dir": "data/lora/lora-plan-a40/all-r4/adapter",
+          "metrics_file": "data/lora/lora-plan-a40/all-r4/metrics.json"
+        },
+        "error": "RuntimeError: trainer exited with 1:\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/peft/tuners/tuners_utils.py\", line 359, in forward\n    return self.model(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1778, in _wrapped_call_impl\n    return self._call_impl(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/modules/module.py\", line 1789, in _call_impl\n    return forward_call(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/utils/generic.py\", line 939, in wrapper\n    output = func(self, *args, **kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py\", line 1877, in forward\n    loss = self.loss_function(\n           ^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 70, in ForCausalLMLoss\n    loss = fixed_cross_entropy(logits, shift_labels, num_items_in_batch, ignore_index, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/transformers/loss/loss_utils.py\", line 40, in fixed_cross_entropy\n    loss = nn.functional.cross_entropy(source, target, ignore_index=ignore_index, reduction=reduction)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/vllm-env/lib/python3.12/site-packages/torch/nn/functional.py\", line 3555, in cross_entropy\n    return torch._C._nn.cross_entropy_loss(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntorch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.22 GiB. GPU 0 has a total capacity of 44.42 GiB of which 2.43 GiB is free. Including non-PyTorch memory, this process has 41.98 GiB memory in use. Of the allocated memory 40.82 GiB is allocated by PyTorch, and 871.61 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+        "wall_s": 43.77
+      }
+    },
+    "servers": {}
+  },
+  "cost_usd": 0.0481,
+  "notes": "SYNTHETIC TRAINING DATA (8.2). Adapters trained on the pod; the dev split is recorded per adapter and for the base controls on one vLLM server and scored on the laptop by `python -m vms.eval run --planner replay` (D40, D42). Training time is wall time on the pod, model download and load included in wall_s, not in train_s.; GPU session 01M5MPSE6YBG311PMNXPQ92AJQ (Runpod A40, SECURE); git from the session"
+}

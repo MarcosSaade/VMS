@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5MPSE6YBG311PMNXPQ92AJQ",
+  "name": "gpu-session",
+  "kind": "cloud.pod_session",
+  "started_at": "2026-10-23T15:41:36.458511Z",
+  "ended_at": "2026-10-23T15:49:10.987099Z",
+  "seed": 1234,
+  "git": {
+    "sha": "33de31c3f3f81ef68b6240cda989ee5cd648109d",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Gold 6342 CPU @ 2.80GHz",
+    "logical_cpus": 96,
+    "cpu_quota": null,
+    "ram_bytes": 540644081664,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39",
+    "gpus": [
+      "NVIDIA A40, 595.91.07"
+    ]
+  },
+  "packages": {
+    "python": "3.12.14",
+    "pydantic": "2.13.5"
+  },
+  "config": {
+    "service": "runpod",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 1.0
+    },
+    "gpu_type": "NVIDIA A40",
+    "gpu_count": 1,
+    "cloud": "SECURE",
+    "min_cuda_version": "13.0",
+    "data_center_ids": [
+      "CA-MTL-1"
+    ],
+    "image": "runpod/base:1.0.3-ubuntu2404@sha256:d536f17af1c7bde1bc0ea642dbe0b0f222709ef3391588bce674eb9c55c1738b",
+    "container_disk_gb": 40,
+    "ssh_user": "root",
+    "name_prefix": "vms",
+    "max_session_minutes": 150,
+    "require_self_terminate": true,
+    "host_setup": [],
+    "prices": {
+      "container_disk_gb_month_usd": 0.1,
+      "hours_per_month": 730.0
+    },
+    "remote": {
+      "dir": "vms",
+      "clips": [
+        "mot17-09-mini",
+        "mot17-04-mini",
+        "commons-roncesvalles"
+      ],
+      "data": [
+        "train/plans.v1/pairs.jsonl",
+        "models/lora"
+      ],
+      "collect": [
+        "eval/results",
+        "data/serving/logs",
+        "models/lora"
+      ]
+    },
+    "timeouts": {
+      "api_s": 30.0,
+      "api_max_attempts": 5,
+      "running_s": 900.0,
+      "ssh_direct_s": 180.0,
+      "ssh_ready_s": 300.0,
+      "ssh_connect_s": 10,
+      "sync_s": 1200.0,
+      "setup_s": 3600.0,
+      "scenario_s": 7200.0,
+      "collect_s": 600.0,
+      "terminate_s": 300.0,
+      "poll_s": 5.0
+    }
+  },
+  "scenario": {
+    "scenarios": [
+      "bench/scenarios/lora-plan-a40.yaml"
+    ]
+  },
+  "metrics": {
+    "provider": "runpod",
+    "cloud": "SECURE",
+    "gpu_type": "NVIDIA A40",
+    "gpu_count": 1,
+    "pod_id": "w3l28cuokv5slh",
+    "pod_name": "vms-gpu-01m5mpse6ybg311pmnxpq92ajq",
+    "data_center": "CA-MTL-1",
+    "host_cuda_version": "13.2",
+    "pod_vcpus": 9,
+    "pod_memory_gb": 50,
+    "image": "runpod/base:1.0.3-ubuntu2404@sha256:d536f17af1c7bde1bc0ea642dbe0b0f222709ef3391588bce674eb9c55c1738b",
+    "launched_at": "2026-10-23T15:41:37.161000+00:00",
+    "terminated_at": "2026-10-23T15:49:10.299400+00:00",
+    "billed_s": 454,
+    "gpu_hourly_usd": 0.59,
+    "hourly_usd": 0.5955,
+    "time_limit": "armed pod=w3l28cuokv5slh key=yes seconds=9000",
+    "scenarios": [
+      {
+        "scenario": "bench/scenarios/lora-plan-a40.yaml",
+        "ok": true,
+        "error": null
+      }
+    ],
+    "results_files": [
+      "2026-10-23-lora-plan-a40-01M5MQ6ZBK82E5J20HK5YJC08X.json",
+      "lora-all-r16.log",
+      "lora-all-r4.log",
+      "lora-all-r64.log",
+      "lora-n1000-r16.log",
+      "lora-n500-r16.log"
+    ],
+    "error": null,
+    "teardown_verified": true,
+    "leftovers": [],
+    "teardown_errors": [],
+    "hardware_is": "pod"
+  },
+  "cost_usd": 0.0751,
+  "notes": "cost estimated from the live catalog price x billed seconds; Runpod's billing history is the record"
+}

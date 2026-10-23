@@ -51,6 +51,7 @@ models/weights/
 models/onnx/
 models/trt/
 /models/finetune/*.pt
+/models/lora/*.tar
 models/triton/**/[0-9]*/
 
 # Results: small JSON summaries under bench/results and eval/results are committed.
