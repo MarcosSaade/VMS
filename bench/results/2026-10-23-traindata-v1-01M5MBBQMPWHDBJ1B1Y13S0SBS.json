@@ -1,0 +1,391 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5MBBQMPWHDBJ1B1Y13S0SBS",
+  "name": "traindata-v1",
+  "kind": "data.traindata",
+  "started_at": "2026-10-23T12:20:47.153429Z",
+  "ended_at": "2026-10-23T12:21:51.894391Z",
+  "seed": 20261023,
+  "git": {
+    "sha": "71c79c94a57ad54647d8b4dbe5004fe72d9965ed",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "cpu_quota": null,
+    "ram_bytes": 16439496704,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "numpy": "2.5.3",
+    "psycopg": "3.3.6",
+    "pydantic": "2.13.5",
+    "sqlglot": "30.21.0"
+  },
+  "config": {
+    "spec": {
+      "version": 1,
+      "seed": 20261023,
+      "states": [
+        {
+          "name": "warehouse",
+          "spec": "configs/traindata/snapshot.warehouse.yaml",
+          "db": "vms_train_warehouse"
+        },
+        {
+          "name": "transit",
+          "spec": "configs/traindata/snapshot.transit.yaml",
+          "db": "vms_train_transit"
+        },
+        {
+          "name": "campus",
+          "spec": "configs/traindata/snapshot.campus.yaml",
+          "db": "vms_train_campus"
+        }
+      ],
+      "states_dir": "data/traindata/states",
+      "states_manifest": "configs/traindata/states.v1.json",
+      "generator": {
+        "prompt": "configs/prompts/traindata.v1.txt",
+        "questions_per_call": 15,
+        "temperature": 1.0,
+        "max_tokens": 8000,
+        "response_format": "json_object",
+        "timeout_s": 180.0,
+        "focuses": [
+          "counts of objects by class over relative time ranges (today, last N hours, this week)",
+          "zone events: entries, exits and loitering in the named zones",
+          "dwell time: how long objects stay on a camera or inside a zone",
+          "trends: counts per hour or per day, busiest periods",
+          "top-k rankings: which cameras, zones or classes have the most activity",
+          "lists of recent tracks, events or detections with filters",
+          "aggregates of detection confidence, track duration or frame quality",
+          "explicit dates and clock times, including other weekdays and times of day",
+          "cameras in different timezones; local times such as this morning or last night",
+          "questions that need grouping by camera, zone, class or time bucket",
+          "frames: asking to see images matching filters",
+          "edge cases the planner must abstain on: comparisons, ratios, funnels, plates, faces, data changes"
+        ],
+        "styles": [
+          "short and terse, like a search box",
+          "full polite sentences",
+          "a manager asking for a report",
+          "casual, with common typos and lowercase",
+          "a security guard on shift",
+          "precise and technical"
+        ]
+      },
+      "planner_concurrency": 4,
+      "budget": {
+        "max_cost_usd": 3.0,
+        "max_candidates": 8000,
+        "call_concurrency": 4,
+        "model_price": "deepseek-flash"
+      },
+      "candidates": "data/traindata/candidates.v1.jsonl",
+      "dataset_dir": "train/plans.v1",
+      "results_dir": "bench/results",
+      "statement_timeout_ms": 10000,
+      "leakage": {
+        "min_ratio": 0.85,
+        "min_jaccard": 0.8,
+        "min_cosine": 0.9
+      }
+    },
+    "spec_sha256": "5b1b524ed1817005129b97c8c51e687ba30206a55f5c1687d389e2fd20d466ca"
+  },
+  "scenario": null,
+  "metrics": {
+    "generation": {
+      "candidates": 3902,
+      "failed_calls": 4,
+      "call_errors": [
+        [
+          "not JSON: Unterminated string starting at: line 1 column 142",
+          1
+        ],
+        [
+          "not JSON: Unterminated string starting at: line 1 column 262",
+          1
+        ],
+        [
+          "not JSON: Unterminated string starting at: line 1 column 227",
+          1
+        ],
+        [
+          "not JSON: Unterminated string starting at: line 1 column 221",
+          1
+        ]
+      ],
+      "budget": {
+        "spent_usd": 2.989,
+        "cap_usd": 3.0,
+        "calls": 4528,
+        "prompt_tokens": 19888640,
+        "cached_prompt_tokens": 19064668,
+        "completion_tokens": 2189544,
+        "price": {
+          "prompt_per_mtok": 0.3,
+          "completion_per_mtok": 1.2,
+          "prompt_cache_hit_per_mtok": 0.006
+        }
+      },
+      "b_status": {
+        "planned": 3855,
+        "failed_validation": 47
+      },
+      "candidates_sha256": "ca3c9e5fec47118e0b4bc77e68bfaa460621f0bbc89f161e443d9f58182ba768"
+    },
+    "filter": {
+      "candidates": 3902,
+      "kept": 2660,
+      "stages": [
+        {
+          "stage": "a_invalid",
+          "dropped": 280,
+          "pass_rate": 0.9282
+        },
+        {
+          "stage": "b_failed",
+          "dropped": 6,
+          "pass_rate": 0.9983
+        },
+        {
+          "stage": "abstain_mismatch",
+          "dropped": 66,
+          "pass_rate": 0.9817
+        },
+        {
+          "stage": "compile_failed",
+          "dropped": 182,
+          "pass_rate": 0.9487
+        },
+        {
+          "stage": "execute_failed",
+          "dropped": 0,
+          "pass_rate": 1.0
+        },
+        {
+          "stage": "results_differ",
+          "dropped": 179,
+          "pass_rate": 0.9469
+        },
+        {
+          "stage": "empty_result",
+          "dropped": 377,
+          "pass_rate": 0.8818
+        },
+        {
+          "stage": "duplicate",
+          "dropped": 13,
+          "pass_rate": 0.9954
+        },
+        {
+          "stage": "leakage",
+          "dropped": 139,
+          "pass_rate": 0.9503
+        }
+      ]
+    },
+    "drop_details": [
+      [
+        "compile_failed: visual_query needs CLIP search, which is not available",
+        182
+      ],
+      [
+        "results_differ: no column matches expected column 'n'",
+        27
+      ],
+      [
+        "results_differ: 1 rows, expected 0",
+        19
+      ],
+      [
+        "results_differ: 1 rows, expected 3",
+        10
+      ],
+      [
+        "results_differ: no column matches expected column 'value'",
+        10
+      ],
+      [
+        "results_differ: 100 rows, expected 20",
+        9
+      ],
+      [
+        "results_differ: 1 rows, expected 20",
+        7
+      ],
+      [
+        "results_differ: no column matches expected column 'frame_id'",
+        6
+      ],
+      [
+        "results_differ: 100 rows, expected 50",
+        5
+      ],
+      [
+        "results_differ: 4 rows, expected 3",
+        4
+      ]
+    ],
+    "leakage": {
+      "reference": 308,
+      "hits": {
+        "template": 2,
+        "near_duplicate": 158,
+        "lexical_embedding": 12
+      },
+      "examples": [
+        {
+          "train_id": "c00066-11",
+          "ref_id": "sq-131",
+          "check": "template",
+          "score": 1.0
+        },
+        {
+          "train_id": "c00245-11",
+          "ref_id": "sq-209",
+          "check": "template",
+          "score": 1.0
+        },
+        {
+          "train_id": "c00001-05",
+          "ref_id": "sq-016",
+          "check": "near_duplicate",
+          "score": 0.857
+        },
+        {
+          "train_id": "c00003-08",
+          "ref_id": "sq-146",
+          "check": "near_duplicate",
+          "score": 0.906
+        },
+        {
+          "train_id": "c00003-11",
+          "ref_id": "sq-146",
+          "check": "near_duplicate",
+          "score": 0.865
+        },
+        {
+          "train_id": "c00005-00",
+          "ref_id": "fewshot:0",
+          "check": "near_duplicate",
+          "score": 0.854
+        },
+        {
+          "train_id": "c00005-04",
+          "ref_id": "fewshot:1",
+          "check": "near_duplicate",
+          "score": 0.87
+        },
+        {
+          "train_id": "c00009-05",
+          "ref_id": "fewshot:6",
+          "check": "near_duplicate",
+          "score": 0.933
+        },
+        {
+          "train_id": "c00009-07",
+          "ref_id": "fewshot:3",
+          "check": "near_duplicate",
+          "score": 0.944
+        },
+        {
+          "train_id": "c00009-12",
+          "ref_id": "sq-138",
+          "check": "near_duplicate",
+          "score": 0.885
+        },
+        {
+          "train_id": "c00013-05",
+          "ref_id": "sq-016",
+          "check": "near_duplicate",
+          "score": 0.932
+        },
+        {
+          "train_id": "c00015-00",
+          "ref_id": "fewshot:13",
+          "check": "near_duplicate",
+          "score": 0.879
+        },
+        {
+          "train_id": "c00016-02",
+          "ref_id": "fewshot:6",
+          "check": "near_duplicate",
+          "score": 0.861
+        },
+        {
+          "train_id": "c00017-06",
+          "ref_id": "sq-154",
+          "check": "near_duplicate",
+          "score": 0.852
+        },
+        {
+          "train_id": "c00018-12",
+          "ref_id": "fewshot:15",
+          "check": "near_duplicate",
+          "score": 0.877
+        },
+        {
+          "train_id": "c00019-08",
+          "ref_id": "sq-016",
+          "check": "near_duplicate",
+          "score": 0.894
+        },
+        {
+          "train_id": "c00019-08",
+          "ref_id": "sq-154",
+          "check": "near_duplicate",
+          "score": 0.879
+        },
+        {
+          "train_id": "c00019-11",
+          "ref_id": "sq-217",
+          "check": "near_duplicate",
+          "score": 0.855
+        },
+        {
+          "train_id": "c00019-11",
+          "ref_id": "fewshot:16",
+          "check": "near_duplicate",
+          "score": 0.926
+        },
+        {
+          "train_id": "c00026-04",
+          "ref_id": "fewshot:23",
+          "check": "near_duplicate",
+          "score": 0.883
+        }
+      ],
+      "hits_after_drop": 0
+    },
+    "dataset": {
+      "pairs": 2660,
+      "file": "train/plans.v1/pairs.jsonl",
+      "sha256": "516cc39fbb3313746157f3debd4d8a04ad916a658dd8bdd7320a964cd680ae46",
+      "by_state": {
+        "warehouse": 865,
+        "transit": 916,
+        "campus": 879
+      },
+      "by_intent": {
+        "count": 547,
+        "trend": 376,
+        "top_k": 448,
+        "list": 163,
+        "dwell": 293,
+        "abstain": 550,
+        "aggregate": 232,
+        "frames": 51
+      },
+      "abstain": 550,
+      "plan_a_equal": 2350
+    }
+  },
+  "cost_usd": 2.989,
+  "notes": "SYNTHETIC DATA: questions and plans by a hosted LLM over synthetic training states. Leakage is checked on masked questions against every eval question (dev and test) and the few-shot bank; the lexical embedding is char 3-gram TF-IDF."
+}
