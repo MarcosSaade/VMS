@@ -16,6 +16,11 @@ ollama:
   host: 127.0.0.1
   port: 11434
   pull_timeout_s: 1800
+lora:                           # LoRA training on the pod (task 8.3, D42)
+  python: /root/vllm-env/bin/python  # vLLM's environment (CUDA torch, transformers) + peft
+  script: scripts/lora_train.py
+  unpack_dir: data/serving/lora # adapter .tar files unpacked for vLLM
+  work_dir: data/lora           # rendered training examples and run specs
 poll_s: 2.0                     # health checks while a server starts
 stop_timeout_s: 60              # SIGTERM, then SIGKILL
 request_timeout_s: 120          # health, version and metrics reads

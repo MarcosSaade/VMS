@@ -342,6 +342,10 @@ traindata-states: ## Build the three synthetic training databases (vms_train_*) 
 traindata-generate: ## Generate candidate (question, plan) pairs up to the cost cap (costs money; resumable)
 	$(RUN) python -m vms.traindata generate
 
+.PHONY: traindata-catalogs
+traindata-catalogs: ## Export the training states' catalogs and clocks (prompt inputs for a pod; needs make traindata-states)
+	$(RUN) python -m vms.traindata catalogs
+
 .PHONY: traindata-filter
 traindata-filter: ## Filter candidates (validity, execution agreement, dedup, leakage) into train/plans.v1
 	$(RUN) python -m vms.traindata filter

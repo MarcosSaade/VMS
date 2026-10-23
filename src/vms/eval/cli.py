@@ -95,6 +95,7 @@ log = get_logger(__name__)
 class Replay:
     llm: ReplayLlm
     source: dict[str, Any]
+    planner_prompt: Path | None = None  # the prompt the replies were recorded with (D42)
 
 
 REPO_ROOT = Path.cwd()
@@ -467,11 +468,14 @@ def select_items(
     return items, actual
 
 
+REPLAY_KINDS = ("bench.llm", "bench.lora")
+
+
 def load_replay(path: Path, server: str, variant: str | None) -> Replay:
     """The recorded replies of one server and variant in a `bench.llm` results file."""
     data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("kind") != "bench.llm":
-        raise SystemExit(f"{path} is not a bench.llm results file")
+    if data.get("kind") not in REPLAY_KINDS:
+        raise SystemExit(f"{path} is not a results file with recorded replies {REPLAY_KINDS}")
     entry = data["metrics"]["servers"].get(server)
     if entry is None or not entry.get("ok"):
         raise SystemExit(f"{path}: no successful server {server!r}")
@@ -481,6 +485,7 @@ def load_replay(path: Path, server: str, variant: str | None) -> Replay:
     if variant not in recorded:
         raise SystemExit(f"{path}: {server} recorded variants {sorted(recorded)}; pick --variant")
     record = recorded[variant]
+    prompt = record.get("prompt")
     return Replay(
         llm=ReplayLlm(record["replies"], server),
         source={
@@ -494,7 +499,11 @@ def load_replay(path: Path, server: str, variant: str | None) -> Replay:
             "revision": entry["revision"],
             "hardware": data["hardware"],
             "pod_call_latency_ms": record["call_latency_ms"],
+            "request_model": record.get("model"),
+            "prompt": prompt,
+            "split": data["config"].get("split", "dev"),
         },
+        planner_prompt=Path(prompt) if prompt else None,
     )
 
 
@@ -532,6 +541,12 @@ def cmd_run(
     dotenv = REPO_ROOT / ".env"
     qs = query_settings(REPO_ROOT, env_file=dotenv if dotenv.is_file() else None)
     endpoint = LlmEndpointSettings()
+    if replay is not None and replay.planner_prompt is not None:
+        # Replay asks exactly the recorded messages, so it builds them from the same prompt.
+        assets = qs.assets.model_copy(update={"planner_prompt": replay.planner_prompt})
+        qs = qs.model_copy(update={"assets": assets})
+    if replay is not None and replay.source["split"] != split.value:
+        raise SystemExit(f"replies were recorded on {replay.source['split']}, not {split.value}")
     if replay is not None:
         llm: LlmClient = replay.llm
         model = f"replay-{replay.source['server']}"

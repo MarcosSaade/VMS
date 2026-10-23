@@ -208,16 +208,16 @@ class Planner:
         return self._llm.name
 
     def system_prompt(self, catalog: QueryCatalog, now: dt.datetime) -> str:
-        return self._prompt.render(
-            {
-                "schema_summary": self._summary,
-                "cameras": cameras_summary(catalog),
-                "classes": ", ".join(catalog.classes),
-                "now": local_now(catalog, now),
-                "plan_schema": self._schema_text,
-                "examples": self._examples,
-            }
-        )
+        values = {
+            "schema_summary": self._summary,
+            "cameras": cameras_summary(catalog),
+            "classes": ", ".join(catalog.classes),
+            "now": local_now(catalog, now),
+            "plan_schema": self._schema_text,
+            "examples": self._examples,
+        }
+        # A compact prompt (D42) has no schema or examples placeholder; render what it has.
+        return self._prompt.render({k: v for k, v in values.items() if k in self._prompt.fields})
 
     async def plan(self, question: str, catalog: QueryCatalog) -> PlanResult:
         now = self._clock.now()

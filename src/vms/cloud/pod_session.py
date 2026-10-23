@@ -66,11 +66,12 @@ KIND = "cloud.pod_session"
 REMOTE_SCRIPT = "scripts/pod_remote.sh"
 CLIPS_DIR = "data/clips"
 # A pod has no Docker, so only scenarios that run in one Python process run on it (D37):
-# the detector's (model, ladder) and LLM serving (llm: engines as child processes, D40).
-POD_SCENARIO_KINDS = frozenset({"model", "ladder", "llm"})
+# the detector's (model, ladder), LLM serving (llm: engines as child processes, D40) and LoRA
+# training with serving (lora: the trainer and vLLM as child processes, D42).
+POD_SCENARIO_KINDS = frozenset({"model", "ladder", "llm", "lora"})
 # What `pod_remote.sh setup` installs for each kind: CUDA PyTorch, ONNX Runtime and TensorRT
-# for the detector; vLLM and Ollama for LLM serving.
-SETUP_PROFILES = {"model": "vision", "ladder": "vision", "llm": "llm"}
+# for the detector; vLLM, Ollama and the LoRA trainer's packages for LLM work.
+SETUP_PROFILES = {"model": "vision", "ladder": "vision", "llm": "llm", "lora": "llm"}
 GONE = frozenset({"TERMINATED"})
 TIMER_LOG = "/var/log/vms-time-limit.log"
 
@@ -395,6 +396,7 @@ class PodSession:
             for clip in self.settings.remote.clips
             if (self.repo / CLIPS_DIR / clip).is_dir()
         ]
+        paths += [p for p in self.settings.remote.data if (self.repo / p).exists()]
         remote.push(self.repo, paths, self.settings.remote.dir, self.settings.timeouts.sync_s)
 
     def _run_scenario(self, remote: Remote, scenario: str) -> ScenarioRun:

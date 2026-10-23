@@ -41,7 +41,7 @@ from vms.query.engine import CatalogCache, PlanEngine, StructuredQueryEngine
 from vms.query.fewshots import load_fewshots
 from vms.query.llm import CannedLlm, LlmClient, LlmEndpointSettings, build_llm
 from vms.query.planner import Planner
-from vms.query.prompts import PLANNER_FIELDS, PromptTemplate
+from vms.query.prompts import PromptTemplate
 from vms.query.settings import QuerySettings
 from vms.query.sql_validator import SqlValidator
 from vms.query.store import PostgresReader, QueryLogEntry
@@ -91,7 +91,7 @@ def eval_planner(llm: LlmClient, qs: QuerySettings, now: dt.datetime, root: Path
     (`vms.serving`) for a later replayed eval."""
     return Planner(
         llm,
-        PromptTemplate.load(root / qs.assets.planner_prompt, PLANNER_FIELDS),
+        PromptTemplate.load_planner(root / qs.assets.planner_prompt),
         load_fewshots(root / qs.assets.fewshots),
         planner=qs.planner,
         sql=qs.sql,

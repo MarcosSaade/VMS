@@ -2,8 +2,10 @@
 variants that are load tested and, optionally, recorded for the replayed dev eval.
 
 A server is one engine process with one model and fixed server flags (prefix caching on or
-off is a server flag, so "off" is its own server entry). A variant is what changes per request
-on the same server: the response format (structured outputs on or off) and extra body fields.
+off is a server flag, so "off" is its own server entry), optionally with LoRA adapters served
+on the base (task 8.3, D42). A variant is what changes per request on the same server: the
+response format (structured outputs on or off), extra body fields, the planner prompt and the
+requested model (the base, or one of its adapters by name).
 """
 
 from __future__ import annotations
@@ -44,6 +46,8 @@ class Variant(_Model):
     response_format: Literal["json_schema", "json_object", "none"] = "json_schema"
     load: bool = True
     record: bool = False  # plan every question of the split with repair; replies kept
+    model: str | None = None  # the request's model: a LoRA adapter's name; default the server's
+    prompt: Path | None = None  # planner prompt template; default configs/query.yaml's
 
 
 class Server(_Model):
@@ -57,6 +61,8 @@ class Server(_Model):
     base_url: str | None = None  # engine external only
     use_llm_api_key: bool = False  # external only: send LLM_API_KEY (env or .env) as bearer
     request_extra: dict[str, Any] = Field(default_factory=dict)  # merged into every body
+    # vLLM only: LoRA adapters served on the base, name -> adapter directory or .tar (D42).
+    lora_modules: dict[str, Path] = Field(default_factory=dict)
     start_timeout_s: float = Field(default=1200.0, gt=0)  # download, load, CUDA graphs
     variants: list[Variant] = Field(min_length=1)
 
@@ -66,6 +72,11 @@ class Server(_Model):
             raise ValueError(f"{self.name}: a vLLM model must be pinned by revision")
         if self.engine == "external" and not self.base_url:
             raise ValueError(f"{self.name}: an external server needs base_url")
+        if self.lora_modules and self.engine != "vllm":
+            raise ValueError(f"{self.name}: LoRA adapters are served by vLLM only")
+        unknown = {v.model for v in self.variants if v.model} - set(self.lora_modules)
+        if unknown:
+            raise ValueError(f"{self.name}: variants ask for unknown adapters {sorted(unknown)}")
         names = [v.name for v in self.variants]
         if len(set(names)) != len(names):
             raise ValueError(f"{self.name}: variant names must be unique")
@@ -83,7 +94,8 @@ class LlmScenario(_Model):
     description: str = ""
     kind: Literal["llm"] = "llm"
     seed: int
-    split: Literal["dev"] = "dev"  # tuning split only (AGENTS 8); test is never served here
+    # Dev for tuning; test only for the one reported run of a chosen model (AGENTS 8).
+    split: Literal["dev", "test"] = "dev"
     catalog: Path
     max_items: int | None = Field(default=None, ge=1)  # smoke runs only: not reportable
     max_tokens: int = Field(default=1024, ge=16)

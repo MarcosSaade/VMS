@@ -16,6 +16,9 @@ from string import Template
 PLANNER_FIELDS = frozenset(
     {"schema_summary", "cameras", "classes", "now", "plan_schema", "examples"}
 )
+# A planner prompt may leave out the plan schema and the few-shot bank (the compact prompt a
+# fine-tuned planner is trained and served with, D42), never the catalog or the clock.
+PLANNER_REQUIRED = frozenset({"schema_summary", "cameras", "classes", "now"})
 SQL_FIELDS = frozenset({"schema_ddl", "cameras", "classes", "max_limit", "examples"})
 
 
@@ -38,6 +41,17 @@ class PromptTemplate:
     @property
     def fields(self) -> frozenset[str]:
         return frozenset(self.template.get_identifiers())
+
+    @classmethod
+    def load_planner(cls, path: Path) -> PromptTemplate:
+        """A planner prompt: PLANNER_REQUIRED <= placeholders <= PLANNER_FIELDS."""
+        prompt = cls.load(path)
+        if not PLANNER_REQUIRED <= prompt.fields <= PLANNER_FIELDS:
+            raise ValueError(
+                f"{path}: planner placeholders {sorted(prompt.fields)} must include "
+                f"{sorted(PLANNER_REQUIRED)} and stay within {sorted(PLANNER_FIELDS)}"
+            )
+        return prompt
 
     def render(self, values: Mapping[str, object]) -> str:
         missing, unknown = self.fields - values.keys(), values.keys() - self.fields

@@ -13,7 +13,11 @@ its log tail and the scenario moves on to the next one.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import random
+import shutil
+import tarfile
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -87,16 +91,30 @@ class Context:
         self.scenario = scenario
         self.root = root
         self.qs = load_settings(QuerySettings, "query", config_dir=root / "configs")
-        eval_settings = load_settings(EvalSettings, "eval", config_dir=root / "configs")
-        self.items: list[EvalItem] = load_items(root / eval_settings.structured.dev)[
-            : scenario.max_items
-        ]
+        paths = load_settings(EvalSettings, "eval", config_dir=root / "configs").structured
+        split_file = paths.test if scenario.split == "test" else paths.dev
+        self.items: list[EvalItem] = load_items(root / split_file)[: scenario.max_items]
+        self.split_sha256 = hashlib.sha256((root / split_file).read_bytes()).hexdigest()
         self.catalog: QueryCatalog
         self.catalog, self.now = load_catalog_file(root / scenario.catalog)
         self.schema = plan_json_schema()
-        # The planner for prompts only; recording builds one per variant around its client.
-        planner = eval_planner(_NoLlm(), self.qs, self.now, root)
-        self.system_prompt = planner.system_prompt(self.catalog, self.now)
+        self._prompts: dict[Path, str] = {}
+
+    def query_settings(self, variant: Variant) -> QuerySettings:
+        """configs/query.yaml, with the variant's planner prompt if it names one."""
+        if variant.prompt is None:
+            return self.qs
+        assets = self.qs.assets.model_copy(update={"planner_prompt": variant.prompt})
+        return self.qs.model_copy(update={"assets": assets})
+
+    def system_prompt(self, variant: Variant) -> str:
+        qs = self.query_settings(variant)
+        path = qs.assets.planner_prompt
+        if path not in self._prompts:
+            # The planner for prompts only; recording builds one per variant around its client.
+            planner = eval_planner(_NoLlm(), qs, self.now, self.root)
+            self._prompts[path] = planner.system_prompt(self.catalog, self.now)
+        return self._prompts[path]
 
     def tuning(self, server: Server, variant: Variant) -> LlmTuning:
         return self.qs.llm.model_copy(
@@ -115,13 +133,18 @@ class Context:
         endpoint = LlmEndpointSettings(  # type: ignore[call-arg]
             _env_file=None,
             base_url=base_url,
-            model=server.request_model,
+            model=variant.model or server.request_model,
             api_key=SecretStr(key) if key else None,
         )
         return OpenAICompatibleClient(endpoint, self.tuning(server, variant))
 
-    def body(self, client: OpenAICompatibleClient, item: EvalItem) -> dict[str, Any]:
-        messages = [ChatMessage("system", self.system_prompt), ChatMessage("user", item.question)]
+    def body(
+        self, client: OpenAICompatibleClient, variant: Variant, item: EvalItem
+    ) -> dict[str, Any]:
+        messages = [
+            ChatMessage("system", self.system_prompt(variant)),
+            ChatMessage("user", item.question),
+        ]
         return client.request_body(messages, self.schema)
 
     def plan_valid(self, text: str) -> bool:
@@ -198,7 +221,7 @@ async def load_variant(
     stream = aiohttp_stream(session, {"Authorization": f"Bearer {key}"} if key else None)
     order = list(ctx.items)
     random.Random(ctx.scenario.seed).shuffle(order)
-    bodies = [ctx.body(client, item) for item in order]
+    bodies = [ctx.body(client, variant, item) for item in order]
 
     async def send(body: dict[str, Any]) -> Sample:
         return await stream_chat(stream, url, body, spec.timeout_s, time.perf_counter)
@@ -243,7 +266,7 @@ async def record_variant(
 ) -> dict[str, Any]:
     """Plan every dev question with the planner (repair included); keep every reply."""
     recorder = RecordingLlm(ctx.client(server, variant, running.base_url))
-    planner = eval_planner(recorder, ctx.qs, ctx.now, ctx.root)
+    planner = eval_planner(recorder, ctx.query_settings(variant), ctx.now, ctx.root)
     limit = asyncio.Semaphore(ctx.scenario.record.concurrency)
     outcomes = {"planned": 0, "failed_validation": 0, "unavailable": 0}
 
@@ -268,8 +291,9 @@ async def record_variant(
         "outcomes": outcomes,
         "wall_s": round(time.perf_counter() - t0, 3),
         "call_latency_ms": percentiles_ms(latencies),
-        "model": server.request_model,
-        "system_prompt_chars": len(ctx.system_prompt),
+        "model": variant.model or server.request_model,
+        "prompt": str(ctx.query_settings(variant).assets.planner_prompt),
+        "system_prompt_chars": len(ctx.system_prompt(variant)),
         "replies": recorder.dump(),
     }
 
@@ -297,17 +321,65 @@ def run_llm(
     settings = load_settings(ServingSettings, "serving", config_dir=root / "configs")
     ctx = Context(scenario, root)
     started = datetime.now(UTC)
+    servers = serve_all(ctx, settings, root, factory)
+    result = RunResult(
+        run_id=new_ulid(),
+        name=scenario.name,
+        kind=KIND,
+        started_at=started,
+        ended_at=datetime.now(UTC),
+        seed=scenario.seed,
+        git=git_info(root),
+        hardware=hardware(),
+        packages=package_versions(PACKAGES),
+        config=run_config(ctx, settings),
+        scenario=raw,
+        metrics={"servers": servers},
+        notes="Closed-loop load on the planner's real first-attempt prompts (dev questions), "
+        "warmup excluded; times are measured on the pod (client and server on one host). "
+        "valid_rate = first-attempt replies that parse and pass the planner's validation. "
+        "Recorded replies feed `python -m vms.eval run --planner replay` (D40).",
+    )
+    path = write_result(root / scenario.results_dir, result)
+    log.info("llm scenario written", extra={"path": str(path)})
+    return path
+
+
+def run_config(ctx: Context, settings: ServingSettings) -> dict[str, Any]:
+    return {
+        "serving": settings.model_dump(mode="json"),
+        "llm": ctx.qs.llm.model_dump(mode="json"),
+        "assets": ctx.qs.assets.model_dump(mode="json"),
+        "eval_clock": ctx.now.isoformat(),
+        "split": ctx.scenario.split,
+        "split_sha256": ctx.split_sha256,
+        "items": len(ctx.items),
+    }
+
+
+def serve_all(
+    ctx: Context, settings: ServingSettings, root: Path, factory: Any = build_server
+) -> dict[str, Any]:
+    """Start each server in turn, load test and record its variants, stop it."""
+    scenario = ctx.scenario
     servers: dict[str, Any] = {}
-    for server in scenario.servers:
-        running = factory(server, settings, root / scenario.logs_dir, scenario.seed)
+    for spec in scenario.servers:
         entry: dict[str, Any] = {
-            "engine": server.engine,
-            "model": server.model,
-            "revision": server.revision,
-            "args": server.args,
-            "env": server.env,
-            "request_extra": server.request_extra,
+            "engine": spec.engine,
+            "model": spec.model,
+            "revision": spec.revision,
+            "args": spec.args,
+            "env": spec.env,
+            "request_extra": spec.request_extra,
         }
+        try:
+            server, entry["lora"] = with_lora(spec, settings.lora.unpack_dir, root)
+        except (OSError, ValueError, tarfile.TarError) as exc:
+            entry["ok"], entry["error"] = False, f"LoRA adapters: {type(exc).__name__}: {exc}"
+            servers[spec.name] = entry
+            continue
+        entry["args"] = server.args
+        running = factory(server, settings, root / scenario.logs_dir, scenario.seed)
         try:
             entry["info"] = running.start()
             entry["gpu_memory_used_mib_idle"] = gpu_memory_used_mib()
@@ -321,31 +393,62 @@ def run_llm(
             log.exception("server run failed", extra={"server": server.name})
         finally:
             running.stop()
-        servers[server.name] = entry
-    result = RunResult(
-        run_id=new_ulid(),
-        name=scenario.name,
-        kind=KIND,
-        started_at=started,
-        ended_at=datetime.now(UTC),
-        seed=scenario.seed,
-        git=git_info(root),
-        hardware=hardware(),
-        packages=package_versions(PACKAGES),
-        config={
-            "serving": settings.model_dump(mode="json"),
-            "llm": ctx.qs.llm.model_dump(mode="json"),
-            "assets": ctx.qs.assets.model_dump(mode="json"),
-            "eval_clock": ctx.now.isoformat(),
-            "items": len(ctx.items),
-        },
-        scenario=raw,
-        metrics={"servers": servers, "system_prompt_chars": len(ctx.system_prompt)},
-        notes="Closed-loop load on the planner's real first-attempt prompts (dev questions), "
-        "warmup excluded; times are measured on the pod (client and server on one host). "
-        "valid_rate = first-attempt replies that parse and pass the planner's validation. "
-        "Recorded replies feed `python -m vms.eval run --planner replay` (D40).",
-    )
-    path = write_result(root / scenario.results_dir, result)
-    log.info("llm scenario written", extra={"path": str(path)})
-    return path
+        servers[spec.name] = entry
+    return servers
+
+
+# vLLM accepts these maximum LoRA ranks (its LoRAConfig check).
+VLLM_LORA_RANKS = (1, 8, 16, 32, 64, 128, 256, 320, 512)
+
+
+def unpack_adapter(path: Path, unpack_dir: Path, name: str) -> Path:
+    """An adapter directory: `path` itself, or a .tar of one unpacked into `unpack_dir/name`."""
+    if path.is_dir():
+        return path
+    out = unpack_dir / name
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+    with tarfile.open(path) as tar:
+        tar.extractall(out, filter="data")
+    return out
+
+
+def with_lora(server: Server, unpack_dir: Path, root: Path) -> tuple[Server, dict[str, Any]]:
+    """The server with vLLM's LoRA flags for its adapters, and what was served (ranks,
+    hashes). The maximum rank is the smallest vLLM accepts that fits every adapter."""
+    if not server.lora_modules:
+        return server, {}
+    served: dict[str, Any] = {}
+    modules = []
+    for name, path in server.lora_modules.items():
+        src = root / path
+        adapter = unpack_adapter(src, root / unpack_dir, name)
+        config = json.loads((adapter / "adapter_config.json").read_text(encoding="utf-8"))
+        served[name] = {
+            "path": str(path),
+            "sha256": sha256_file(src) if src.is_file() else None,
+            "rank": int(config["r"]),
+        }
+        modules.append(f"{name}={adapter.resolve()}")
+    top = max(a["rank"] for a in served.values())
+    max_rank = next(r for r in VLLM_LORA_RANKS if r >= top)
+    args = [
+        *server.args,
+        "--enable-lora",
+        "--max-loras",
+        str(len(modules)),
+        "--max-lora-rank",
+        str(max_rank),
+        "--lora-modules",
+        *modules,
+    ]
+    return server.model_copy(update={"args": args}), served
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()

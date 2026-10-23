@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from vms.common.settings import ServiceSettings
@@ -25,9 +27,20 @@ class EngineSettings(_Section):
         return f"http://{self.host}:{self.port}"
 
 
+class LoraSettings(_Section):
+    """LoRA training on a pod (task 8.3, D42)."""
+
+    # The trainer runs in vLLM's virtualenv (its CUDA torch and transformers, plus peft).
+    python: str = "/root/vllm-env/bin/python"
+    script: Path = Path("scripts/lora_train.py")
+    unpack_dir: Path = Path("data/serving/lora")  # adapter .tar files unpacked for vLLM
+    work_dir: Path = Path("data/lora")  # rendered examples and run specs
+
+
 class ServingSettings(ServiceSettings):
     vllm: EngineSettings
     ollama: EngineSettings
+    lora: LoraSettings = Field(default_factory=LoraSettings)
     poll_s: float = Field(default=2.0, gt=0)
     stop_timeout_s: float = Field(default=60.0, gt=0)
     request_timeout_s: float = Field(default=120.0, gt=0)

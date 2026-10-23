@@ -12,6 +12,7 @@
                                    finetune       detector fine-tune and before/after mAP
                                                   (vms.finetune, task 9.5)
                                    llm            LLM serving load and plan recording
+                                   lora           LoRA training, then recording per adapter
                                                   (vms.serving, task 8.1)
     report  FILE [FILE ...]      Markdown tables of results files, for docs/BENCHMARKS.md
 
@@ -88,6 +89,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         configure_logging(SERVICE, "INFO")
         run_llm(args.scenario)
+        return 0
+    if kind == "lora":
+        from vms.lora.run import run_lora
+
+        configure_logging(SERVICE, "INFO")
+        run_lora(args.scenario)
         return 0
     if kind == "profile":
         from vms.bench.profile import run_profile

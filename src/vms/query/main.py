@@ -26,7 +26,7 @@ from vms.query.fewshots import load_fewshots
 from vms.query.llm import CannedLlm, LlmEndpointSettings, build_llm
 from vms.query.plan import QueryPlan
 from vms.query.planner import Planner, PlannerUnavailableError, PlanningFailedError, abstention
-from vms.query.prompts import PLANNER_FIELDS, PromptTemplate
+from vms.query.prompts import PromptTemplate
 from vms.query.settings import QuerySettings
 from vms.query.sql_validator import SqlValidator
 from vms.query.store import PostgresQueryLog, PostgresReader
@@ -63,7 +63,7 @@ def build_app(settings: QuerySettings, obs: Observability) -> FastAPI:
     llm = build_llm(LlmEndpointSettings(), settings.llm, REPO_ROOT)
     planner = Planner(
         llm,
-        PromptTemplate.load(REPO_ROOT / settings.assets.planner_prompt, PLANNER_FIELDS),
+        PromptTemplate.load_planner(REPO_ROOT / settings.assets.planner_prompt),
         load_fewshots(REPO_ROOT / settings.assets.fewshots),
         planner=settings.planner,
         sql=settings.sql,
@@ -160,7 +160,7 @@ def plan_questions(questions: list[str], compare: dict[str, dict[str, Any]]) -> 
     llm = build_llm(LlmEndpointSettings(), settings.llm, REPO_ROOT)
     planner = Planner(
         llm,
-        PromptTemplate.load(REPO_ROOT / settings.assets.planner_prompt, PLANNER_FIELDS),
+        PromptTemplate.load_planner(REPO_ROOT / settings.assets.planner_prompt),
         load_fewshots(REPO_ROOT / settings.assets.fewshots),
         planner=settings.planner,
         sql=settings.sql,

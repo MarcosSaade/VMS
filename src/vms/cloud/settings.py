@@ -25,6 +25,9 @@ class Prices(_Section):
 class RemoteSettings(_Section):
     dir: str = "vms"
     clips: list[str] = Field(default_factory=list)
+    # Untracked files or directories pushed when present (repo-relative): DVC-tracked training
+    # data and adapters the git sync leaves out (task 8.3).
+    data: list[str] = Field(default_factory=list)
     # Directories copied back after the scenarios besides bench/results (repo-relative).
     collect: list[str] = Field(default_factory=list)
 

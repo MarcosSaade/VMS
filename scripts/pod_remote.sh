@@ -2,7 +2,8 @@
 # Runs ON a Runpod pod; vms.cloud.pod_session calls it over SSH (scripts/runpod_session.sh, D37).
 # A pod is a container: no Docker or Compose, so no stack and no services. Only in-process
 # scenarios run here: `kind: model` and `ladder` in the project's environment with CUDA PyTorch,
-# and `kind: llm`, whose engines (vLLM, Ollama) run as child processes of the scenario (D40).
+# `kind: llm`, whose engines (vLLM, Ollama) run as child processes of the scenario (D40), and
+# `kind: lora`, whose trainer and vLLM do the same (D42).
 #
 #   setup vision     uv, the locked environment with torch and torchvision swapped for their
 #                    CUDA 13 builds (the versions uv.lock pins), onnxruntime swapped for
@@ -10,9 +11,10 @@
 #                    (copied from the operator's machine), the calibration and detection eval
 #                    images, the detector weights, their ONNX export, and the TensorRT engines
 #   setup llm        uv and the locked environment (the load client and the planner, CPU only),
-#                    vLLM in its own virtualenv (it pins its own CUDA torch) and the Ollama
-#                    binary, both pinned below; models are downloaded by the scenario
-#   run SCENARIO     one model, ladder or llm scenario through python -m vms.bench
+#                    vLLM in its own virtualenv (it pins its own CUDA torch) with peft and
+#                    flash-linear-attention added for the LoRA trainer, and the Ollama binary,
+#                    all pinned below; models are downloaded by the scenario
+#   run SCENARIO     one model, ladder, llm or lora scenario through python -m vms.bench
 #
 # No secrets reach the pod: .env comes from .env.example, so no LLM key and no Runpod or AWS
 # key of the operator's. Results land in bench/results/, which the session copies back.
@@ -30,6 +32,10 @@ TENSORRT_VERSION=11.3.0.99    # tensorrt-cu13, released 2026-09-09
 # LLM serving (D40): the latest releases older than two weeks on 2026-10-23.
 VLLM_VERSION=0.31.0           # PyPI, 2026-10-05; brings torch 2.13 for the host's CUDA
 OLLAMA_VERSION=0.40.2         # GitHub release, 2026-10-08
+# LoRA training (D42), in vLLM's virtualenv against its torch and transformers.
+PEFT_VERSION=0.21.2           # PyPI, 2026-10-01
+FLA_VERSION=0.5.2             # flash-linear-attention (Triton kernels for Qwen3.5's linear
+                              # attention; no nvcc needed), PyPI, 2026-07-27
 VLLM_ENV=/root/vllm-env       # = configs/serving.yaml vllm.bin's virtualenv
 export PATH="$HOME/.local/bin:$PATH"
 # After the CUDA swap, `uv run` must not re-sync the environment back to the CPU wheels.
@@ -57,6 +63,14 @@ setup_llm() {
   uv pip install --python "$VLLM_ENV/bin/python" --torch-backend=auto "vllm==${VLLM_VERSION}"
   "$VLLM_ENV/bin/python" -c "import torch, vllm; assert torch.cuda.is_available(), 'no CUDA'; \
 print('vllm', vllm.__version__, 'torch', torch.__version__, 'CUDA', torch.version.cuda)"
+
+  step "LoRA trainer: peft ${PEFT_VERSION}, flash-linear-attention ${FLA_VERSION} (torch and transformers as vLLM pinned them)"
+  "$VLLM_ENV/bin/python" -c "from importlib.metadata import version as v; \
+print(f'torch=={v(\"torch\")}'); print(f'transformers=={v(\"transformers\")}')" > /tmp/lora-constraints.txt
+  uv pip install --python "$VLLM_ENV/bin/python" --constraint /tmp/lora-constraints.txt \
+    "peft==${PEFT_VERSION}" "flash-linear-attention==${FLA_VERSION}"
+  "$VLLM_ENV/bin/python" -c "import peft, transformers, torch; \
+print('peft', peft.__version__, 'transformers', transformers.__version__, 'torch', torch.__version__)"
 
   step "Ollama ${OLLAMA_VERSION}"
   command -v zstd >/dev/null || { apt-get -q update && apt-get -q install -y zstd; }
@@ -104,8 +118,8 @@ run() {
   kind="$(uv run python -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))["kind"])' \
     "$scenario")"
   step "scenario $scenario ($kind)"
-  if [[ "$kind" != model && "$kind" != ladder && "$kind" != llm ]]; then
-    echo "a pod runs only in-process scenarios, kind model, ladder or llm (no Docker, D37)" >&2
+  if [[ "$kind" != model && "$kind" != ladder && "$kind" != llm && "$kind" != lora ]]; then
+    echo "a pod runs only in-process scenarios, kind model, ladder, llm or lora (no Docker, D37)" >&2
     exit 2
   fi
   uv run python -m vms.bench run --scenario "$scenario"

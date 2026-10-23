@@ -4,6 +4,7 @@ states     generate the training states' snapshots and load each into its own da
            stack's Postgres; writes the states manifest (make traindata-states)
 generate   append candidates from the hosted LLM (LLM_* in .env) until the candidate target or
            the cost cap in configs/traindata.v1.yaml; resumes from the candidates file
+catalogs   export each state's catalog and clock (the prompt inputs) to the catalogs file
 filter     check every candidate (validity, agreement of two generations on the executed
            result, duplicates, leakage), write the dataset and the report (results JSON)
 """
@@ -30,10 +31,11 @@ from vms.common.settings import load_settings
 from vms.eval.compare import Tolerance
 from vms.eval.dataset import load_items
 from vms.eval.settings import EvalSettings
+from vms.query.catalog import CAMERAS_SQL, ZONES_SQL
 from vms.query.fewshots import load_fewshots
 from vms.query.llm import LlmEndpointSettings
 from vms.query.settings import QuerySettings
-from vms.serving.catalog_file import CATALOG_FILE, load_catalog_file
+from vms.serving.catalog_file import CATALOG_FILE, catalog_json, load_catalog_file
 from vms.traindata.filter import (
     PairChecker,
     connection_executor,
@@ -49,6 +51,7 @@ from vms.traindata.states import (
     build_states,
     check_states,
     load_state,
+    owner_conninfo,
     reader_conninfo,
 )
 
@@ -112,6 +115,28 @@ def cmd_generate(spec: TrainDataSpec) -> int:
     sys.stdout.write(
         f"{gen.written} candidates after {next_call} calls; spent ${budget.spent_usd:.3f}\n"
     )
+    return 0
+
+
+def cmd_catalogs(spec: TrainDataSpec) -> int:
+    qs, _ = _settings()
+    check_states(spec, REPO_ROOT)
+    manifest_sha = _sha256(REPO_ROOT / spec.states_manifest)
+    out: dict[str, Any] = {}
+    for state in spec.states:
+        with psycopg.connect(owner_conninfo(state)) as conn:
+            cameras = conn.execute(CAMERAS_SQL).fetchall()
+            zones = conn.execute(ZONES_SQL).fetchall()
+        out[state.name] = catalog_json(
+            cameras,
+            zones,
+            qs.classes,
+            load_state(state, REPO_ROOT, list(qs.classes)).now,
+            manifest_sha,
+        )
+    path = REPO_ROOT / spec.catalogs
+    path.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    sys.stdout.write(f"wrote {path}\n")
     return 0
 
 
@@ -230,13 +255,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--spec", type=Path, default=SPEC)
     parser.add_argument("--log-level", default="INFO")
-    parser.add_argument("command", choices=["states", "generate", "filter"])
+    parser.add_argument("command", choices=["states", "generate", "catalogs", "filter"])
     args = parser.parse_args(argv)
     configure_logging("traindata", args.log_level)
     spec = load_spec(args.spec)
     commands: dict[str, Any] = {
         "states": cmd_states,
         "generate": cmd_generate,
+        "catalogs": cmd_catalogs,
         "filter": cmd_filter,
     }
     return int(commands[args.command](spec))

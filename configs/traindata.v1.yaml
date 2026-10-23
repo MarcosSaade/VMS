@@ -15,6 +15,9 @@ states:
   - {name: campus, spec: configs/traindata/snapshot.campus.yaml, db: vms_train_campus}
 states_dir: data/traindata/states              # generated snapshot files (from spec and seed)
 states_manifest: configs/traindata/states.v1.json  # in git: row counts and file hashes
+# In git: each state's cameras, zones, classes and clock (make traindata-catalogs), so a GPU pod
+# renders the planner's prompt for a pair without the state's database (task 8.3, D42).
+catalogs: configs/traindata/catalogs.v1.json
 
 # Generation A writes questions with plans in batches; generation B is the planner itself
 # (configs/query.yaml, same prompt as the service, temperature 0, one repair) on each

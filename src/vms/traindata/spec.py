@@ -48,6 +48,7 @@ class TrainDataSpec(_Model):
     states: list[State] = Field(min_length=1)
     states_dir: Path
     states_manifest: Path
+    catalogs: Path  # in git: each state's catalog and clock, for prompts without a database
     generator: Generator
     planner_concurrency: int = Field(ge=1)
     budget: Budget

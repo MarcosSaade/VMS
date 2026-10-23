@@ -31,7 +31,10 @@ prices:
 remote:
   dir: vms                      # under root's home
   clips: [mot17-09-mini, mot17-04-mini, commons-roncesvalles]
-  collect: [eval/results, data/serving/logs]  # + bench/results; engine logs for debugging
+  # Untracked inputs pushed when present: the 8.2 training pairs and trained adapters (DVC).
+  data: [train/plans.v1/pairs.jsonl, models/lora]
+  # + bench/results; engine and trainer logs for debugging; adapters (.tar, then DVC)
+  collect: [eval/results, data/serving/logs, models/lora]
 
 timeouts:
   api_s: 30
@@ -42,7 +45,7 @@ timeouts:
   ssh_connect_s: 10
   sync_s: 1200
   setup_s: 3600                 # uv, the environment, CUDA wheels, weights
-  scenario_s: 3600
+  scenario_s: 7200              # a lora scenario trains for up to its budget, then serves
   collect_s: 600
   terminate_s: 300
   poll_s: 5
