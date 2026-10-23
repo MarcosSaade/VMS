@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5M5T54VBV81BY941EPWDMA6",
+  "name": "cpu-session",
+  "kind": "cloud.gpu_session",
+  "started_at": "2026-10-23T10:44:55.893267Z",
+  "ended_at": "2026-10-23T11:40:22.239997Z",
+  "seed": 1234,
+  "git": {
+    "sha": "a05e3b3880c5d583b70b4b38cdc274afcf82468c",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Platinum 8488C",
+    "logical_cpus": 16,
+    "cpu_quota": null,
+    "ram_bytes": 33081987072,
+    "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "boto3": "1.43.110"
+  },
+  "config": {
+    "service": "cloud",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 1.0
+    },
+    "region": null,
+    "machine": "cpu",
+    "instance_type": "c7i.4xlarge",
+    "machines": {
+      "gpu": {
+        "accelerator": "gpu",
+        "instance_type": "g6.xlarge",
+        "vcpu_quota_code": "L-DB2E81BA",
+        "quota_name": "on-demand G and VT",
+        "ami_parameter": "/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-22.04/latest/ami-id",
+        "root_volume_gb": 100,
+        "host_setup": []
+      },
+      "cpu": {
+        "accelerator": "cpu",
+        "instance_type": "c7i.2xlarge",
+        "vcpu_quota_code": "L-1216C47A",
+        "quota_name": "on-demand standard (A, C, D, H, I, M, R, T, Z)",
+        "ami_parameter": "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id",
+        "root_volume_gb": 60,
+        "host_setup": [
+          "cloud-init status --wait >/dev/null || true",
+          "sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 -q update && sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 -q install -y docker.io docker-compose-v2 docker-buildx make rsync"
+        ]
+      }
+    },
+    "ssh_user": "ubuntu",
+    "ssh_cidr": null,
+    "max_session_minutes": 240,
+    "tags": {
+      "project": "vms"
+    },
+    "prices": {
+      "hourly_usd": {
+        "g4dn.xlarge": 0.526,
+        "g5.xlarge": 1.006,
+        "g6.xlarge": 0.8048,
+        "g6e.xlarge": 1.861,
+        "c7i.xlarge": 0.1785,
+        "c7i.2xlarge": 0.357,
+        "c7i.4xlarge": 0.714
+      },
+      "gp3_gb_month_usd": 0.08,
+      "hours_per_month": 730.0,
+      "public_ipv4_hour_usd": 0.005
+    },
+    "remote": {
+      "dir": "vms",
+      "clips": [
+        "mot17-09-mini",
+        "mot17-04-mini",
+        "commons-roncesvalles"
+      ],
+      "collect": [
+        "eval/results",
+        "data/eval/detection/predictions",
+        "models/finetune"
+      ]
+    },
+    "timeouts": {
+      "aws_connect_s": 10.0,
+      "aws_read_s": 60.0,
+      "aws_max_attempts": 5,
+      "running_s": 600.0,
+      "ssh_ready_s": 600.0,
+      "ssh_connect_s": 10,
+      "sync_s": 1200.0,
+      "setup_s": 3600.0,
+      "scenario_s": 10800.0,
+      "collect_s": 600.0,
+      "terminate_s": 600.0,
+      "delete_retry_s": 300.0,
+      "poll_s": 5.0
+    },
+    "budget": {
+      "name": "vms-monthly",
+      "amount_usd": 20.0,
+      "actual_thresholds_pct": [
+        50.0,
+        80.0,
+        100.0
+      ],
+      "forecast_thresholds_pct": [
+        100.0
+      ]
+    }
+  },
+  "scenario": {
+    "scenarios": [
+      "bench/scenarios/finetune-blur-freeze-cpu.yaml"
+    ]
+  },
+  "metrics": {
+    "region": "us-east-2",
+    "machine": "cpu",
+    "instance_type": "c7i.4xlarge",
+    "instance_id": "i-0d16559ef0ce5d3be",
+    "image": {
+      "id": "ami-02ad619be5bc165df",
+      "name": "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-20261017"
+    },
+    "launched_at": "2026-10-23T10:44:57+00:00",
+    "terminated_at": "2026-10-23T11:40:19.389999+00:00",
+    "billed_s": 3323,
+    "hourly_usd": 0.7256,
+    "scenarios": [
+      {
+        "scenario": "bench/scenarios/finetune-blur-freeze-cpu.yaml",
+        "ok": true,
+        "error": null
+      }
+    ],
+    "results_files": [
+      "2026-10-23-finetune-blur-freeze-cpu-01M5M8XS8CZE80DDDR5ST935H8.json",
+      "2026-10-23-finetune-blur-freeze-cpu-blur-mix-01M5M6W4YS6X7W3W3X4SMHHVKE.json",
+      "2026-10-23-finetune-blur-freeze-cpu-control-01M5M7HP8VHTH2BCXVJDB3260W.json",
+      "2026-10-23-finetune-blur-freeze-cpu-base-blur-3-01M5M7K53MVX0E4SDDE025KPTS.json",
+      "2026-10-23-finetune-blur-freeze-cpu-base-blur-6-01M5M7MKMQ01DCEYB7HGTDJ1MA.json",
+      "2026-10-23-finetune-blur-freeze-cpu-base-clean-01M5M7HPCTD029W2R1DGDH104Y.json",
+      "2026-10-23-finetune-blur-freeze-cpu-base-noise-25-01M5M7P2WKM27CKES1QZ07D40G.json",
+      "2026-10-23-finetune-blur-freeze-cpu-blur-mix-blur-3-01M5M7S8CDCQV63F9W7DX81PRT.json",
+      "2026-10-23-finetune-blur-freeze-cpu-blur-mix-blur-6-01M5M7TTAFKQA1MQ157Q8GWB5G.json",
+      "2026-10-23-finetune-blur-freeze-cpu-blur-mix-clean-01M5M7QSEJQJQ720Z0K7J7PFPR.json",
+      "2026-10-23-finetune-blur-freeze-cpu-blur-mix-noise-25-01M5M7WG210NYZ3P501RAFMCG0.json",
+      "2026-10-23-finetune-blur-freeze-cpu-control-blur-3-01M5M7ZQ9TSM1HQWR32D4NS6MY.json",
+      "2026-10-23-finetune-blur-freeze-cpu-control-blur-6-01M5M813B59G1179JZWCXDY7N7.json",
+      "2026-10-23-finetune-blur-freeze-cpu-control-clean-01M5M7YAPMXMY0CBVVZKEAD8PX.json",
+      "2026-10-23-finetune-blur-freeze-cpu-control-noise-25-01M5M82FNABRFDSEH5RFMCXMDC.json",
+      "01M5M7HPCTD029W2R1DGDH104Y.jsonl.gz",
+      "01M5M7K53MVX0E4SDDE025KPTS.jsonl.gz",
+      "01M5M7MKMQ01DCEYB7HGTDJ1MA.jsonl.gz",
+      "01M5M7P2WKM27CKES1QZ07D40G.jsonl.gz",
+      "01M5M7QSEJQJQ720Z0K7J7PFPR.jsonl.gz",
+      "01M5M7S8CDCQV63F9W7DX81PRT.jsonl.gz",
+      "01M5M7TTAFKQA1MQ157Q8GWB5G.jsonl.gz",
+      "01M5M7WG210NYZ3P501RAFMCG0.jsonl.gz",
+      "01M5M7YAPMXMY0CBVVZKEAD8PX.jsonl.gz",
+      "01M5M7ZQ9TSM1HQWR32D4NS6MY.jsonl.gz",
+      "01M5M813B59G1179JZWCXDY7N7.jsonl.gz",
+      "01M5M82FNABRFDSEH5RFMCXMDC.jsonl.gz",
+      "finetune-blur-freeze-cpu-blur-mix.pt",
+      "finetune-blur-freeze-cpu-control.pt"
+    ],
+    "error": null,
+    "teardown_verified": true,
+    "leftovers": [],
+    "teardown_errors": [],
+    "hardware_is": "instance"
+  },
+  "cost_usd": 0.6697,
+  "notes": "cost estimated from configs/cloud.yaml prices; billing data lags a day"
+}

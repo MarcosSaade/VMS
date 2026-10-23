@@ -100,7 +100,7 @@ After each step the README headline numbers and the write-up are updated.
   - Understand it: an alert fires on one camera at 3 a.m.; what do you check, in order?
 - [x] 9.5 Detector fine-tune on drifted data: before/after mAP on drifted and clean sets (SHRINK: no sweep, no W&B). Done 2026-10-19 on AWS CPU (E-060, E-061, D36): negative, blur augmentation +4.4 MOT17 mAP at blur 6 over a no-blur control but the recipe loses 2 to 7 points elsewhere; not deployed
   - Understand it: did fine-tuning help the drifted set without hurting the clean set, and why is augmentation not real domain shift?
-- [ ] 9.6 Fine-tune follow-up (added 2026-10-19): one recipe change (freeze the backbone, or no warmup) against the same control and the same eval, to test whether 9.5's loss comes from the recipe; AWS CPU, ~$0.80. Change chosen before running 2026-10-23: frozen backbone (D39, `finetune-blur-freeze-cpu.yaml`)
+- [ ] 9.6 Fine-tune follow-up (added 2026-10-19): one recipe change (freeze the backbone, or no warmup) against the same control and the same eval, to test whether 9.5's loss comes from the recipe; AWS CPU, ~$0.80. Change chosen before running 2026-10-23: frozen backbone (D39, `finetune-blur-freeze-cpu.yaml`). Run 2026-10-23 (E-067, $0.67): control's clean loss -5.6/-3.2 -> -3.0/+0.5 (COCO/MOT17), but the blur gain shrinks to +1.2 on MOT17 blur 6; not deployed. Done criteria met; ticks when "Understand it" is answered
   - Understand it: what did the one change do to the control's loss on clean video, and does blur training now help without hurting clean?
 
 ## Phase 11: Packaging

@@ -476,6 +476,26 @@ blur-mix against the control (the effect of the blur augmentation alone), COCO /
 - **Likely causes (untested)**: 800 COCO images for 80 classes in a fine-tune of every layer (forgetting the rest of COCO), and Ultralytics' default 3-epoch warmup (bias lr 0.1) applied to an already trained head. A follow-up would change one thing at a time against this control (frozen backbone; no warmup), not sweep.
 - CPU limits the set to 1,567 images and 10 epochs; the result is about this recipe, not an upper bound on what fine-tuning can recover. Weights: `models/finetune/*.pt` (DVC). Evidence: [summary](../bench/results/2026-10-19-finetune-blur-cpu-01M5ADGCCBWNYCCAZ5RMPVKG17.json), [blur-mix training](../bench/results/2026-10-19-finetune-blur-cpu-blur-mix-01M5A9CNW3HAERH1M2GSB1EBH9.json), [control training](../bench/results/2026-10-19-finetune-blur-cpu-control-01M5AACJBSVWAPRAK2XSZZTRW9.json).
 
+### Fine-tune follow-up: frozen backbone (task 9.6; E-067, D39)
+
+9.5's recipe with one change chosen before running (D39): `freeze: 11`, so YOLO11n's backbone (layers 0 to 10, including its BatchNorm statistics) stays pretrained and only the neck and head train. Same training list v1, seed, runs, epochs and eval as 9.5; trained on `aws-c7i-4xl` (`bench/scenarios/finetune-blur-freeze-cpu.yaml`, clean commit a05e3b3), 641 s and 690 s (24 and 23 images/s, vs 16 and 15 with every layer training). **Synthetic drift**, as in 9.5.
+
+mAP@50-95 in points; change against the untouched model (paired bootstrap, 2,000 resamples, 95% intervals):
+
+| Condition | Base COCO / MOT17 | blur-mix COCO | change | blur-mix MOT17 | change | control COCO | change | control MOT17 | change |
+|---|---|---|---|---|---|---|---|---|---|
+| clean | 37.9 / 40.3 | 34.4 | -3.4 [-4.2, -2.1] | 40.3 | -0.0 [-0.8, +0.8] | 34.8 | -3.0 [-3.8, -2.2] | 40.8 | +0.5 [-0.2, +1.3] |
+| blur 3 | 33.3 / 35.1 | 31.4 | -1.9 [-3.1, -0.8] | 35.5 | +0.5 [-0.4, +1.3] | 31.3 | -2.1 [-3.3, -1.0] | 36.4 | +1.3 [+0.7, +2.1] |
+| blur 6 (target) | 26.1 / 23.2 | 24.8 | -1.2 [-1.9, -0.5] | 23.9 | +0.6 [-0.3, +1.5] | 24.3 | -1.7 [-2.6, -1.1] | 22.7 | -0.6 [-1.2, +0.1] |
+| noise 25 (untargeted) | 24.9 / 34.3 | 23.2 | -1.8 [-2.7, -1.1] | 34.8 | +0.5 [-0.1, +1.1] | 23.2 | -1.7 [-2.6, -0.9] | 35.5 | +1.2 [+0.6, +1.8] |
+
+blur-mix against the control, COCO / MOT17: clean -0.4 [-1.2, +0.9] / -0.5 [-0.9, -0.2]; blur 3 +0.1 / -0.9; **blur 6 +0.5 [-0.0, +1.2] / +1.2 [+0.5, +1.9]**; noise 25 -0.1 / -0.7. The frozen-backbone control against 9.5's control on clean images: **+2.6 [+1.4, +3.9] COCO, +3.7 [+3.0, +4.4] MOT17**.
+
+- **The change fixed most of the recipe's own loss.** Clean MOT17 goes from -3.2 (9.5 control) to +0.5 [-0.2, +1.3], no measurable loss; clean COCO from -5.6 to -3.0, halved but still a loss (D39 predicted within 2 points: missed on COCO, met on MOT17). Forgetting in the backbone explains roughly half of 9.5's COCO loss; the rest sits in the neck and head trained on 800 COCO images for 80 classes.
+- **But blur training no longer buys much.** With the backbone fixed, blur augmentation is worth +1.2 [+0.5, +1.9] on MOT17 blur 6 against the control (9.5: +4.4), and blur-mix is +0.6 [-0.3, +1.5] against the untouched model, not distinguishable from zero. Blur robustness lives in the low-level features that freezing protects, which is the trade-off D39 named.
+- **Not deployed** (D39's rule: beat the base on the blur target with no clean drop beyond 1 point): blur-mix gains nothing significant on the target and still loses 3.4 points on clean COCO. The deployed worker keeps the pretrained yolo11n. A next step, if revisited, would be a partial freeze (backbone's first stages only) or more COCO images, each again one change against a control.
+- Evidence: [summary](../bench/results/2026-10-23-finetune-blur-freeze-cpu-01M5M8XS8CZE80DDDR5ST935H8.json), [blur-mix training](../bench/results/2026-10-23-finetune-blur-freeze-cpu-blur-mix-01M5M6W4YS6X7W3W3X4SMHHVKE.json), [control training](../bench/results/2026-10-23-finetune-blur-freeze-cpu-control-01M5M7HP8VHTH2BCXVJDB3260W.json), [control vs 9.5 control](../eval/results/2026-10-23-finetune-control-freeze-vs-9.5-01M5M92VCRS3SEKY1YYBMRB1NF.json). Weights: `models/finetune/finetune-blur-freeze-cpu-*.pt` (DVC).
+
 ## Cost
 
 Per-session cost, estimated as the live catalog price x billed seconds (Runpod) or configured price x billed seconds (AWS); each session's results file has the figure.
@@ -489,6 +509,8 @@ Per-session cost, estimated as the live catalog price x billed seconds (Runpod) 
 | GPU session 2, attempt 2: no public SSH port, nothing ran (E-063) | runpod-a40, $0.595/h | 905 s | $0.150 | `bench/results/2026-10-19-gpu-session-01M5ACHRPBFSA4CFTHBP2RHJB0.json` |
 | GPU session 2: ladder with mAP, two TensorRT sweeps (E-064) | runpod-a40, $0.595/h | 1,540 s | $0.255 | `bench/results/2026-10-19-gpu-session-01M5ADM7DVEKN4CGVGW2Q6RDRK.json` |
 | GPU session 3: ladder speed and FP16 sweep, quota-sized threads (E-065) | runpod-a40, $0.595/h | 852 s | $0.141 | `bench/results/2026-10-19-gpu-session-01M5AG2G0NKR8DSCBAW4BTC6ZD.json` |
+| AWS CPU session 3: 9.6 frozen-backbone fine-tune, two trainings and 12 evals (E-067) | aws-c7i-4xl, $0.726/h | 3,323 s | $0.670 | `bench/results/2026-10-23-cpu-session-01M5M5T54VBV81BY941EPWDMA6.json` |
+| LLM session 1, attempt 1: vLLM servers failed at warmup (no nvcc), stopped by hand (E-066) | runpod-a40, $0.611/h | 595 s | $0.101 | `bench/results/2026-10-23-gpu-session-01M5M79GH2QWWJ4GNFRSV4Q29F.json` |
 
 Cost per camera-hour at full scale: placeholder (task 10.3). Measured so far: $0.12 per camera-hour of on-demand CPU compute on aws-c7i-2xl (3 rated cameras, E-059).
 

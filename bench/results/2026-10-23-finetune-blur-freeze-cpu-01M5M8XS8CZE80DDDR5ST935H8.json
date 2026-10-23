@@ -1,0 +1,871 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5M8XS8CZE80DDDR5ST935H8",
+  "name": "finetune-blur-freeze-cpu",
+  "kind": "train.finetune",
+  "started_at": "2026-10-23T10:52:24.129450Z",
+  "ended_at": "2026-10-23T11:39:17.644108Z",
+  "seed": 20261019,
+  "git": {
+    "sha": "a05e3b3880c5d583b70b4b38cdc274afcf82468c",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Platinum 8488C",
+    "logical_cpus": 16,
+    "cpu_quota": null,
+    "ram_bytes": 33081987072,
+    "platform": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "torch": "2.14.1+cpu",
+    "torchvision": "0.29.1+cpu",
+    "ultralytics": "8.4.175",
+    "opencv-python": null
+  },
+  "config": {
+    "service": "eval-detection",
+    "env": "local",
+    "seed": 1234,
+    "log": {
+      "level": "INFO"
+    },
+    "telemetry": {
+      "enabled": true,
+      "otlp_endpoint": null,
+      "otlp_insecure": true,
+      "export_timeout_s": 10.0,
+      "sample_ratio": 1.0
+    },
+    "paths": {
+      "spec": "configs/eval/detection.v1.yaml",
+      "subset": "eval/detection/subset.v1.jsonl",
+      "manifest": "eval/detection/subset.v1.json",
+      "images_dir": "data/eval/detection/v1",
+      "fetch_workers": 8
+    },
+    "results_dir": "eval/results",
+    "predictions_dir": "data/eval/detection/predictions",
+    "sources": [
+      "coco",
+      "mot17"
+    ],
+    "detector": {
+      "weights": "yolo11n",
+      "backend": "ultralytics",
+      "precision": "fp32",
+      "device": "cpu",
+      "imgsz": 640,
+      "conf": 0.001,
+      "iou": 0.7,
+      "max_det": 300,
+      "threads": null,
+      "spin": true
+    },
+    "max_dets_per_class": 100,
+    "mot_frame": {
+      "width": 1280,
+      "height": 720,
+      "jpeg_quality": 85
+    },
+    "bootstrap": {
+      "seed": 20261014,
+      "resamples": 2000,
+      "confidence": 0.95
+    },
+    "drift": null,
+    "max_images": null
+  },
+  "scenario": {
+    "name": "finetune-blur-freeze-cpu",
+    "description": "Task 9.6: 9.5's recipe (finetune-blur-cpu.yaml, D36) with exactly one change, the backbone frozen (Ultralytics `freeze: 11`: layers 0 to 10 of YOLO11n, the convolutional backbone, SPPF and C2PSA), so only the neck and the Detect head adapt. Picked before running (D39): 9.5's no-blur control lost 3 to 6 points on every condition (E-061), which points at forgetting in 800 COCO images for 80 classes; of the two candidate changes, the warmup's high bias learning rate is already off under the automatic AdamW optimizer (Ultralytics 8.4.175 sets warmup_bias_lr to 0 for Adam), so dropping warmup would change only a 3-epoch ramp, while freezing keeps the pretrained features that the forgetting hypothesis says are being overwritten. Everything else is 9.5's: training list v1, seed, 10 epochs, batch 16, imgsz 640, no mosaic, last epoch kept, a blur-mix run and a no-blur control, the same eval (detection subset v1 clean, blur 3 and 6, noise 25; COCO and MOT17; paired bootstrap).\n",
+    "kind": "finetune",
+    "seed": 20261019,
+    "data_spec": "configs/finetune.v1.yaml",
+    "data_lock": "configs/finetune.v1.lock.jsonl",
+    "images_dir": "data/finetune/images/v1",
+    "dataset_dir": "data/finetune/runs",
+    "artifacts_dir": "models/finetune",
+    "base_weights": "yolo11n",
+    "train": {
+      "epochs": 10,
+      "imgsz": 640,
+      "batch": 16,
+      "workers": 0,
+      "close_mosaic": 10,
+      "val_images": 64,
+      "extra": {
+        "freeze": 11
+      }
+    },
+    "runs": [
+      {
+        "name": "blur-mix",
+        "blur": {
+          "fraction": 0.5,
+          "sigma_min": 1.0,
+          "sigma_max": 8.0
+        }
+      },
+      {
+        "name": "control",
+        "role": "control",
+        "blur": {
+          "fraction": 0.0
+        }
+      }
+    ],
+    "eval": {
+      "detector": {
+        "backend": "ultralytics"
+      }
+    },
+    "conditions": [
+      {
+        "name": "blur-3",
+        "drift": {
+          "kind": "blur",
+          "strength": 3.0
+        }
+      },
+      {
+        "name": "blur-6",
+        "drift": {
+          "kind": "blur",
+          "strength": 6.0
+        }
+      },
+      {
+        "name": "noise-25",
+        "drift": {
+          "kind": "noise",
+          "strength": 25.0
+        }
+      }
+    ]
+  },
+  "metrics": {
+    "base": {
+      "clean": {
+        "coco": {
+          "value": 0.3785216267167187,
+          "ci_lo": 0.3613692141684093,
+          "ci_hi": 0.42171466147560643,
+          "boot_std": 0.015361857728920856,
+          "boot_mean": 0.3917088763294914
+        },
+        "mot17": {
+          "value": 0.40316007467229786,
+          "ci_lo": 0.3861509879103355,
+          "ci_hi": 0.41979876919797376,
+          "boot_std": 0.00841383286571434,
+          "boot_mean": 0.4037581025629396
+        }
+      },
+      "blur-3": {
+        "coco": {
+          "value": 0.3334158093714319,
+          "ci_lo": 0.32051717357681037,
+          "ci_hi": 0.3782204530102813,
+          "boot_std": 0.014598149323642593,
+          "boot_mean": 0.3485667717413629
+        },
+        "mot17": {
+          "value": 0.3506407497368428,
+          "ci_lo": 0.33609453074402285,
+          "ci_hi": 0.3659381831389301,
+          "boot_std": 0.0077329493370461196,
+          "boot_mean": 0.3513882308383366
+        }
+      },
+      "blur-6": {
+        "coco": {
+          "value": 0.26052952351500885,
+          "ci_lo": 0.24543856371332406,
+          "ci_hi": 0.30153309874285394,
+          "boot_std": 0.014555651107192162,
+          "boot_mean": 0.27374724936189826
+        },
+        "mot17": {
+          "value": 0.2323265399194629,
+          "ci_lo": 0.21935595819559092,
+          "ci_hi": 0.24674361026791802,
+          "boot_std": 0.007097115145607305,
+          "boot_mean": 0.23269787077818832
+        }
+      },
+      "noise-25": {
+        "coco": {
+          "value": 0.24925228859684975,
+          "ci_lo": 0.23678568313994672,
+          "ci_hi": 0.2894580994458041,
+          "boot_std": 0.013492462965929,
+          "boot_mean": 0.26306477912787946
+        },
+        "mot17": {
+          "value": 0.34314301296149197,
+          "ci_lo": 0.3285363981085029,
+          "ci_hi": 0.35810740933911533,
+          "boot_std": 0.0075760526207773425,
+          "boot_mean": 0.34386363668608066
+        }
+      }
+    },
+    "trained": {
+      "blur-mix": {
+        "weights": "models/finetune/finetune-blur-freeze-cpu-blur-mix.pt",
+        "sha256": "b0e927a8f39e8e5958eb5b13bf2449e8d412a06d4b3f6789e8d773a05808ca9f",
+        "results_file": "bench/results/2026-10-23-finetune-blur-freeze-cpu-blur-mix-01M5M6W4YS6X7W3W3X4SMHHVKE.json",
+        "train_s": 641.044418914,
+        "images_per_s": 24.444483935367085,
+        "blurred": 787
+      },
+      "control": {
+        "weights": "models/finetune/finetune-blur-freeze-cpu-control.pt",
+        "sha256": "0dc18898249f1bf35ac881572d1431408387355bae2478e1207003073c75041e",
+        "results_file": "bench/results/2026-10-23-finetune-blur-freeze-cpu-control-01M5M7HP8VHTH2BCXVJDB3260W.json",
+        "train_s": 690.2065452869999,
+        "images_per_s": 22.703348884476515,
+        "blurred": 0
+      }
+    },
+    "runs": {
+      "blur-mix": {
+        "vs_base": {
+          "clean": {
+            "coco": {
+              "base_map50_95": 0.3785083465305002,
+              "map50_95": {
+                "value": 0.344189392605836,
+                "ci_lo": 0.32907540755348264,
+                "ci_hi": 0.3909441769287458,
+                "boot_std": 0.015488245893150301,
+                "boot_mean": 0.3598885898139486
+              },
+              "delta_map50_95": {
+                "value": -0.03431895392466422,
+                "ci_lo": -0.04196351534393846,
+                "ci_hi": -0.021229721087392444,
+                "boot_std": 0.005105956419083787,
+                "boot_mean": -0.03180993013699816
+              },
+              "delta_map50": {
+                "value": -0.036806396551566756,
+                "ci_lo": -0.044787440042804376,
+                "ci_hi": -0.019118912906265422,
+                "boot_std": 0.006652648390998627,
+                "boot_mean": -0.032413503871222216
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.4031073368254817,
+              "map50_95": {
+                "value": 0.4026171294765497,
+                "ci_lo": 0.3863097873774282,
+                "ci_hi": 0.41971576090241464,
+                "boot_std": 0.008486178953523747,
+                "boot_mean": 0.40344069847874
+              },
+              "delta_map50_95": {
+                "value": -0.0004902073489320147,
+                "ci_lo": -0.007708946211463967,
+                "ci_hi": 0.007772490871105207,
+                "boot_std": 0.00388869774596408,
+                "boot_mean": -0.0002555252733261937
+              },
+              "delta_map50": {
+                "value": -0.005242011076894593,
+                "ci_lo": -0.015692702303912412,
+                "ci_hi": 0.005694698699340933,
+                "boot_std": 0.005500385571659854,
+                "boot_mean": -0.005062268125959537
+              }
+            }
+          },
+          "blur-3": {
+            "coco": {
+              "base_map50_95": 0.33343482047983347,
+              "map50_95": {
+                "value": 0.3142486190491342,
+                "ci_lo": 0.30150793182002095,
+                "ci_hi": 0.35766841298265145,
+                "boot_std": 0.014334610755723714,
+                "boot_mean": 0.3291080796780327
+              },
+              "delta_map50_95": {
+                "value": -0.019186201430699268,
+                "ci_lo": -0.030635585465539163,
+                "ci_hi": -0.00809586651637495,
+                "boot_std": 0.005705698953444321,
+                "boot_mean": -0.01947243911517501
+              },
+              "delta_map50": {
+                "value": -0.014152741076974229,
+                "ci_lo": -0.025850911286254035,
+                "ci_hi": -0.0019093757586914105,
+                "boot_std": 0.006213835077001168,
+                "boot_mean": -0.014573548673373573
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.3507263758907569,
+              "map50_95": {
+                "value": 0.3554812701343908,
+                "ci_lo": 0.3390462835937676,
+                "ci_hi": 0.37230114984563484,
+                "boot_std": 0.008557609912179407,
+                "boot_mean": 0.355958081088641
+              },
+              "delta_map50_95": {
+                "value": 0.0047548942436339,
+                "ci_lo": -0.003598609599814743,
+                "ci_hi": 0.01316500632898263,
+                "boot_std": 0.0042408173660012285,
+                "boot_mean": 0.004489951383054194
+              },
+              "delta_map50": {
+                "value": -0.00026220877829663536,
+                "ci_lo": -0.013924497641487382,
+                "ci_hi": 0.011385668733001808,
+                "boot_std": 0.006616288711108137,
+                "boot_mean": -0.001700636634798831
+              }
+            }
+          },
+          "blur-6": {
+            "coco": {
+              "base_map50_95": 0.260499729727586,
+              "map50_95": {
+                "value": 0.2482213715556116,
+                "ci_lo": 0.23390702920950154,
+                "ci_hi": 0.28991357780463245,
+                "boot_std": 0.014321598184641895,
+                "boot_mean": 0.2615138068936099
+              },
+              "delta_map50_95": {
+                "value": -0.012278358171974396,
+                "ci_lo": -0.01949733426958922,
+                "ci_hi": -0.0052257095533397024,
+                "boot_std": 0.003623706613247633,
+                "boot_mean": -0.012202662095921106
+              },
+              "delta_map50": {
+                "value": -0.010772802829900507,
+                "ci_lo": -0.021001881934514636,
+                "ci_hi": -0.0018984439535181198,
+                "boot_std": 0.004824238709274266,
+                "boot_mean": -0.011374761720830366
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.23227875189749123,
+              "map50_95": {
+                "value": 0.23858517532325613,
+                "ci_lo": 0.22382651491392577,
+                "ci_hi": 0.2562932975241643,
+                "boot_std": 0.008330112959150485,
+                "boot_mean": 0.23902099755133002
+              },
+              "delta_map50_95": {
+                "value": 0.006306423425764901,
+                "ci_lo": -0.0029668354951721005,
+                "ci_hi": 0.015445578971320716,
+                "boot_std": 0.0047103822723022154,
+                "boot_mean": 0.006372592440099068
+              },
+              "delta_map50": {
+                "value": 0.0009294977399380011,
+                "ci_lo": -0.015949993090575168,
+                "ci_hi": 0.018847675134954597,
+                "boot_std": 0.008909958772224917,
+                "boot_mean": 0.0010997424833635687
+              }
+            }
+          },
+          "noise-25": {
+            "coco": {
+              "base_map50_95": 0.24925378375676968,
+              "map50_95": {
+                "value": 0.2315219549076248,
+                "ci_lo": 0.21941686660577414,
+                "ci_hi": 0.26941368429770113,
+                "boot_std": 0.013031377723427233,
+                "boot_mean": 0.2441210677476917
+              },
+              "delta_map50_95": {
+                "value": -0.01773182884914487,
+                "ci_lo": -0.02698555705325857,
+                "ci_hi": -0.010814168243485595,
+                "boot_std": 0.00412951383027297,
+                "boot_mean": -0.01894576434406433
+              },
+              "delta_map50": {
+                "value": -0.02046990648280589,
+                "ci_lo": -0.030962939915995708,
+                "ci_hi": -0.01084146649260643,
+                "boot_std": 0.005155844492033397,
+                "boot_mean": -0.02092633557563394
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.3431461598529487,
+              "map50_95": {
+                "value": 0.34829004927801965,
+                "ci_lo": 0.33295931601285866,
+                "ci_hi": 0.3654534019911149,
+                "boot_std": 0.008307856580297873,
+                "boot_mean": 0.3489647571109146
+              },
+              "delta_map50_95": {
+                "value": 0.0051438894250709355,
+                "ci_lo": -0.0013728431520649567,
+                "ci_hi": 0.011412022859048493,
+                "boot_std": 0.0033782011311561263,
+                "boot_mean": 0.005093127276185726
+              },
+              "delta_map50": {
+                "value": -0.0035764576739808485,
+                "ci_lo": -0.0155649092078987,
+                "ci_hi": 0.008438566993193876,
+                "boot_std": 0.006086283328444225,
+                "boot_mean": -0.0032583220962272346
+              }
+            }
+          }
+        },
+        "vs_control": {
+          "clean": {
+            "coco": {
+              "base_map50_95": 0.3482188583990514,
+              "map50_95": {
+                "value": 0.344189392605836,
+                "ci_lo": 0.32907540755348264,
+                "ci_hi": 0.3909441769287458,
+                "boot_std": 0.015488245893150301,
+                "boot_mean": 0.3598885898139486
+              },
+              "delta_map50_95": {
+                "value": -0.004029465793215448,
+                "ci_lo": -0.011619574060973352,
+                "ci_hi": 0.008519333032550229,
+                "boot_std": 0.005123146054741505,
+                "boot_mean": -0.0015746009793081233
+              },
+              "delta_map50": {
+                "value": 0.00014843320150759176,
+                "ci_lo": -0.007410664456135993,
+                "ci_hi": 0.01572553777887412,
+                "boot_std": 0.005814723908398529,
+                "boot_mean": 0.003695173424818826
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.40801527993111575,
+              "map50_95": {
+                "value": 0.4026171294765497,
+                "ci_lo": 0.3863097873774282,
+                "ci_hi": 0.41971576090241464,
+                "boot_std": 0.008486178953523747,
+                "boot_mean": 0.40344069847874
+              },
+              "delta_map50_95": {
+                "value": -0.005398150454566042,
+                "ci_lo": -0.009293224234990011,
+                "ci_hi": -0.0018391264841566093,
+                "boot_std": 0.001862023994477103,
+                "boot_mean": -0.005526961037571036
+              },
+              "delta_map50": {
+                "value": -0.006939564061400394,
+                "ci_lo": -0.01339884778835993,
+                "ci_hi": -0.0021793020372947516,
+                "boot_std": 0.0028644745136499335,
+                "boot_mean": -0.007942743175158435
+              }
+            }
+          },
+          "blur-3": {
+            "coco": {
+              "base_map50_95": 0.3129125221376357,
+              "map50_95": {
+                "value": 0.3142486190491342,
+                "ci_lo": 0.30150793182002095,
+                "ci_hi": 0.35766841298265145,
+                "boot_std": 0.014334610755723714,
+                "boot_mean": 0.3291080796780327
+              },
+              "delta_map50_95": {
+                "value": 0.0013360969114984966,
+                "ci_lo": -0.0062003391173347565,
+                "ci_hi": 0.009648249673717225,
+                "boot_std": 0.003964061237288971,
+                "boot_mean": 0.002154152547864748
+              },
+              "delta_map50": {
+                "value": 0.00040596431055067717,
+                "ci_lo": -0.009430989482803949,
+                "ci_hi": 0.010274865511682486,
+                "boot_std": 0.004974295263720374,
+                "boot_mean": 0.0009624087019253792
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.36416019088644147,
+              "map50_95": {
+                "value": 0.3554812701343908,
+                "ci_lo": 0.3390462835937676,
+                "ci_hi": 0.37230114984563484,
+                "boot_std": 0.008557609912179407,
+                "boot_mean": 0.355958081088641
+              },
+              "delta_map50_95": {
+                "value": -0.008678920752050678,
+                "ci_lo": -0.01236607091588494,
+                "ci_hi": -0.005269633149070308,
+                "boot_std": 0.0018151978231020934,
+                "boot_mean": -0.008717980994164053
+              },
+              "delta_map50": {
+                "value": -0.03122252366380418,
+                "ci_lo": -0.040860573871641,
+                "ci_hi": -0.024149053001915752,
+                "boot_std": 0.004254275859060147,
+                "boot_mean": -0.03249665892607661
+              }
+            }
+          },
+          "blur-6": {
+            "coco": {
+              "base_map50_95": 0.24340376632881675,
+              "map50_95": {
+                "value": 0.2482213715556116,
+                "ci_lo": 0.23390702920950154,
+                "ci_hi": 0.28991357780463245,
+                "boot_std": 0.014321598184641895,
+                "boot_mean": 0.2615138068936099
+              },
+              "delta_map50_95": {
+                "value": 0.004817605226794863,
+                "ci_lo": -0.00022208300106696258,
+                "ci_hi": 0.012049336024767508,
+                "boot_std": 0.003209939294743417,
+                "boot_mean": 0.005765539917510819
+              },
+              "delta_map50": {
+                "value": 0.005212464679094697,
+                "ci_lo": -0.003062237021162833,
+                "ci_hi": 0.014771197914015783,
+                "boot_std": 0.004574299702229818,
+                "boot_mean": 0.005554683977158774
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.22671936793989406,
+              "map50_95": {
+                "value": 0.23858517532325613,
+                "ci_lo": 0.22382651491392577,
+                "ci_hi": 0.2562932975241643,
+                "boot_std": 0.008330112959150485,
+                "boot_mean": 0.23902099755133002
+              },
+              "delta_map50_95": {
+                "value": 0.01186580738336207,
+                "ci_lo": 0.00470727826536472,
+                "ci_hi": 0.0187788934886732,
+                "boot_std": 0.0036588174066515397,
+                "boot_mean": 0.011671993435307133
+              },
+              "delta_map50": {
+                "value": -0.011674203772306768,
+                "ci_lo": -0.02655095472347172,
+                "ci_hi": 0.004483591161239278,
+                "boot_std": 0.008046051977670186,
+                "boot_mean": -0.01099150973443474
+              }
+            }
+          },
+          "noise-25": {
+            "coco": {
+              "base_map50_95": 0.23222559079406502,
+              "map50_95": {
+                "value": 0.2315219549076248,
+                "ci_lo": 0.21941686660577414,
+                "ci_hi": 0.26941368429770113,
+                "boot_std": 0.013031377723427233,
+                "boot_mean": 0.2441210677476917
+              },
+              "delta_map50_95": {
+                "value": -0.000703635886440207,
+                "ci_lo": -0.008329236621319245,
+                "ci_hi": 0.0057521976892407215,
+                "boot_std": 0.003528242288337452,
+                "boot_mean": -0.0014828301122970173
+              },
+              "delta_map50": {
+                "value": -0.0010124229084164105,
+                "ci_lo": -0.012168876352102027,
+                "ci_hi": 0.009910185979994629,
+                "boot_std": 0.005473961304519304,
+                "boot_mean": -0.0016782522340947263
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.3553518526358153,
+              "map50_95": {
+                "value": 0.34829004927801965,
+                "ci_lo": 0.33295931601285866,
+                "ci_hi": 0.3654534019911149,
+                "boot_std": 0.008307856580297873,
+                "boot_mean": 0.3489647571109146
+              },
+              "delta_map50_95": {
+                "value": -0.00706180335779566,
+                "ci_lo": -0.010771028563288043,
+                "ci_hi": -0.0031588562877271054,
+                "boot_std": 0.001896755038347543,
+                "boot_mean": -0.006844932901685473
+              },
+              "delta_map50": {
+                "value": -0.026374019501364754,
+                "ci_lo": -0.034042081452443855,
+                "ci_hi": -0.016208791089787556,
+                "boot_std": 0.004525381484558104,
+                "boot_mean": -0.025112111612310382
+              }
+            }
+          }
+        }
+      },
+      "control": {
+        "vs_base": {
+          "clean": {
+            "coco": {
+              "base_map50_95": 0.3785083465305002,
+              "map50_95": {
+                "value": 0.3482188583990514,
+                "ci_lo": 0.3306473340455532,
+                "ci_hi": 0.3922992104115761,
+                "boot_std": 0.015434077178324176,
+                "boot_mean": 0.3614631907932568
+              },
+              "delta_map50_95": {
+                "value": -0.030289488131448772,
+                "ci_lo": -0.03811701862413774,
+                "ci_hi": -0.022079898913115244,
+                "boot_std": 0.00403851379777364,
+                "boot_mean": -0.03023532915769004
+              },
+              "delta_map50": {
+                "value": -0.03695482975307435,
+                "ci_lo": -0.04770884444424428,
+                "ci_hi": -0.023975992065239097,
+                "boot_std": 0.006109836654293646,
+                "boot_mean": -0.03610867729604105
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.4031073368254817,
+              "map50_95": {
+                "value": 0.40801527993111575,
+                "ci_lo": 0.39011296835332876,
+                "ci_hi": 0.4259909008369406,
+                "boot_std": 0.008995804352092057,
+                "boot_mean": 0.408967659516311
+              },
+              "delta_map50_95": {
+                "value": 0.004907943105634027,
+                "ci_lo": -0.0020720399313292584,
+                "ci_hi": 0.01338506320363927,
+                "boot_std": 0.003880686877327208,
+                "boot_mean": 0.0052714357642448416
+              },
+              "delta_map50": {
+                "value": 0.0016975529845058013,
+                "ci_lo": -0.007329398258384769,
+                "ci_hi": 0.01329152194281665,
+                "boot_std": 0.0052565635834495306,
+                "boot_mean": 0.0028804750491988975
+              }
+            }
+          },
+          "blur-3": {
+            "coco": {
+              "base_map50_95": 0.33343482047983347,
+              "map50_95": {
+                "value": 0.3129125221376357,
+                "ci_lo": 0.2997768853586577,
+                "ci_hi": 0.35462460857520367,
+                "boot_std": 0.01405783143879233,
+                "boot_mean": 0.32695392713016797
+              },
+              "delta_map50_95": {
+                "value": -0.020522298342197764,
+                "ci_lo": -0.032943612097838686,
+                "ci_hi": -0.010024730503095481,
+                "boot_std": 0.0057929056238818066,
+                "boot_mean": -0.02162659166303976
+              },
+              "delta_map50": {
+                "value": -0.014558705387524906,
+                "ci_lo": -0.027185505840198798,
+                "ci_hi": -0.002398244166987082,
+                "boot_std": 0.00628135264053627,
+                "boot_mean": -0.01553595737529895
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.3507263758907569,
+              "map50_95": {
+                "value": 0.36416019088644147,
+                "ci_lo": 0.34883388208866095,
+                "ci_hi": 0.38013397432030077,
+                "boot_std": 0.008079796416919426,
+                "boot_mean": 0.36467606208280495
+              },
+              "delta_map50_95": {
+                "value": 0.013433814995684579,
+                "ci_lo": 0.006521477633648319,
+                "ci_hi": 0.020524708961755504,
+                "boot_std": 0.0036552832136274656,
+                "boot_mean": 0.013207932377218248
+              },
+              "delta_map50": {
+                "value": 0.030960314885507545,
+                "ci_lo": 0.021846108913765257,
+                "ci_hi": 0.04011497066743272,
+                "boot_std": 0.0047927266248402834,
+                "boot_mean": 0.030796022291277775
+              }
+            }
+          },
+          "blur-6": {
+            "coco": {
+              "base_map50_95": 0.260499729727586,
+              "map50_95": {
+                "value": 0.24340376632881675,
+                "ci_lo": 0.22955783677977806,
+                "ci_hi": 0.28322199337481835,
+                "boot_std": 0.014347455230190374,
+                "boot_mean": 0.2557482669760991
+              },
+              "delta_map50_95": {
+                "value": -0.01709596339876926,
+                "ci_lo": -0.02604402010650181,
+                "ci_hi": -0.010775548693720174,
+                "boot_std": 0.0039284491841893475,
+                "boot_mean": -0.01796820201343193
+              },
+              "delta_map50": {
+                "value": -0.015985267508995205,
+                "ci_lo": -0.027814985116043415,
+                "ci_hi": -0.007432025878219494,
+                "boot_std": 0.005230224679151114,
+                "boot_mean": -0.01692944569798914
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.23227875189749123,
+              "map50_95": {
+                "value": 0.22671936793989406,
+                "ci_lo": 0.21137348476737441,
+                "ci_hi": 0.2447531663690344,
+                "boot_std": 0.008445807793464441,
+                "boot_mean": 0.22734900411602288
+              },
+              "delta_map50_95": {
+                "value": -0.005559383957597169,
+                "ci_lo": -0.011690888451052824,
+                "ci_hi": 0.001225949048819559,
+                "boot_std": 0.003276769440828469,
+                "boot_mean": -0.005299400995208065
+              },
+              "delta_map50": {
+                "value": 0.01260370151224477,
+                "ci_lo": 0.0017826243556332867,
+                "ci_hi": 0.021861013817530167,
+                "boot_std": 0.005114345924981193,
+                "boot_mean": 0.01209125221779831
+              }
+            }
+          },
+          "noise-25": {
+            "coco": {
+              "base_map50_95": 0.24925378375676968,
+              "map50_95": {
+                "value": 0.23222559079406502,
+                "ci_lo": 0.22018905844788528,
+                "ci_hi": 0.27043791336470774,
+                "boot_std": 0.01288546657100203,
+                "boot_mean": 0.24560389785998873
+              },
+              "delta_map50_95": {
+                "value": -0.017028192962704664,
+                "ci_lo": -0.026105962545658334,
+                "ci_hi": -0.009498896544845314,
+                "boot_std": 0.004233113497341667,
+                "boot_mean": -0.017462934231767313
+              },
+              "delta_map50": {
+                "value": -0.019457483574389478,
+                "ci_lo": -0.031162090245137598,
+                "ci_hi": -0.009249353241977343,
+                "boot_std": 0.005441321461247447,
+                "boot_mean": -0.019248083341539213
+              }
+            },
+            "mot17": {
+              "base_map50_95": 0.3431461598529487,
+              "map50_95": {
+                "value": 0.3553518526358153,
+                "ci_lo": 0.3390472092914708,
+                "ci_hi": 0.372066983528238,
+                "boot_std": 0.008511107456336667,
+                "boot_mean": 0.3558096900126001
+              },
+              "delta_map50_95": {
+                "value": 0.012205692782866595,
+                "ci_lo": 0.0063055817585811235,
+                "ci_hi": 0.01801818936935542,
+                "boot_std": 0.003092092934431745,
+                "boot_mean": 0.011938060177871199
+              },
+              "delta_map50": {
+                "value": 0.022797561827383905,
+                "ci_lo": 0.01200056812906665,
+                "ci_hi": 0.031464474400669476,
+                "boot_std": 0.0049317762497372965,
+                "boot_mean": 0.021853789516083147
+              }
+            }
+          }
+        },
+        "vs_control": {}
+      }
+    },
+    "eval_files": {
+      "base": {
+        "clean": "eval/results/2026-10-23-finetune-blur-freeze-cpu-base-clean-01M5M7HPCTD029W2R1DGDH104Y.json",
+        "blur-3": "eval/results/2026-10-23-finetune-blur-freeze-cpu-base-blur-3-01M5M7K53MVX0E4SDDE025KPTS.json",
+        "blur-6": "eval/results/2026-10-23-finetune-blur-freeze-cpu-base-blur-6-01M5M7MKMQ01DCEYB7HGTDJ1MA.json",
+        "noise-25": "eval/results/2026-10-23-finetune-blur-freeze-cpu-base-noise-25-01M5M7P2WKM27CKES1QZ07D40G.json"
+      },
+      "blur-mix": {
+        "clean": "eval/results/2026-10-23-finetune-blur-freeze-cpu-blur-mix-clean-01M5M7QSEJQJQ720Z0K7J7PFPR.json",
+        "blur-3": "eval/results/2026-10-23-finetune-blur-freeze-cpu-blur-mix-blur-3-01M5M7S8CDCQV63F9W7DX81PRT.json",
+        "blur-6": "eval/results/2026-10-23-finetune-blur-freeze-cpu-blur-mix-blur-6-01M5M7TTAFKQA1MQ157Q8GWB5G.json",
+        "noise-25": "eval/results/2026-10-23-finetune-blur-freeze-cpu-blur-mix-noise-25-01M5M7WG210NYZ3P501RAFMCG0.json"
+      },
+      "control": {
+        "clean": "eval/results/2026-10-23-finetune-blur-freeze-cpu-control-clean-01M5M7YAPMXMY0CBVVZKEAD8PX.json",
+        "blur-3": "eval/results/2026-10-23-finetune-blur-freeze-cpu-control-blur-3-01M5M7ZQ9TSM1HQWR32D4NS6MY.json",
+        "blur-6": "eval/results/2026-10-23-finetune-blur-freeze-cpu-control-blur-6-01M5M813B59G1179JZWCXDY7N7.json",
+        "noise-25": "eval/results/2026-10-23-finetune-blur-freeze-cpu-control-noise-25-01M5M82FNABRFDSEH5RFMCXMDC.json"
+      }
+    }
+  },
+  "cost_usd": 0.5671,
+  "notes": "delta = fine-tuned - base (vs_base) or treatment - control (vs_control), mAP points as fractions, paired percentile bootstrap over images. Blur is a synthetic augmentation, not real defocus or fog; the MOT17 gain includes adapting to MOT's amodal box convention, which the control run isolates.; CPU session 01M5M5T54VBV81BY941EPWDMA6 (c7i.4xlarge)"
+}

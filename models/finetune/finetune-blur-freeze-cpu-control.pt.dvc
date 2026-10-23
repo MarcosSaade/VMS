@@ -1,0 +1,5 @@
+outs:
+- md5: c53d7e0c3ab8da1af0802b8c33bab33e
+  size: 5538522
+  hash: md5
+  path: finetune-blur-freeze-cpu-control.pt
