@@ -21,12 +21,16 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import os
 import random
 import sys
 import time
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
+
+# Before torch allocates: fewer fragmentation OOMs with the varying batch shapes.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import torch
 from peft import LoraConfig, get_peft_model
@@ -109,6 +113,36 @@ def versions() -> dict[str, str | None]:
     return out
 
 
+def fit_micro_batch(
+    model: Any,
+    data: list[tuple[list[int], list[int]]],
+    micro: int,
+    accum: int,
+    pad: int,
+    device: str,
+) -> tuple[int, int, list[int]]:
+    """Largest micro-batch, at most `micro`, whose forward and backward on the longest
+    examples fit in GPU memory; the accumulation grows to keep the effective batch. Returns
+    (micro-batch, accumulation, the sizes that ran out of memory)."""
+    longest = sorted(range(len(data)), key=lambda i: -len(data[i][0]))
+    failed: list[int] = []
+    while True:
+        batch = collate(data, longest[:micro], pad, device)
+        try:
+            out = model(**batch, num_items_in_batch=target_tokens(batch["labels"]))
+            out.loss.backward()
+            model.zero_grad(set_to_none=True)
+            return micro, accum, failed
+        except torch.OutOfMemoryError:
+            model.zero_grad(set_to_none=True)
+            del batch
+            torch.cuda.empty_cache()
+            if micro == 1:
+                raise
+            failed.append(micro)
+            micro, accum = micro // 2, accum * 2
+
+
 @torch.no_grad()
 def eval_loss(
     model: Any, data: list[tuple[list[int], list[int]]], size: int, pad: int, device: str
@@ -167,6 +201,11 @@ def main(spec_path: str) -> int:
     optimizer = torch.optim.AdamW(params, lr=hp["learning_rate"], weight_decay=hp["weight_decay"])
     load_s = time.perf_counter() - t0
 
+    micro_fails: list[int] = []
+    if device == "cuda":
+        hp["micro_batch"], hp["grad_accum"], micro_fails = fit_micro_batch(
+            model, train, hp["micro_batch"], hp["grad_accum"], pad, device
+        )
     rng = random.Random(seed)
     per_step = hp["micro_batch"] * hp["grad_accum"]
     steps_per_epoch = math.ceil(len(train) / per_step)
@@ -229,6 +268,9 @@ def main(spec_path: str) -> int:
             "max_len_seen": max(len(x) for x, _ in train),
         },
         "params": {"trainable": trainable, "total": total_params},
+        "micro_batch": hp["micro_batch"],
+        "grad_accum": hp["grad_accum"],
+        "micro_batch_out_of_memory": micro_fails,
         "steps": step,
         "steps_per_epoch": steps_per_epoch,
         "warmup_steps": warmup,

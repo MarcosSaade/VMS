@@ -27,8 +27,8 @@ train:
   epochs: 2
   learning_rate: 2.0e-4
   warmup_ratio: 0.03
-  micro_batch: 4
-  grad_accum: 4
+  micro_batch: 2                # 4 ran out of memory on the 248k-vocab logits (E-071)
+  grad_accum: 8                 # effective batch 16
   max_len: 2048
   alpha_per_rank: 2.0
   dropout: 0.05
