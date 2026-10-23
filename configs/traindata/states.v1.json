@@ -1,0 +1,68 @@
+{
+ "warehouse": {
+  "version": 1,
+  "seed": 81001,
+  "now": "2026-05-14T03:15:00Z",
+  "spec": "configs/traindata/snapshot.warehouse.yaml",
+  "spec_sha256": "8b8deeefb321c8b20240f729b2fd4d816ca57845b2a1d8950962b7fec476deda",
+  "catalog": "configs/traindata/cameras.warehouse.yaml",
+  "catalog_sha256": "c7c3bbd9b75d84aa70b30b004720f66425dac75197d7aad54cf343e42f75b07c",
+  "files": {
+   "frames.csv.gz": "a9e3b9a8c2b5174ccfea47e7f5d457973c4f968f895fcb30ea804be7070aef9e",
+   "tracks.csv.gz": "99b406428203af2753359d1bbaabb07deba3f941cfff9f947ea02ff16af4b26a",
+   "detections.csv.gz": "5eddef19857e7d8cc680d11ad1e74861d8feb7e774ba724622c7e20cfb8423dd",
+   "events.csv.gz": "777651f855310d0fc9dd16b7eb8be7db84930a770033071e6ad03f99703b1348"
+  },
+  "rows": {
+   "frames": 175140,
+   "tracks": 7208,
+   "detections": 117554,
+   "events": 6228
+  },
+  "synthetic": true
+ },
+ "transit": {
+  "version": 1,
+  "seed": 81002,
+  "now": "2026-11-03T18:40:00Z",
+  "spec": "configs/traindata/snapshot.transit.yaml",
+  "spec_sha256": "636120844c8e12f84081047fee29cbba4f00f75461cc1a51a94b98b368511eca",
+  "catalog": "configs/traindata/cameras.transit.yaml",
+  "catalog_sha256": "cdf95ccdea44ff38e539532a80b4aa3c60e0f92b6f80080c31916d1a42ed6949",
+  "files": {
+   "frames.csv.gz": "ac379c93a829511ba48cc98cbb8cc528dc9aa814801bbb87d7ec5dfaaded4303",
+   "tracks.csv.gz": "66fafb1524db6c0fcfe1c48bdf6b09a93f695d19e69329c39e77da87fef6743f",
+   "detections.csv.gz": "1a162e8820f9afac6695ea03dfdcc589df0228918b319eb175449bb5e88e39ab",
+   "events.csv.gz": "119212f0c4939846d29918c997390e71c4266c6ef2852622d76c3cbe4ab420b8"
+  },
+  "rows": {
+   "frames": 186240,
+   "tracks": 40798,
+   "detections": 567006,
+   "events": 21681
+  },
+  "synthetic": true
+ },
+ "campus": {
+  "version": 1,
+  "seed": 81003,
+  "now": "2026-02-19T08:05:00Z",
+  "spec": "configs/traindata/snapshot.campus.yaml",
+  "spec_sha256": "95b9eb96510d20add0fa3a9d58edcd51310bb8a646d16c06ec2ada1b88026d3c",
+  "catalog": "configs/traindata/cameras.campus.yaml",
+  "catalog_sha256": "334efd2968473047572693af571c1ecc00989234e3c86058a116e97a0e256e6c",
+  "files": {
+   "frames.csv.gz": "f2da687e99b2307a9f38344c49e351cd345053d75e088ea944a9c570bda8dc91",
+   "tracks.csv.gz": "ff25b0668610e8c821e3bffbf497b8781b348f5d68f3c4ecc0334a66f05a4934",
+   "detections.csv.gz": "a3b2ad92a9d1993eb337223ba7686c65b4d6980b16138d0b99823d6e0f8bec8c",
+   "events.csv.gz": "f2a74afba71aaed8ff561015f9632d9297c364cecc0a6c2d236390d29b084362"
+  },
+  "rows": {
+   "frames": 178620,
+   "tracks": 19738,
+   "detections": 1387879,
+   "events": 10356
+  },
+  "synthetic": true
+ }
+}

@@ -1,0 +1,91 @@
+# Training state 'warehouse' (task 8.2): a synthetic database the generated (question, plan)
+# pairs are executed on, like the eval snapshot (configs/eval/snapshot.v1.yaml, D29) but with
+# its own cameras, timezones, dates and seed, so training questions never name eval cameras.
+# SYNTHETIC DATA. Frozen: changing it changes which pairs pass the filters.
+
+version: 1
+seed: 81001
+catalog: configs/traindata/cameras.warehouse.yaml
+start: "2026-05-04T00:00:00Z"
+now: "2026-05-14T03:15:00Z"
+
+frame_interval_s: 20          # each camera stores one processed frame every 20 s, day and night
+loiter_s: 180                 # a loiter event when a visit to a zone lasts this long
+model_version: yolo11n-synthetic-train-v1
+
+# Activity by local hour (0..23), multiplied into each class's hourly rate.
+shapes:
+  store:   [0.02, 0.01, 0.01, 0.01, 0.01, 0.02, 0.05, 0.20, 0.50, 0.70, 0.80, 0.90,
+            1.00, 0.95, 0.85, 0.80, 0.85, 0.95, 0.90, 0.70, 0.45, 0.20, 0.06, 0.03]
+  parking: [0.05, 0.03, 0.03, 0.03, 0.04, 0.08, 0.20, 0.45, 0.70, 0.80, 0.85, 0.90,
+            1.00, 0.95, 0.85, 0.80, 0.85, 0.95, 0.85, 0.65, 0.40, 0.20, 0.10, 0.07]
+  dock:    [0.05, 0.05, 0.05, 0.10, 0.40, 0.80, 1.00, 1.00, 0.90, 0.80, 0.70, 0.60,
+            0.50, 0.40, 0.30, 0.20, 0.15, 0.10, 0.08, 0.05, 0.05, 0.05, 0.05, 0.05]
+  office:  [0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.05, 0.40, 1.00, 0.80, 0.50, 0.40,
+            0.70, 0.60, 0.40, 0.40, 0.50, 0.80, 0.60, 0.25, 0.10, 0.05, 0.02, 0.01]
+
+# Detection confidence per class: [mean, sd], clipped to [0.25, 0.99].
+confidence:
+  default: [0.60, 0.10]
+  person: [0.82, 0.08]
+  car: [0.86, 0.07]
+  truck: [0.74, 0.10]
+  bicycle: [0.66, 0.10]
+  motorcycle: [0.68, 0.10]
+  dog: [0.70, 0.10]
+  handbag: [0.52, 0.10]
+  backpack: [0.56, 0.10]
+  suitcase: [0.62, 0.10]
+  umbrella: [0.58, 0.10]
+  cell phone: [0.46, 0.08]
+  bottle: [0.48, 0.08]
+
+# Untracked low-confidence detections (track_id NULL), the detector's noise.
+false_positive_classes: [person, handbag, bird, chair, potted plant]
+false_positive_confidence: [0.25, 0.45]
+run_id: train-warehouse-v1
+
+cameras:
+  - name: main_gate
+    shape: parking
+    weekend: 1.0
+    size: [1280, 720]
+    indoor: false
+    rates: {car: 10, truck: 6, person: 9, motorcycle: 1}
+    duration_s: {default: [45, 0.6], truck: [400, 0.6], car: [120, 0.8]}
+    zones:
+      gate_lane: {classes: [car, truck], p_visit: 0.8, dwell_s: [60, 0.6], p_revisit: 0.02}
+    false_positives_per_hour: 3
+
+  - name: aisle_7
+    shape: office
+    weekend: 0.4
+    size: [1280, 720]
+    indoor: true
+    rates: {person: 25}
+    duration_s: {default: [80, 0.6]}
+    zones:
+      picking_area: {classes: [person], p_visit: 0.55, dwell_s: [140, 0.6], p_revisit: 0.1}
+    false_positives_per_hour: 4
+
+  - name: shipping_bay
+    shape: dock
+    weekend: 0.3
+    size: [1280, 720]
+    indoor: false
+    rates: {truck: 4, person: 10, car: 0.8}
+    duration_s: {default: [90, 0.7], truck: [1200, 0.5]}
+    false_positives_per_hour: 2
+
+  - name: break_room
+    shape: office
+    weekend: 0.2
+    size: [1280, 720]
+    indoor: true
+    rates: {person: 14, cup: 3, chair: 0.5, laptop: 1}
+    duration_s: {default: [600, 0.6]}
+    zones:
+      coffee_corner: {classes: [person], p_visit: 0.5, dwell_s: [240, 0.6], p_revisit: 0.2}
+    false_positives_per_hour: 2
+
+max_duration_s: 14400

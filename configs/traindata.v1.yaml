@@ -1,0 +1,68 @@
+# Synthetic (question, QueryPlan) training data v1 (task 8.2; python -m vms.traindata).
+# SYNTHETIC DATA: questions and plans are written by a hosted LLM over synthetic databases.
+# The generation is seeded but the hosted model is not deterministic, so the dataset is
+# reproduced from its DVC-tracked files, not regenerated; this file, the prompt and the seed
+# record how it was made.
+
+version: 1
+seed: 20261023
+
+# Databases the pairs are executed on: synthetic snapshots with their own cameras, zones,
+# timezones and dates (configs/traindata/), none shared with the eval catalog.
+states:
+  - {name: warehouse, spec: configs/traindata/snapshot.warehouse.yaml, db: vms_train_warehouse}
+  - {name: transit, spec: configs/traindata/snapshot.transit.yaml, db: vms_train_transit}
+  - {name: campus, spec: configs/traindata/snapshot.campus.yaml, db: vms_train_campus}
+states_dir: data/traindata/states              # generated snapshot files (from spec and seed)
+states_manifest: configs/traindata/states.v1.json  # in git: row counts and file hashes
+
+# Generation A writes questions with plans in batches; generation B is the planner itself
+# (configs/query.yaml, same prompt as the service, temperature 0, one repair) on each
+# question alone, without seeing A's plan. A pair is kept only when both agree on the result.
+generator:
+  prompt: configs/prompts/traindata.v1.txt
+  questions_per_call: 15
+  temperature: 1.0
+  max_tokens: 8000               # DeepSeek's output cap; 20 per call truncated at 6000
+  response_format: json_object   # DeepSeek has no json_schema
+  timeout_s: 180
+  focuses:
+    - "counts of objects by class over relative time ranges (today, last N hours, this week)"
+    - "zone events: entries, exits and loitering in the named zones"
+    - "dwell time: how long objects stay on a camera or inside a zone"
+    - "trends: counts per hour or per day, busiest periods"
+    - "top-k rankings: which cameras, zones or classes have the most activity"
+    - "lists of recent tracks, events or detections with filters"
+    - "aggregates of detection confidence, track duration or frame quality"
+    - "explicit dates and clock times, including other weekdays and times of day"
+    - "cameras in different timezones; local times such as this morning or last night"
+    - "questions that need grouping by camera, zone, class or time bucket"
+    - "frames: asking to see images matching filters"
+    - "edge cases the planner must abstain on: comparisons, ratios, funnels, plates, faces, data changes"
+  styles:
+    - "short and terse, like a search box"
+    - "full polite sentences"
+    - "a manager asking for a report"
+    - "casual, with common typos and lowercase"
+    - "a security guard on shift"
+    - "precise and technical"
+planner_concurrency: 4
+
+budget:
+  max_cost_usd: 3.0              # user's cap (2026-10-23); generation stops before exceeding it
+  max_candidates: 8000
+  call_concurrency: 4            # generation-A calls in flight
+  model_price: deepseek-flash    # configs/eval.yaml prices
+
+candidates: data/traindata/candidates.v1.jsonl   # raw generations, appended (resumable)
+dataset_dir: train/plans.v1                      # DVC-tracked: pairs.jsonl
+results_dir: bench/results                       # the generation and filter report (data.traindata)
+
+statement_timeout_ms: 10000
+
+# Leakage against every eval question (dev and test) and the few-shot bank, on questions with
+# camera, zone and class names, numbers and dates masked. Any hit drops the pair.
+leakage:
+  min_ratio: 0.85                # difflib, as configs/eval.yaml
+  min_jaccard: 0.8
+  min_cosine: 0.9                # char 3-gram TF-IDF (a lexical embedding)

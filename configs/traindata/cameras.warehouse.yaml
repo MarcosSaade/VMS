@@ -1,0 +1,35 @@
+# Camera catalog of training state 'warehouse' (task 8.2): synthetic, disjoint from the eval
+# catalog (configs/eval/cameras.v1.yaml) in every camera and zone name. Frozen with
+# configs/traindata/snapshot.warehouse.yaml.
+
+version: 1
+
+cameras:
+  - camera_id: cam-w01
+    name: main_gate
+    site: logistics-hub
+    timezone: Asia/Tokyo
+    zones:
+      - name: gate_lane
+        polygon: [[0.1, 0.5], [0.6, 0.45], [0.7, 0.95], [0.05, 0.98]]
+
+  - camera_id: cam-w02
+    name: aisle_7
+    site: logistics-hub
+    timezone: Asia/Tokyo
+    zones:
+      - name: picking_area
+        polygon: [[0.2, 0.1], [0.8, 0.1], [0.8, 0.9], [0.2, 0.9]]
+
+  - camera_id: cam-w03
+    name: shipping_bay
+    site: logistics-hub
+    timezone: Asia/Tokyo
+
+  - camera_id: cam-w04
+    name: break_room
+    site: logistics-hub
+    timezone: Asia/Tokyo
+    zones:
+      - name: coffee_corner
+        polygon: [[0.55, 0.3], [0.95, 0.3], [0.95, 0.8], [0.55, 0.8]]

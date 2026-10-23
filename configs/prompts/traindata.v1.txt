@@ -1,0 +1,19 @@
+Now you are not answering a user. You are writing training data for the planner described
+above, for this deployment (the cameras, zones, classes and local time listed above).
+
+Write $n different questions that a person operating these cameras might type, each with the
+QueryPlan you would produce for it under the rules above.
+
+Focus of this batch: $focus
+Writing style of the questions: $style
+
+Requirements:
+- Use only the camera, zone and class names listed above, but write them the way people do
+  (e.g. "loading dock" or "the dock" for loading_dock) when the meaning stays unambiguous.
+- Vary intents, filters, time ranges, grouping and wording; no two questions may be
+  paraphrases of each other.
+- About one question in eight must be one the planner has to abstain on (ambiguous,
+  unanswerable, unsupported or disallowed), with the matching abstain plan.
+- Do not copy or lightly reword the examples above.
+
+Return one JSON object: {"pairs": [{"question": "...", "plan": {...}}, ...]}

@@ -1,0 +1,91 @@
+# Training state 'campus' (task 8.2): a synthetic database the generated (question, plan)
+# pairs are executed on, like the eval snapshot (configs/eval/snapshot.v1.yaml, D29) but with
+# its own cameras, timezones, dates and seed, so training questions never name eval cameras.
+# SYNTHETIC DATA. Frozen: changing it changes which pairs pass the filters.
+
+version: 1
+seed: 81003
+catalog: configs/traindata/cameras.campus.yaml
+start: "2026-02-09T00:00:00Z"
+now: "2026-02-19T08:05:00Z"
+
+frame_interval_s: 20          # each camera stores one processed frame every 20 s, day and night
+loiter_s: 180                 # a loiter event when a visit to a zone lasts this long
+model_version: yolo11n-synthetic-train-v1
+
+# Activity by local hour (0..23), multiplied into each class's hourly rate.
+shapes:
+  store:   [0.02, 0.01, 0.01, 0.01, 0.01, 0.02, 0.05, 0.20, 0.50, 0.70, 0.80, 0.90,
+            1.00, 0.95, 0.85, 0.80, 0.85, 0.95, 0.90, 0.70, 0.45, 0.20, 0.06, 0.03]
+  parking: [0.05, 0.03, 0.03, 0.03, 0.04, 0.08, 0.20, 0.45, 0.70, 0.80, 0.85, 0.90,
+            1.00, 0.95, 0.85, 0.80, 0.85, 0.95, 0.85, 0.65, 0.40, 0.20, 0.10, 0.07]
+  dock:    [0.05, 0.05, 0.05, 0.10, 0.40, 0.80, 1.00, 1.00, 0.90, 0.80, 0.70, 0.60,
+            0.50, 0.40, 0.30, 0.20, 0.15, 0.10, 0.08, 0.05, 0.05, 0.05, 0.05, 0.05]
+  office:  [0.00, 0.00, 0.00, 0.00, 0.00, 0.01, 0.05, 0.40, 1.00, 0.80, 0.50, 0.40,
+            0.70, 0.60, 0.40, 0.40, 0.50, 0.80, 0.60, 0.25, 0.10, 0.05, 0.02, 0.01]
+
+# Detection confidence per class: [mean, sd], clipped to [0.25, 0.99].
+confidence:
+  default: [0.60, 0.10]
+  person: [0.82, 0.08]
+  car: [0.86, 0.07]
+  truck: [0.74, 0.10]
+  bicycle: [0.66, 0.10]
+  motorcycle: [0.68, 0.10]
+  dog: [0.70, 0.10]
+  handbag: [0.52, 0.10]
+  backpack: [0.56, 0.10]
+  suitcase: [0.62, 0.10]
+  umbrella: [0.58, 0.10]
+  cell phone: [0.46, 0.08]
+  bottle: [0.48, 0.08]
+
+# Untracked low-confidence detections (track_id NULL), the detector's noise.
+false_positive_classes: [person, handbag, bird, chair, potted plant]
+false_positive_confidence: [0.25, 0.45]
+run_id: train-campus-v1
+
+cameras:
+  - name: library_door
+    shape: office
+    weekend: 0.5
+    size: [1280, 720]
+    indoor: true
+    rates: {person: 70, backpack: 30, bicycle: 1, umbrella: 3}
+    duration_s: {default: [25, 0.5]}
+    zones:
+      turnstiles: {classes: [person], p_visit: 0.85, dwell_s: [8, 0.4], p_revisit: 0.0}
+    false_positives_per_hour: 4
+
+  - name: quad
+    shape: store
+    weekend: 0.7
+    size: [1280, 720]
+    indoor: false
+    rates: {person: 60, dog: 3, bicycle: 8, skateboard: 1, sports ball: 1}
+    duration_s: {default: [70, 0.7]}
+    zones:
+      fountain: {classes: [person, dog], p_visit: 0.2, dwell_s: [200, 0.8], p_revisit: 0.05}
+    false_positives_per_hour: 3
+
+  - name: staff_parking
+    shape: parking
+    weekend: 0.2
+    size: [1280, 720]
+    indoor: false
+    rates: {car: 20, person: 10, bicycle: 1}
+    duration_s: {default: [40, 0.6], car: [20000, 0.5]}
+    false_positives_per_hour: 2
+
+  - name: lab_corridor
+    shape: office
+    weekend: 0.1
+    size: [1280, 720]
+    indoor: true
+    rates: {person: 18, laptop: 2, backpack: 3}
+    duration_s: {default: [30, 0.5]}
+    zones:
+      clean_room_door: {classes: [person], p_visit: 0.4, dwell_s: [40, 0.5], p_revisit: 0.1}
+    false_positives_per_hour: 2
+
+max_duration_s: 14400

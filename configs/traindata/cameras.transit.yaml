@@ -1,0 +1,37 @@
+# Camera catalog of training state 'transit' (task 8.2): synthetic, disjoint from the eval
+# catalog (configs/eval/cameras.v1.yaml) in every camera and zone name. Frozen with
+# configs/traindata/snapshot.transit.yaml.
+
+version: 1
+
+cameras:
+  - camera_id: cam-t01
+    name: platform_1
+    site: union-station
+    timezone: America/Los_Angeles
+    zones:
+      - name: yellow_line
+        polygon: [[0.0, 0.7], [1.0, 0.65], [1.0, 0.8], [0.0, 0.85]]
+
+  - camera_id: cam-t02
+    name: concourse
+    site: union-station
+    timezone: America/Los_Angeles
+    zones:
+      - name: ticket_machines
+        polygon: [[0.05, 0.2], [0.35, 0.2], [0.35, 0.6], [0.05, 0.6]]
+      - name: info_desk
+        polygon: [[0.6, 0.25], [0.9, 0.25], [0.9, 0.55], [0.6, 0.55]]
+
+  - camera_id: cam-t03
+    name: bike_rack
+    site: union-station
+    timezone: America/Los_Angeles
+
+  - camera_id: cam-t04
+    name: bus_bay
+    site: union-station
+    timezone: America/New_York
+    zones:
+      - name: stop_a
+        polygon: [[0.1, 0.6], [0.5, 0.6], [0.5, 0.95], [0.1, 0.95]]
