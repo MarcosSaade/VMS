@@ -8,6 +8,7 @@ What is built, with its evidence, and what comes next. Numbers live in [BENCHMAR
 - Repo, tooling and CI: uv, ruff, mypy `--strict`, pytest (unit, integration against the compose stack, GPU-marked), pre-commit, DVC with a local remote, GitHub Actions running lint, typecheck, unit and integration tests and the CPU demo.
 - Compose stack: Postgres + pgvector, SeaweedFS (S3 API, D12), OpenTelemetry collector, Prometheus, Tempo, Grafana. Redis, MLflow and W&B were removed for lack of a measured need (D16).
 - Shared library: layered YAML + environment config, structured JSON logs with trace IDs, OpenTelemetry setup, ULIDs, an injectable clock.
+- Fresh-clone test: `make setup && make up && make demo` from a clone of the public repo with empty volumes, data, weights and uv cache passes in under 6 minutes on the laptop; a port preflight in `make up` came out of it (E-079).
 
 ### End-to-end pipeline (CPU)
 - Dataset scripts with pinned checksums and license notes (MOT17, MOT20, Wikimedia Commons; VIRAT opt-in).
@@ -90,4 +91,7 @@ Docs, code comments and commit messages cite work by task number. The numbers ar
 | 2.3 | Benchmark framework | 9.6 | Fine-tune follow-up (frozen backbone) |
 | 2.4 | Rented GPU sessions | | |
 | 2.5 | Ingest ramp and query load | | |
-| 2.6 | Baseline bottleneck analysis | | |
+| 2.6 | Baseline bottleneck analysis | 11.1 | README |
+| | | 11.2 | Technical write-up |
+| | | 11.3 | Demo video |
+| | | 11.4 | Fresh-clone test |

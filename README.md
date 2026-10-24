@@ -74,7 +74,7 @@ make up      # Postgres, object store, OTel collector, Prometheus, Tempo, Grafan
 make demo    # clips, ingest, worker, query service + UI, 4 virtual cameras, example questions
 ```
 
-Then open http://localhost:8070 (camera wall and question box) and http://localhost:3000 (Grafana). Without `LLM_MODEL` the planner is a canned stand-in that answers the example questions; point `LLM_BASE_URL` and `LLM_MODEL` at any OpenAI-compatible endpoint (Ollama, vLLM, a hosted API) for open questions. `make check` runs lint, typecheck and the 1,365 unit tests; `make test-integration` runs 64 more against the stack. `make help` lists every target; [RUNBOOK.md](docs/RUNBOOK.md) covers data, benchmarks, evals, GPU sessions and troubleshooting.
+Then open http://localhost:8070 (camera wall and question box) and http://localhost:3000 (Grafana). Without `LLM_MODEL` the planner is a canned stand-in that answers the example questions; point `LLM_BASE_URL` and `LLM_MODEL` at any OpenAI-compatible endpoint (Ollama, vLLM, a hosted API) for open questions. `make check` runs lint, typecheck and the 1,371 unit tests; `make test-integration` runs 64 more against the stack. `make help` lists every target; [RUNBOOK.md](docs/RUNBOOK.md) covers data, benchmarks, evals, GPU sessions and troubleshooting.
 
 ## Stack
 

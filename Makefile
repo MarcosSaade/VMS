@@ -54,6 +54,7 @@ check: lint typecheck test ## Lint + typecheck + unit tests
 
 .PHONY: up
 up: ## Start the compose stack, wait until healthy, migrate and bootstrap the DB (PROFILES=cpu|gpu)
+	@$(COMPOSE) config --format json | $(RUN) python -m vms.common.ports $(COMPOSE_FILE)
 	$(COMPOSE) up -d --build --remove-orphans --wait --wait-timeout $(STACK_WAIT_TIMEOUT)
 	@$(MAKE) --no-print-directory migrate
 	@scripts/stack_urls.sh $(ENV_FILE)

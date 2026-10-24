@@ -102,7 +102,7 @@ Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); eve
 | Postgres + pgvector | localhost:5432 | `POSTGRES_PORT` | User/DB from `POSTGRES_*`. The `vector` extension is available but not created: embeddings are not built yet. |
 | Object store (SeaweedFS, S3 API) | http://localhost:8333 | `S3_PORT` | Credentials `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`; bucket `S3_BUCKET` is created at startup. |
 
-- Port taken on the host: set the `*_PORT` variable in `.env` and update the matching URL (`S3_ENDPOINT_URL` for `S3_PORT`), then `make up`.
+- Port taken on the host: `make up` checks the ports it publishes before starting anything (`vms.common.ports`) and names the variable to change, for example a local Postgres on 5432. Set the `*_PORT` variable in `.env` and update the matching URL (`S3_ENDPOINT_URL` for `S3_PORT`), then `make up`. Ports held by the stack's own running containers pass.
 - Profiles: `make up` activates the `cpu` profile; `make up PROFILES=gpu` activates the `gpu` profile (GPU services arrive in Phase 5 and need the NVIDIA container toolkit).
 - Credentials and database names are applied when a volume is first created. After changing `POSTGRES_*` or `S3_*` credentials, run `make down-volumes && make up`, which deletes all stack data.
 - Images are pinned by tag in the compose file. Tempo and the collector get a static busybox `wget` for health checks, because their images have no shell.
@@ -553,7 +553,8 @@ Symptom, cause and fix entries as issues are met.
 
 - Frames stay `processing` and nothing advances: a worker died holding leases. Its cameras move to another worker once `expires_at` in `camera_leases` passes (`queue.lease_ttl_s`, default 30 s), and any running worker resets the frames then. With no worker running, nothing moves: start one.
 - Worker `/readyz` never turns ready right after start: it loads and warms the model first (a few seconds on CPU; the first run also downloads the weights).
-- `make up` fails with "port is already allocated" or "address already in use": another process holds a default port. Change the `*_PORT` variable and its URL in `.env` (see Running locally).
+- `make up` stops with "Host ports the stack needs are in use by another process" (or, from Docker, "port is already allocated" / "address already in use"): another process holds a default port. Change the named `*_PORT` variable and its URL in `.env` (see Running locally).
+- Migrations fail with `password authentication failed for user "vms"` right after a failed `make up`: they reached another Postgres on the same host port (a container left without its published port). Free or change the port, then `make up`.
 - `make up` reports `dependency failed to start: container vms-<service>-1 is unhealthy`: run `make ps`, then `make logs SERVICE=<service>`. `docker inspect vms-<service>-1 --format '{{json .State.Health}}'` shows the health check output.
 - Old `vms-redis-1` or `vms-mlflow-1` containers after pulling task 0.7: `make up` removes them (`--remove-orphans`); `make down-volumes` also drops their old volumes.
 - `make data` fails with a checksum or size mismatch: the upstream file changed or the download was corrupted. Re-run once (corrupt cached files are re-downloaded). If it persists, the source changed: re-check the clip and re-pin it (see Data).
