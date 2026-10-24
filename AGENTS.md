@@ -6,18 +6,17 @@ You are building a scalable, production-style Video Management System that demon
 
 Read, in this order:
 1. This file.
-2. `docs/PLAN.md` for status and the next task.
-3. The current phase in `docs/PLAN_FULL.md` (task prompt, done criteria, considerations).
-4. The relevant sections of `docs/ARCHITECTURE.md`.
-5. The last ~20 entries of `docs/EXPERIMENTS.md` and any related entries (search by tag) so you don't repeat dead ends.
-6. `docs/DECISIONS.md` for decisions already made.
+2. `docs/ROADMAP.md` for what is built and what comes next.
+3. The relevant sections of `docs/ARCHITECTURE.md`.
+4. The last ~20 entries of `docs/EXPERIMENTS.md` and any related entries (search by tag) so you don't repeat dead ends.
+5. `docs/DECISIONS.md` for decisions already made.
 
 ## 2. Working loop
 
-1. Take the next unchecked task in `docs/PLAN.md`, or the task the user names.
+1. Take the task the user names, or the next item in `docs/ROADMAP.md`.
 2. Briefly state your approach before large changes.
 3. Implement in small steps. Run `make test` after each meaningful change.
-4. Before finishing a task: run `make check` and `make test-integration`, update docs (section 6), log experiments (section 4), tick the task in `docs/PLAN.md`, commit.
+4. Before finishing a task: run `make check` and `make test-integration`, update docs (section 6), log experiments (section 4), move the item to "Built" in `docs/ROADMAP.md`, commit.
 5. Report back briefly: what changed, test status, any numbers measured, open questions.
 
 ## 3. Testing
@@ -48,7 +47,7 @@ Outcome: keep; feeds D1.
 
 ## 5. Decisions: `docs/DECISIONS.md`
 
-Any choice a reviewer or interviewer could reasonably ask "why?" about gets an entry:
+Any choice a reviewer could reasonably ask "why?" about gets an entry:
 
 ```
 ## D1: Detection store
@@ -60,7 +59,7 @@ Evidence: E-ids and key numbers.
 Trade-offs and consequences: what we gave up, what to revisit and when.
 ```
 
-Explain the reasoning, not only the outcome, clearly enough that someone could defend it in an interview. D1 to D11 from `docs/ARCHITECTURE.md` start as `proposed`. Add new decisions as they arise.
+Explain the reasoning, not only the outcome, clearly enough that someone could defend it to a skeptical reviewer. D1 to D11 from `docs/ARCHITECTURE.md` start as `proposed`. Add new decisions as they arise.
 
 ## 6. Documentation structure (fixed)
 
@@ -72,13 +71,12 @@ These are the only Markdown files in the repo:
 | `AGENTS.md` | These instructions |
 | `CLAUDE.md` | One-line pointer (`@AGENTS.md`) so Claude Code loads these instructions; no other content |
 | `docs/ARCHITECTURE.md` | Current design; update whenever the design changes |
-| `docs/PLAN.md` | Compact plan with status checkboxes |
-| `docs/PLAN_FULL.md` | Detailed plan: task prompts, done criteria, considerations |
+| `docs/ROADMAP.md` | What is built (with evidence links) and what comes next |
 | `docs/DECISIONS.md` | Decision records |
 | `docs/EXPERIMENTS.md` | Append-only log of everything tried |
 | `docs/BENCHMARKS.md` | Curated current numbers: tables, methodology, hardware, how to reproduce each |
 | `docs/RUNBOOK.md` | Setup, data, running, deploying, operating, troubleshooting, teardown, production checklist |
-| `docs/WRITEUP.md` | Final technical write-up (Phase 11) |
+| `docs/WRITEUP.md` | Technical write-up |
 
 Rules:
 - Do not create any other `.md` file: no summaries, notes, phase reports, changelogs, per-folder READMEs or scratch docs. New information goes into a section of the right file above.
@@ -139,7 +137,7 @@ Rules:
 
 ## 12. Initiative and judgment
 
-- `docs/ARCHITECTURE.md` and the plans are a starting hypothesis, not a contract. Refactor, replace or remove code (including earlier work) when there is a better approach. If evidence points elsewhere, change course: log it in `EXPERIMENTS.md`, record or supersede the decision in `DECISIONS.md`, and update `ARCHITECTURE.md` and `PLAN.md`.
+- `docs/ARCHITECTURE.md` and the roadmap are a starting hypothesis, not a contract. Refactor, replace or remove code (including earlier work) when there is a better approach. If evidence points elsewhere, change course: log it in `EXPERIMENTS.md`, record or supersede the decision in `DECISIONS.md`, and update `ARCHITECTURE.md` and `ROADMAP.md`.
 - Propose improvements, missing tests, better tools or simpler designs proactively.
 - When a choice is non-obvious, explain the reasoning briefly in the decision record or commit body.
 - Ask the user only when an action costs money, is irreversible, changes the project's goals or scope, or depends on an ambiguous requirement where a wrong guess is expensive.
@@ -147,7 +145,6 @@ Rules:
 ## 13. Definition of done (any task)
 
 - Code and tests in place; `make check` and `make test-integration` pass.
-- Task-specific done criteria in `docs/PLAN_FULL.md` are met.
 - Docs updated: `ARCHITECTURE.md` if the design changed, `RUNBOOK.md` if running or ops changed, `BENCHMARKS.md` if numbers changed, `DECISIONS.md` if a decision was made.
 - Anything measured or tried is logged in `EXPERIMENTS.md`.
-- Task ticked in `docs/PLAN.md`; work committed.
+- `docs/ROADMAP.md` updated; work committed.

@@ -11,11 +11,6 @@ PROFILES ?= cpu
 STACK_WAIT_TIMEOUT ?= 300
 COMPOSE := COMPOSE_PROFILES=$(PROFILES) docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
 
-# Prints a clear error for targets whose implementation lands in a later task.
-define not_yet
-	@echo "make $@: not implemented yet (see task $(1) in docs/PLAN.md)." >&2; exit 1
-endef
-
 .PHONY: help
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-18s %s\n", $$1, $$2}'

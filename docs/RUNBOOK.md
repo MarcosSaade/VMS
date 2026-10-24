@@ -99,7 +99,7 @@ Compose reads the repo-root `.env` (or `.env.example` if `.env` is missing); eve
 | Prometheus | http://localhost:9090 | `PROMETHEUS_PORT` | Scrape config: `deploy/compose/prometheus/prometheus.yml`. Retention `PROMETHEUS_RETENTION` (15d). |
 | Tempo | http://localhost:3200 | `TEMPO_PORT` | Query API; traces arrive only through the collector. |
 | OTel collector | localhost:4317 (gRPC), 4318 (HTTP) | `OTEL_GRPC_PORT`, `OTEL_HTTP_PORT` | Point `OTEL_EXPORTER_OTLP_ENDPOINT` here. |
-| Postgres + pgvector | localhost:5432 | `POSTGRES_PORT` | User/DB from `POSTGRES_*`. The `vector` extension is available but not created: embeddings are deferred. |
+| Postgres + pgvector | localhost:5432 | `POSTGRES_PORT` | User/DB from `POSTGRES_*`. The `vector` extension is available but not created: embeddings are not built yet. |
 | Object store (SeaweedFS, S3 API) | http://localhost:8333 | `S3_PORT` | Credentials `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`; bucket `S3_BUCKET` is created at startup. |
 
 - Port taken on the host: set the `*_PORT` variable in `.env` and update the matching URL (`S3_ENDPOINT_URL` for `S3_PORT`), then `make up`.
@@ -545,7 +545,7 @@ Grafana (http://localhost:3000, anonymous viewer) opens on **VMS / Pipeline**; t
 - Drift dashboard markers: red regions are drift alarms (from the alarm gauge); blue markers are injected drift onsets, posted by the load generator to Grafana when a drift scenario's repetition starts (a region over the ramp for gradual drift). Toggle either at the top of the dashboard. Onsets need `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` (`.env`) to match the stack; otherwise the run logs a warning and its results show `drift.annotations.failed`. Onset markers stay in Grafana's database (volume `grafana-data`); delete them under Dashboards > Annotations or with `DELETE /api/annotations/<id>`.
 - Screenshots for the README and write-up, while there is live data (for example during or right after `make demo`): `cd frontend && CHROMIUM_PATH=/path/to/chrome npm run screenshots:grafana -- http://localhost:3000 ../docs/images [from] [to]`, with `from` and `to` as Grafana time values (Unix ms of the run, or `now-15m`). Kiosk mode, light theme, 1600 px wide. `DASHBOARDS=vms-drift` takes only the listed dashboards; `DRIFT_CAMERAS=drift-darken-001,drift-darken-003` picks the Drift dashboard's cameras (one repeated section each, all of them in the screenshot), as for `docs/images/grafana-drift.png` (E-056).
 
-Alerts and the drift procedure are under Running locally, "Drift alerts". _Placeholder (deferred 6.5, 10.2):_ scaling, and promoting a model to champion.
+Alerts and the drift procedure are under Running locally, "Drift alerts". _Not built yet (ROADMAP):_ scaling, and promoting a model to champion.
 
 ## Troubleshooting
 

@@ -29,7 +29,7 @@ One entry per environment used (CPU, RAM, GPU model, driver, CUDA, instance type
 
 ## Headline results
 
-Self-measured on `laptop` unless a row names another host; 95% bootstrap intervals. Still to come: GPU model-level numbers (Runpod, D37), cost per camera-hour at scale.
+Self-measured on `laptop` unless a row names another host; 95% bootstrap intervals. GPU numbers are model-level (Runpod A40, D37); the GPU end to end and cost per camera-hour at scale are on the roadmap.
 
 | Result | Number | Evidence |
 |---|---|---|
@@ -49,7 +49,7 @@ Self-measured on `laptop` unless a row names another host; 95% bootstrap interva
 
 ### Baseline ramp, CPU (task 2.5, E-039)
 
-`make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` on `laptop`, commit 7803f35: containerized ingest, one worker (yolo11n, PyTorch CPU build, batch size 1, imgsz 640), Postgres and SeaweedFS from `make up`; loadgen replays the data-mini clips at 5 FPS per camera (1280x720 q85); no query load. Warmup 20 s, hold 90 s, 3 repetitions; mean (std). GPU column: not measured; the GPU end-to-end ramp is deferred (D37: GPU sessions run on Runpod pods, which have no Docker for the stack).
+`make bench SCENARIO=bench/scenarios/ramp-cpu.yaml` on `laptop`, commit 7803f35: containerized ingest, one worker (yolo11n, PyTorch CPU build, batch size 1, imgsz 640), Postgres and SeaweedFS from `make up`; loadgen replays the data-mini clips at 5 FPS per camera (1280x720 q85); no query load. Warmup 20 s, hold 90 s, 3 repetitions; mean (std). GPU column: not measured; the GPU end-to-end ramp is on the roadmap (D37: GPU sessions run on Runpod pods, which have no Docker for the stack).
 
 | Cameras | Offered = accepted fps | Worker done fps | Freshness p50 / p95 s | Backlog slope fps (max frames) | Lost | Worker cores | Ingest SLO |
 |---|---|---|---|---|---|---|---|
@@ -153,14 +153,14 @@ The inference thread was busy 57 s of the 80 s under load (71%).
 
 **Query service, canned planner, 8 clients** (130 q/s with the profiler attached; [results](../bench/results/2026-10-14-profile-query-cpu-01M4XXP40EA6Q9CQ3GV2C73DCB.json), [profile](../bench/profiles/2026-10-14-profile-query-cpu-01M4XXP40EA6Q9CQ3GV2C73DCB.speedscope.json.gz)): SQL validation (sqlglot parse and regenerate) 53.2%, HTTP and pydantic 14.0%, OpenTelemetry 11.6%, execution 10.4%, planning 4.8%, event loop 3.4%, compile 0.7%.
 
-**Ranked bottlenecks** (for the CPU deployment; no GPU profile: deferred with the GPU ramp, D37):
+**Ranked bottlenecks** (for the CPU deployment; no GPU profile: on the roadmap with the GPU ramp, D37):
 
 1. **The detector's forward pass** sets the worker's ceiling: 66% of the worker's time at saturation, infer p95 73 ms per frame, at batch size 1. PyTorch runs 10 intra-op threads on a 2P+8E hybrid CPU yet the worker uses only 3.5 cores at saturation; whether fewer threads (on the performance cores) are faster is a hypothesis for 5.2, not measured here. This is what Phase 5 attacks: ONNX Runtime (already at parity, 5.1), the precision ladder (5.2) and batching (5.3). Fix first: largest share, and the levers are planned.
 2. **The worker runs each frame's stages one after another**: claim, fetch, infer, write. The inference thread idles 29% of the time while the event loop does I/O, a ceiling of about 1/0.71 = 1.4x left on the table. Overlapping the next frame's fetch and the previous frame's write with inference is part of 5.5 (batching across cameras); no plan change needed.
 3. **Pre-model CPU work in the inference thread**: decode 6.6% + input statistics 6.1%, about 9 ms per frame. Statistics compute a full-resolution float64 Laplacian (E-013); a downscaled float32 version would remove most of it. Small, cheap, and in the same thread as the model; it matters more once the model is faster.
 4. **Query service, only without an LLM**: one process, one core, ~160 q/s, half of it SQL validation. Not a bottleneck while the planner is a hosted LLM (~1.9 s per question); with a fast local planner, cache validated SQL per plan or run more server processes.
 
-Not bottlenecks: ingest (0.15 cores at 20 frames/s), loadgen (0.04 cores), tracking (2.8%), Ultralytics pre- and post-processing (3.3% together, which is why GPU pre/post-processing, 5.4, stays deferred).
+Not bottlenecks: ingest (0.15 cores at 20 frames/s), loadgen (0.04 cores), tracking (2.8%), Ultralytics pre- and post-processing (3.3% together, which is why GPU pre/post-processing waits on the roadmap).
 
 ## Storage
 
@@ -168,7 +168,7 @@ _Placeholder (tasks 4.3, 4.4)._
 
 ## Inference
 
-_Still to come: GPU batch columns and sweep free of the pod's CPU limits (re-run of E-064); the GPU worker end to end is deferred (D37)._ Model-only and end-to-end numbers are reported separately, with mAP next to speed.
+_Still to come: GPU batch columns and sweep free of the pod's CPU limits (re-run of E-064); the GPU worker end to end is on the roadmap (D37)._ Model-only and end-to-end numbers are reported separately, with mAP next to speed.
 
 ### Worker model-only latency, CPU baseline
 
@@ -385,7 +385,7 @@ Weakest categories on test: frames 75.0% [37.5, 100.0] (n=8), unanswerable 87.5%
 | plan A invalid (schema or catalog/policy) | 280 | 92.8% |
 | planner (B) failed on the question alone | 6 | 99.8% |
 | A and B disagree on abstaining or its reason | 66 | 98.2% |
-| does not compile (frames with a visual query: CLIP is deferred) | 182 | 94.9% |
+| does not compile (frames with a visual query: CLIP is not built yet) | 182 | 94.9% |
 | execution failed | 0 | 100% |
 | A and B return different results | 179 | 94.7% |
 | empty or all-zero result (agreement without evidence) | 377 | 88.2% |
