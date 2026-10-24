@@ -1,7 +1,7 @@
 """The structured-query eval set: items, splits and leakage checks (task 3.1).
 
 Authoring and building are separate. `eval/structured/items.v<N>.jsonl` is written by hand
-(drafted by a model, reviewed by the user): each item has a question, its category, a gold
+(drafted with a model, reviewed by hand): each item has a question, its category, a gold
 `QueryPlan` (an abstaining plan where the answer is to refuse or ask), an independent gold SQL
 query where an answer exists, and whether row order matters. `python -m vms.eval build` then
 executes both golds on the frozen snapshot, requires them to agree, stores the result as

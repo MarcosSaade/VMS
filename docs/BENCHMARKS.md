@@ -1,6 +1,6 @@
 # Benchmarks
 
-> Location in repo: `docs/BENCHMARKS.md`. Curated current numbers. Every number links to its experiment (`docs/EXPERIMENTS.md`) and results JSON, states the hardware, and labels synthetic data and self-measured results as such. Raw history stays in `EXPERIMENTS.md`.
+Curated current numbers. Every number links to its experiment ([EXPERIMENTS.md](EXPERIMENTS.md)) and results JSON, states the hardware, and labels synthetic data and self-measured results as such.
 
 ## Methodology
 
@@ -296,7 +296,7 @@ Peak RSS includes about 830 MB of decoded frames held by the harness. Per-batch 
 
 ### Structured-query eval set v1 (task 3.1, D29, E-029)
 
-Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`, seed 20260331): five cameras (four in London, one in New York), 2026-03-16 to the eval clock **2026-03-31 14:30 UTC**, which every run must inject. Each answerable item has a gold SQL and, where the plan schema can express it, a gold `QueryPlan`; both were executed on the snapshot as the read-only login and agree. Items were drafted by the coding agent and reviewed by the user.
+Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`, seed 20260331): five cameras (four in London, one in New York), 2026-03-16 to the eval clock **2026-03-31 14:30 UTC**, which every run must inject. Each answerable item has a gold SQL and, where the plan schema can express it, a gold `QueryPlan`; both were executed on the snapshot as the read-only login and agree. Every item was reviewed by hand.
 
 | Category | Dev | Test |
 |---|---|---|
@@ -315,7 +315,7 @@ Questions over a **synthetic** frozen database (`configs/eval/snapshot.v1.yaml`,
 | adversarial (red team: DDL, DML, injection, exfiltration, exhaustion, prompt) | 12 | 13 |
 | **total** | **137** | **142** |
 
-- **Frozen test split:** reviewed and approved by the user on 2026-10-14; every item's side is pinned in `eval/structured/splits.v1.json`, so later edits or additions never move a test question. `eval/structured/test.v1.jsonl`, sha256 `0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb` (also in `eval/structured/dataset.v1.json`). Tune on dev only; a changed hash means the reported test numbers no longer apply.
+- **Frozen test split:** reviewed and approved on 2026-10-14; every item's side is pinned in `eval/structured/splits.v1.json`, so later edits or additions never move a test question. `eval/structured/test.v1.jsonl`, sha256 `0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb` (also in `eval/structured/dataset.v1.json`). Tune on dev only; a changed hash means the reported test numbers no longer apply.
 - **Snapshot:** `eval/structured/snapshot.v1/` (DVC), file hashes in `eval/structured/snapshot.v1.json`.
 - **Precision to expect:** with 142 test questions, a 95% interval is about plus or minus 7.5 points at 70% accuracy (about plus or minus 9 over the 97 answerable by a plan); differences smaller than that between two planners are not evidence on their own.
 
@@ -374,7 +374,7 @@ Test errors (6), the same failure modes as on dev:
 
 Weakest categories on test: frames 75.0% [37.5, 100.0] (n=8), unanswerable 87.5% [62.5, 100.0] (n=8), join 90.9% [72.7, 100.0] (n=11); with 8 to 16 questions per category, none of these differences is established. Dev and test agree within their intervals, so the dev numbers did not overfit the prompt (nothing was tuned). Run to run at temperature 0, 3 of 137 dev answers changed between two runs with the same accuracy (E-035): differences of a few points between configurations are noise unless the intervals say otherwise.
 
-**What this does and does not show.** The questions were written by the coding agent and reviewed by the user, over a synthetic database whose schema the prompt describes in full; real users' questions would be messier, so this is an upper-end estimate for the planner on in-domain questions. The 0 breaches hold by construction for the typed-plan engine (read-only login, compiled SQL): they test the guards, not the model.
+**What this does and does not show.** The questions were written for this project and reviewed by hand, over a synthetic database whose schema the prompt describes in full; real users' questions would be messier, so this is an upper-end estimate for the planner on in-domain questions. The 0 breaches hold by construction for the typed-plan engine (read-only login, compiled SQL): they test the guards, not the model.
 
 ### Planner training data v1 (task 8.2; E-070, D41)
 

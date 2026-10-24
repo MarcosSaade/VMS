@@ -39,7 +39,7 @@ run:
 
 # USD per million tokens, by LLM_MODEL. A model not listed gets no cost in its results.
 # Fill in from the provider's price page on the day of the run; note the date in EXPERIMENTS.md.
-# DeepSeek (prices given by the user on 2026-10-14): peak-hour, cache-miss input rates, so
+# DeepSeek (prices as of 2026-10-14): peak-hour, cache-miss input rates, so
 # reported costs are upper bounds (off-peak halves them; cached prompt tokens cost ~1% as much,
 # and the planner prompt is mostly a cacheable prefix). Usage does not report cache hits yet.
 # Cache-hit rate (2026-10-23, task 8.2): $0.006/M at peak hours, from a third-party price list

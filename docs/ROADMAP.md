@@ -1,6 +1,6 @@
 # Roadmap
 
-> Location in repo: `docs/ROADMAP.md`. What is built, with its evidence, and what comes next. Numbers live in [BENCHMARKS.md](BENCHMARKS.md), reasons in [DECISIONS.md](DECISIONS.md), every attempt (including failed ones) in [EXPERIMENTS.md](EXPERIMENTS.md).
+What is built, with its evidence, and what comes next. Numbers live in [BENCHMARKS.md](BENCHMARKS.md), reasons in [DECISIONS.md](DECISIONS.md), every attempt (including failed ones) in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## Built
 

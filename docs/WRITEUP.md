@@ -1,6 +1,6 @@
 # Technical write-up
 
-> Location in repo: `docs/WRITEUP.md`. The story of the system: what it does, how it was designed, what was measured, what did not work and what it does not show. Numbers are summarized here and curated in [BENCHMARKS.md](BENCHMARKS.md); each one links to its experiment (E-ids in [EXPERIMENTS.md](EXPERIMENTS.md)) and decision (D-ids in [DECISIONS.md](DECISIONS.md)), and through them to a results JSON with the git SHA, config, hardware and seeds that produced it.
+The story of the system: what it does, how it was designed, what was measured, what did not work and what it does not show. Numbers are summarized here and curated in [BENCHMARKS.md](BENCHMARKS.md); each one links to its experiment (E-ids in [EXPERIMENTS.md](EXPERIMENTS.md)) and decision (D-ids in [DECISIONS.md](DECISIONS.md)), and through them to a results JSON with the git SHA, config, hardware and seeds that produced it.
 
 ## 1. Summary
 

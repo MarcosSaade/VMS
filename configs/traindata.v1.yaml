@@ -52,7 +52,7 @@ generator:
 planner_concurrency: 4
 
 budget:
-  max_cost_usd: 3.0              # user's cap (2026-10-23); generation stops before exceeding it
+  max_cost_usd: 3.0              # spend cap (2026-10-23); generation stops before exceeding it
   max_candidates: 8000
   call_concurrency: 4            # generation-A calls in flight
   model_price: deepseek-flash    # configs/eval.yaml prices

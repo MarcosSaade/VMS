@@ -1,6 +1,6 @@
 # Runbook
 
-> Location in repo: `docs/RUNBOOK.md`. How to set up, run, operate and tear down the system. Update it whenever running or operations change.
+How to set up, run, benchmark, operate and tear down the system.
 
 ## Setup
 
