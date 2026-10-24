@@ -1,0 +1,472 @@
+{
+  "schema_version": 1,
+  "run_id": "01M5PZTAAM7FWWA8C5WMB4AYF2",
+  "name": "d7-compare",
+  "kind": "bench.llm-compare",
+  "started_at": "2026-10-24T12:57:50.092997Z",
+  "ended_at": "2026-10-24T12:57:50.164968Z",
+  "seed": 2026,
+  "git": {
+    "sha": "232970541099bb06859f08eb34a9170bf2f9cf09",
+    "dirty": false
+  },
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+    "logical_cpus": 12,
+    "cpu_quota": null,
+    "ram_bytes": 16439500800,
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+    "gpus": []
+  },
+  "packages": {
+    "python": "3.12.14",
+    "pydantic": "2.13.5"
+  },
+  "config": {
+    "prices": {
+      "deepseek-flash": {
+        "prompt_per_mtok": 0.3,
+        "completion_per_mtok": 1.2,
+        "prompt_cache_hit_per_mtok": 0.006
+      },
+      "deepseek-v4-pro": {
+        "prompt_per_mtok": 1.32,
+        "completion_per_mtok": 3.96,
+        "prompt_cache_hit_per_mtok": null
+      }
+    }
+  },
+  "scenario": {
+    "name": "d7-compare",
+    "description": "Task 8.5 (D7): the four planner options on the frozen test split (n=142), latency under the same closed-loop load (concurrency 1 to 32, warmup excluded, 3 reps) and cost per 1,000 questions. Computed from results files only (no model calls). Self-hosted options on one Runpod A40 at the 2026-10-24 session's price, all on vLLM 0.31 with prefix caching on; each load test ran on the server with the adapter enabled, so the base few-shot's load includes LoRA being enabled on its server (dev scenario llm-quant-a40). The hosted option is DeepSeek deepseek-flash measured from the laptop (internet path included, llm-load-hosted). SLO: the query service's p95 1.5 s (configs/bench.yaml query_p95_s), applied to the LLM call alone.\n",
+    "kind": "llm-compare",
+    "seed": 2026,
+    "slo_p95_s": 1.5,
+    "hours_per_month": 730,
+    "resamples": 2000,
+    "options": [
+      {
+        "name": "hosted",
+        "description": "DeepSeek deepseek-flash, full prompt, few-shot (E-036 test; llm-load-hosted)",
+        "accuracy": "eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json",
+        "load": {
+          "results": "bench/results/2026-10-24-llm-load-hosted-01M5PXAMV2Q6DSTWHBGB99BFJ6.json",
+          "server": "hosted",
+          "variant": "structured"
+        },
+        "cost": {
+          "kind": "hosted",
+          "price": "deepseek-flash"
+        }
+      },
+      {
+        "name": "base-few-shot",
+        "description": "Qwen3.5-4B BF16, full prompt with the few-shot bank (E-074 test)",
+        "accuracy": "eval/results/2026-10-23-structured-test-replay-qwen3.5-4b-01M5NBSNHYDADVTS6G9XY2XK7V.json",
+        "load": {
+          "results": "bench/results/2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06.json",
+          "server": "qwen3.5-4b",
+          "variant": "base-full"
+        },
+        "cost": {
+          "kind": "gpu",
+          "session": "bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json"
+        }
+      },
+      {
+        "name": "lora",
+        "description": "Qwen3.5-4B BF16 + all-r4 adapter, compact prompt (E-074 test)",
+        "accuracy": "eval/results/2026-10-23-structured-test-replay-qwen3.5-4b-01M5NBSJR43JKPQ7AA9KQ0RW5W.json",
+        "load": {
+          "results": "bench/results/2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06.json",
+          "server": "qwen3.5-4b",
+          "variant": "all-r4"
+        },
+        "cost": {
+          "kind": "gpu",
+          "session": "bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json"
+        }
+      },
+      {
+        "name": "lora-w4a16",
+        "description": "GPTQ W4A16 Qwen3.5-4B + the same adapter, compact prompt (llm-quant-test-a40)",
+        "accuracy": "eval/results/2026-10-24-structured-test-replay-qwen3.5-4b-w4a16-01M5PZQ3154YACNZBERSBEFZ5B.json",
+        "load": {
+          "results": "bench/results/2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06.json",
+          "server": "qwen3.5-4b-w4a16",
+          "variant": "all-r4"
+        },
+        "cost": {
+          "kind": "gpu",
+          "session": "bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json"
+        }
+      }
+    ],
+    "paired": [
+      [
+        "hosted",
+        "lora"
+      ],
+      [
+        "hosted",
+        "lora-w4a16"
+      ],
+      [
+        "lora",
+        "base-few-shot"
+      ],
+      [
+        "lora-w4a16",
+        "lora"
+      ]
+    ]
+  },
+  "metrics": {
+    "split_sha256": "0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb",
+    "options": {
+      "hosted": {
+        "description": "DeepSeek deepseek-flash, full prompt, few-shot (E-036 test; llm-load-hosted)",
+        "split": "test",
+        "split_sha256": "0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb",
+        "accuracy": {
+          "mean": 0.9577464788732394,
+          "lo": 0.9225352112676056,
+          "hi": 0.9859154929577465,
+          "n": 142
+        },
+        "calls_per_question": 1.0492957746478873,
+        "levels": [
+          {
+            "concurrency": 1,
+            "requests_per_s": 0.593,
+            "p50_s": 1.847622,
+            "p95_s": 2.772458,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 4377.208333333333,
+              "completion": 154.6875,
+              "cached": 4224.0
+            }
+          },
+          {
+            "concurrency": 4,
+            "requests_per_s": 1.936,
+            "p50_s": 1.6471790000000002,
+            "p95_s": 4.071989,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 4378.1875,
+              "completion": 170.8125,
+              "cached": 4224.0
+            }
+          },
+          {
+            "concurrency": 16,
+            "requests_per_s": 6.932,
+            "p50_s": 1.630925,
+            "p95_s": 3.987596,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 4378.104166666667,
+              "completion": 178.859375,
+              "cached": 4224.0
+            }
+          },
+          {
+            "concurrency": 32,
+            "requests_per_s": 11.656,
+            "p50_s": 1.6206980000000002,
+            "p95_s": 3.402498,
+            "error_rate": 0.0234375,
+            "tokens_per_request": {
+              "prompt": 4378.217847769029,
+              "completion": 174.01837270341207,
+              "cached": 4224.0
+            }
+          }
+        ],
+        "floor_p95_s": 2.772458,
+        "slo_level": null,
+        "saturation_level": 32,
+        "saturation_p95_s": 3.402498,
+        "cost_kind": "hosted",
+        "cost": {
+          "usd_per_1k": 0.2942,
+          "usd_per_1k_all_miss": 1.5972,
+          "cached_share": 0.96477611367657
+        }
+      },
+      "base-few-shot": {
+        "description": "Qwen3.5-4B BF16, full prompt with the few-shot bank (E-074 test)",
+        "split": "test",
+        "split_sha256": "0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb",
+        "accuracy": {
+          "mean": 0.7887323943661971,
+          "lo": 0.7183098591549296,
+          "hi": 0.852112676056338,
+          "n": 142
+        },
+        "calls_per_question": 1.1408450704225352,
+        "levels": [
+          {
+            "concurrency": 1,
+            "requests_per_s": 0.879,
+            "p50_s": 1.207499,
+            "p95_s": 2.204657,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 4162.208333333333,
+              "completion": 59.0,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 4,
+            "requests_per_s": 2.582,
+            "p50_s": 1.3641400000000001,
+            "p95_s": 2.529623,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 4163.229166666667,
+              "completion": 58.666666666666664,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 16,
+            "requests_per_s": 6.579,
+            "p50_s": 2.159021,
+            "p95_s": 4.342537,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 4163.088541666667,
+              "completion": 58.375,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 32,
+            "requests_per_s": 8.819,
+            "p50_s": 3.212151,
+            "p95_s": 6.3017579999999995,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 4163.236979166667,
+              "completion": 58.606770833333336,
+              "cached": null
+            }
+          }
+        ],
+        "floor_p95_s": 2.204657,
+        "slo_level": null,
+        "saturation_level": 32,
+        "saturation_p95_s": 6.3017579999999995,
+        "cost_kind": "gpu",
+        "hourly_usd": 0.601,
+        "monthly_usd": 438.73,
+        "cost_at_slo": null,
+        "cost_at_saturation": {
+          "usd_per_1k": 0.0216,
+          "questions_per_month": 20315056
+        },
+        "break_even_questions_per_month": {
+          "hosted": 1491264
+        }
+      },
+      "lora": {
+        "description": "Qwen3.5-4B BF16 + all-r4 adapter, compact prompt (E-074 test)",
+        "split": "test",
+        "split_sha256": "0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb",
+        "accuracy": {
+          "mean": 0.8309859154929577,
+          "lo": 0.7676056338028169,
+          "hi": 0.8873239436619719,
+          "n": 142
+        },
+        "calls_per_question": 1.0774647887323943,
+        "levels": [
+          {
+            "concurrency": 1,
+            "requests_per_s": 0.917,
+            "p50_s": 1.2742829999999998,
+            "p95_s": 2.021337,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 833.2083333333334,
+              "completion": 50.708333333333336,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 4,
+            "requests_per_s": 2.573,
+            "p50_s": 1.391732,
+            "p95_s": 4.564691,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 834.2291666666666,
+              "completion": 49.541666666666664,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 16,
+            "requests_per_s": 8.102,
+            "p50_s": 1.900219,
+            "p95_s": 3.018649,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 834.0885416666666,
+              "completion": 49.578125,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 32,
+            "requests_per_s": 11.203,
+            "p50_s": 2.7446819999999996,
+            "p95_s": 4.263911,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 834.2369791666666,
+              "completion": 50.200520833333336,
+              "cached": null
+            }
+          }
+        ],
+        "floor_p95_s": 2.021337,
+        "slo_level": null,
+        "saturation_level": 32,
+        "saturation_p95_s": 4.263911,
+        "cost_kind": "gpu",
+        "hourly_usd": 0.601,
+        "monthly_usd": 438.73,
+        "cost_at_slo": null,
+        "cost_at_saturation": {
+          "usd_per_1k": 0.0161,
+          "questions_per_month": 27324776
+        },
+        "break_even_questions_per_month": {
+          "hosted": 1491264
+        }
+      },
+      "lora-w4a16": {
+        "description": "GPTQ W4A16 Qwen3.5-4B + the same adapter, compact prompt (llm-quant-test-a40)",
+        "split": "test",
+        "split_sha256": "0330b3db2330934d59510b23f2cd914bc3521fbaac8dbee598a403eb6c68e3eb",
+        "accuracy": {
+          "mean": 0.823943661971831,
+          "lo": 0.7605633802816901,
+          "hi": 0.8804577464788723,
+          "n": 142
+        },
+        "calls_per_question": 1.0774647887323943,
+        "levels": [
+          {
+            "concurrency": 1,
+            "requests_per_s": 1.366,
+            "p50_s": 0.829305,
+            "p95_s": 1.329192,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 833.2083333333334,
+              "completion": 50.4375,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 4,
+            "requests_per_s": 3.555,
+            "p50_s": 0.949992,
+            "p95_s": 4.256863999999999,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 834.2291666666666,
+              "completion": 49.083333333333336,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 16,
+            "requests_per_s": 10.176,
+            "p50_s": 1.49128,
+            "p95_s": 2.517114,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 834.0885416666666,
+              "completion": 49.505208333333336,
+              "cached": null
+            }
+          },
+          {
+            "concurrency": 32,
+            "requests_per_s": 13.058,
+            "p50_s": 2.3453090000000003,
+            "p95_s": 3.865972,
+            "error_rate": 0.0,
+            "tokens_per_request": {
+              "prompt": 834.2369791666666,
+              "completion": 49.888020833333336,
+              "cached": null
+            }
+          }
+        ],
+        "floor_p95_s": 1.329192,
+        "slo_level": 1,
+        "saturation_level": 32,
+        "saturation_p95_s": 3.865972,
+        "cost_kind": "gpu",
+        "hourly_usd": 0.601,
+        "monthly_usd": 438.73,
+        "cost_at_slo": {
+          "usd_per_1k": 0.1317,
+          "questions_per_month": 3331754
+        },
+        "cost_at_saturation": {
+          "usd_per_1k": 0.0138,
+          "questions_per_month": 31849230
+        },
+        "break_even_questions_per_month": {
+          "hosted": 1491264
+        }
+      }
+    },
+    "paired": {
+      "hosted - lora": {
+        "mean": 0.1267605633802817,
+        "lo": 0.07042253521126761,
+        "hi": 0.19014084507042253,
+        "n": 142,
+        "a_only": 20,
+        "b_only": 2
+      },
+      "hosted - lora-w4a16": {
+        "mean": 0.13380281690140844,
+        "lo": 0.07746478873239436,
+        "hi": 0.19718309859154928,
+        "n": 142,
+        "a_only": 21,
+        "b_only": 2
+      },
+      "lora - base-few-shot": {
+        "mean": 0.04225352112676056,
+        "lo": -0.007042253521126761,
+        "hi": 0.09859154929577464,
+        "n": 142,
+        "a_only": 10,
+        "b_only": 4
+      },
+      "lora-w4a16 - lora": {
+        "mean": -0.007042253521126761,
+        "lo": -0.035211267605633804,
+        "hi": 0.014084507042253521,
+        "n": 142,
+        "a_only": 1,
+        "b_only": 2
+      }
+    },
+    "markdown": "| Option | Test accuracy | p95 at c=1 | Best level within 1.5 s p95 | Saturation (req/s, p95) | USD per 1k questions | Fixed USD/month |\n|---|---|---|---|---|---|---|\n| hosted | 95.8% [92.3, 98.6] | 2.77 s | none | 11.66 at c=32, 3.40 s | 0.294 (all-miss 1.597) | 0 |\n| base-few-shot | 78.9% [71.8, 85.2] | 2.20 s | none | 8.82 at c=32, 6.30 s | 0.022 (saturation, full use) | 439 |\n| lora | 83.1% [76.8, 88.7] | 2.02 s | none | 11.20 at c=32, 4.26 s | 0.016 (saturation, full use) | 439 |\n| lora-w4a16 | 82.4% [76.1, 88.0] | 1.33 s | c=1 (USD 0.132/1k there) | 13.06 at c=32, 3.87 s | 0.014 (saturation, full use) | 439 |\n\n| Paired difference (test) | Points [95% CI] | Only a / only b |\n|---|---|---|\n| hosted - lora | +12.7 [+7.0, +19.0] | 20 / 2 |\n| hosted - lora-w4a16 | +13.4 [+7.7, +19.7] | 21 / 2 |\n| lora - base-few-shot | +4.2 [-0.7, +9.9] | 10 / 4 |\n| lora-w4a16 - lora | -0.7 [-3.5, +1.4] | 1 / 2 |"
+  },
+  "cost_usd": 0.0,
+  "notes": "Computed from the results files the scenario names, no model calls. GPU cost per 1,000 questions assumes full utilization at the stated level; the fixed monthly cost is one GPU kept up. Hosted cost uses the load test's tokens per request."
+}

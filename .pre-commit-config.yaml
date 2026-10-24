@@ -6,9 +6,10 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=500"]
         # The 9.5 training list: 1,567 images with their boxes, text, frozen (D36). The 8.3
-        # continuation session's results: the recorded dev replies of seven variants (D42),
-        # which the replayed eval reads, so they stay next to the other results in git.
-        exclude: ^(configs/finetune\.v1\.lock\.jsonl|bench/results/2026-10-23-lora-plan-a40-b-01M5N2QY7YSASA28F4JTEGQZ24\.json)$
+        # continuation session's results and the 8.4 session's: the recorded dev replies of
+        # seven variants each (D42, D43), which the replayed eval reads, so they stay next to
+        # the other results in git.
+        exclude: ^(configs/finetune\.v1\.lock\.jsonl|bench/results/(2026-10-23-lora-plan-a40-b-01M5N2QY7YSASA28F4JTEGQZ24|2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06)\.json)$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
