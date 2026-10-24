@@ -53,8 +53,6 @@ What is built, with its evidence, and what comes next. Numbers live in [BENCHMAR
 
 ## Next
 
-- **Demo video** (2 minutes): camera wall, a few questions with the plan and SQL panel, the pipeline dashboard under load, a drift alert firing.
-- **Fresh-clone reproduction** on a clean machine following only the README and RUNBOOK.
 - **GPU end to end**: the stack on a GPU host (a full VM or a single-image variant for pods) for a GPU ingest ramp, a GPU worker profile and rated capacity on GPU. Today the GPU numbers are model-level only.
 - **Storage benchmarks**: partitioned Postgres vs TimescaleDB vs ClickHouse at 10M and 100M detections, with plan-to-SQL result equivalence across backends (D1); pgvector vs Qdrant for filtered vector search (D2).
 - **Visual search**: CLIP embeddings with a sampling policy (D8), hybrid structured + visual queries sharing the `QueryPlan`, and a retrieval eval (recall@k, nDCG).
@@ -90,6 +88,6 @@ Docs, code comments and commit messages cite work by task number. The numbers ar
 | 2.1 | Tracing and metrics | 9.4 | Drift dashboard and runbook |
 | 2.2 | Dashboards | 9.5 | Detector fine-tune against blur |
 | 2.3 | Benchmark framework | 9.6 | Fine-tune follow-up (frozen backbone) |
-| 2.4 | Rented GPU sessions | 11.1 | README |
-| 2.5 | Ingest ramp and query load | 11.2 | Technical write-up |
+| 2.4 | Rented GPU sessions | | |
+| 2.5 | Ingest ramp and query load | | |
 | 2.6 | Baseline bottleneck analysis | | |
