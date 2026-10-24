@@ -100,3 +100,7 @@ What comes next is in [ROADMAP.md](docs/ROADMAP.md); the full story, including w
 | [EXPERIMENTS.md](docs/EXPERIMENTS.md) | Append-only log of every attempt |
 | [RUNBOOK.md](docs/RUNBOOK.md) | Setup, data, running, benchmarking, rented sessions, operations, teardown |
 | [ROADMAP.md](docs/ROADMAP.md) | What is built and what comes next |
+
+## License
+
+Code: [MIT](LICENSE). The video clips and datasets are not redistributed; each keeps its own license (MOT17 and MOT20 CC BY-NC-SA 3.0, Wikimedia Commons CC BY-SA 4.0, COCO CC BY 4.0, VIRAT by agreement), listed in [RUNBOOK.md](docs/RUNBOOK.md#video-clips-virtual-cameras). Screenshots in `docs/images/` contain MOT17 and Wikimedia Commons frames under those licenses.
