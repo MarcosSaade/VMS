@@ -3,7 +3,8 @@
 # A pod is a container: no Docker or Compose, so no stack and no services. Only in-process
 # scenarios run here: `kind: model` and `ladder` in the project's environment with CUDA PyTorch,
 # `kind: llm`, whose engines (vLLM, Ollama) run as child processes of the scenario (D40), and
-# `kind: lora`, whose trainer and vLLM do the same (D42).
+# `kind: lora`, whose trainer and vLLM do the same (D42); an llm scenario may first merge an
+# adapter into its base (scripts/lora_merge.py, task 8.4) in vLLM's virtualenv.
 #
 #   setup vision     uv, the locked environment with torch and torchvision swapped for their
 #                    CUDA 13 builds (the versions uv.lock pins), onnxruntime swapped for

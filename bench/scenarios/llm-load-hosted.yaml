@@ -1,0 +1,30 @@
+name: llm-load-hosted
+description: >
+  Task 8.5 (D7): the hosted planner (DeepSeek deepseek-flash, LLM_* in .env; the configuration
+  of E-036) under the same closed-loop load as llm-quant-a40: the service's full prompt on dev
+  questions, json_object (DeepSeek has no json_schema), concurrency 1 to 32, warmup excluded,
+  3 reps. Run from the laptop, so latency includes the internet path to the provider, as the
+  query service sees it. Tokens per request, with the provider's cache hits, price the hosted
+  option per question. No recording: its test accuracy is E-036's. About 700 requests of
+  ~4.9k tokens: $0.20 with the expected cache hits, at most ~$1.1 if none hit (configs/eval.yaml
+  prices).
+kind: llm
+seed: 20261024
+catalog: eval/structured/catalog.v1.json
+max_tokens: 1024
+load:
+  concurrency: [1, 4, 16, 32]
+  min_requests: 16
+  requests_per_slot: 4
+  warmup: 4
+  repetitions: 3
+  timeout_s: 120
+servers:
+  - name: hosted
+    engine: external
+    model: deepseek-flash
+    served_name: deepseek-flash
+    base_url: https://api.deepseek.com
+    use_llm_api_key: true
+    variants:
+      - {name: structured, response_format: json_object}

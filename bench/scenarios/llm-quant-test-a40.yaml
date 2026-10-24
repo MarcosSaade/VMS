@@ -1,0 +1,31 @@
+name: llm-quant-test-a40
+description: >
+  Task 8.5 (D7) test run on one Runpod A40, after llm-quant-a40 in the same session: the
+  quantized-LoRA option, chosen before any result (2026-10-24): the pinned adapter all-r4 on
+  the W4A16 GPTQ base (the 4-bit rung 8.4 names), with the compact prompt, records the frozen
+  test split once, with the deployment flags of llm-quant-a40 (prefix caching on). The other
+  options already have their one test run: the hosted model (E-036), the base few-shot and the
+  BF16 adapter (E-074). No load test (llm-quant-a40 has it). Scored on the laptop by the
+  replayed eval (make eval-replay SPLIT=test).
+kind: llm
+seed: 20261024
+split: test
+catalog: eval/structured/catalog.v1.json
+max_tokens: 1024
+load:
+  concurrency: [1]
+record:
+  concurrency: 4               # = configs/eval.yaml run.concurrency
+servers:
+  - name: qwen3.5-4b-w4a16
+    engine: vllm
+    model: RedHatAI/Qwen3.5-4B-quantized.w4a16
+    revision: 7a613872f394578b0b52b683ff4ac47516b4bcaf
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    lora_modules:
+      all-r4: models/lora/lora-plan-a40-b-all-r4.tar
+    variants:
+      - {name: all-r4, model: all-r4, prompt: configs/prompts/planner.compact.v1.txt,
+         load: false, record: true}

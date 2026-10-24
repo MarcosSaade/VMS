@@ -40,12 +40,16 @@ class PinnedAdapter(_Section):
 
 
 class LoraSettings(_Section):
-    """LoRA training on a pod (task 8.3, D42)."""
+    """LoRA training (task 8.3, D42) and merging (task 8.4) on a pod."""
 
-    # The trainer runs in vLLM's virtualenv (its CUDA torch and transformers, plus peft).
+    # The trainer and the merge run in vLLM's virtualenv (its CUDA torch and transformers,
+    # plus peft).
     python: str = "/root/vllm-env/bin/python"
     script: Path = Path("scripts/lora_train.py")
+    merge_script: Path = Path("scripts/lora_merge.py")
     unpack_dir: Path = Path("data/serving/lora")  # adapter .tar files unpacked for vLLM
+    merged_dir: Path = Path("data/serving/merged")  # merged models (not collected: rebuildable)
+    merge_timeout_s: float = Field(default=1800.0, gt=0)  # download, merge, save
     work_dir: Path = Path("data/lora")  # rendered examples and run specs
     planner: PinnedAdapter | None = None
 

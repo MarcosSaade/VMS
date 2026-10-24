@@ -178,7 +178,8 @@ def test_committed_config_prices_the_a40_from_the_catalog(settings: PodSettings)
     )
     assert "@sha256:" in settings.image  # pinned by digest
     assert settings.require_self_terminate
-    assert settings.hourly_usd(0.59) == pytest.approx(0.59 + 40 * 0.10 / 730)
+    # 80 GB of container disk since 8.4 (three checkpoints and a merged copy)
+    assert settings.hourly_usd(0.59) == pytest.approx(0.59 + 80 * 0.10 / 730)
 
 
 def test_setup_installs_what_the_scenarios_need_once_each(make) -> None:  # type: ignore[no-untyped-def]

@@ -73,6 +73,8 @@ def _usage(chunk: dict[str, Any], sample: Sample) -> None:
     details = usage.get("prompt_tokens_details")
     if isinstance(details, dict) and details.get("cached_tokens") is not None:
         sample.cached_tokens = int(details["cached_tokens"])
+    elif usage.get("prompt_cache_hit_tokens") is not None:  # DeepSeek's name for the same
+        sample.cached_tokens = int(usage["prompt_cache_hit_tokens"])
 
 
 async def stream_chat(

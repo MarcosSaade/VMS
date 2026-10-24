@@ -12,8 +12,12 @@
                                    finetune       detector fine-tune and before/after mAP
                                                   (vms.finetune, task 9.5)
                                    llm            LLM serving load and plan recording
-                                   lora           LoRA training, then recording per adapter
                                                   (vms.serving, task 8.1)
+                                   lora           LoRA training, then recording per adapter
+                                                  (vms.lora, task 8.3)
+                                   llm-compare    planner options on test accuracy, load
+                                                  and cost from results files
+                                                  (vms.serving.compare, task 8.5, D7)
     report  FILE [FILE ...]      Markdown tables of results files, for docs/BENCHMARKS.md
 
 `make bench SCENARIO=bench/scenarios/<name>.yaml` runs the first. An e2e scenario needs the
@@ -25,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import signal
 import sys
 from collections.abc import Sequence
@@ -95,6 +100,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         configure_logging(SERVICE, "INFO")
         run_lora(args.scenario)
+        return 0
+    if kind == "llm-compare":
+        from vms.serving.compare import run_compare
+
+        configure_logging(SERVICE, "INFO")
+        path = run_compare(args.scenario)
+        sys.stdout.write(json.loads(path.read_text(encoding="utf-8"))["metrics"]["markdown"])
+        sys.stdout.write(f"\n\nSource: `{path}`\n")
         return 0
     if kind == "profile":
         from vms.bench.profile import run_profile

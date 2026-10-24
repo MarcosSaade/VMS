@@ -1,0 +1,88 @@
+name: llm-quant-a40
+description: >
+  Tasks 8.4 and 8.5 on one Runpod A40, dev split: what quantizing the planner's base and
+  merging its adapter do to accuracy, latency under load and memory, and the self-hosted p95
+  under load that D7 needs. Base Qwen3.5-4B (8.3's, pinned) and its chosen adapter all-r4
+  (pinned by sha256, D42). Quantized bases (chosen 2026-10-24): RedHatAI's GPTQ checkpoints of
+  the same base weights made with LLM Compressor, W4A16 (INT4 weights, the 4-bit rung the task
+  names) and W8A8 (INT8 weights and activations, a second rung), pinned by revision; the
+  vision tower, embeddings, lm_head and the linear-attention layers stay BF16, so only the
+  full-attention and MLP projections are quantized (the same modules the adapter is on). The
+  adapter, trained on the BF16 base, is served on each quantized base unchanged. Merged:
+  all-r4 merged into the BF16 base on the pod (FP32 merge, BF16 weights; scripts/lora_merge.py)
+  and served as a plain model, against the same adapter served by vLLM's LoRA path. One variable
+  per comparison: base precision (same adapter, prompt, flags), adapter vs merged (same weights
+  in effect, prompt, flags). Every server runs the deployment configuration of D40: prefix
+  caching on, structured outputs on, greedy, thinking off. The base few-shot control runs the
+  service's full prompt; the adapter and the merged model the compact prompt they were trained
+  with. Each variant is load tested (closed loop, warmup excluded, 3 reps, concurrency up to
+  32 to find saturation) and records the dev split for the replayed eval (make eval-replay).
+  Servers in priority order: a server that fails is recorded and the rest still run.
+kind: llm
+seed: 20261024
+catalog: eval/structured/catalog.v1.json
+max_tokens: 1024
+load:
+  concurrency: [1, 4, 16, 32]
+  min_requests: 16
+  requests_per_slot: 4
+  warmup: 4
+  repetitions: 3
+  timeout_s: 120
+record:
+  concurrency: 4               # = configs/eval.yaml run.concurrency
+merges:
+  - name: merged-all-r4
+    model: Qwen/Qwen3.5-4B
+    revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+    adapter: models/lora/lora-plan-a40-b-all-r4.tar
+servers:
+  - name: qwen3.5-4b
+    engine: vllm
+    model: Qwen/Qwen3.5-4B
+    revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    lora_modules:
+      all-r4: models/lora/lora-plan-a40-b-all-r4.tar
+    variants:
+      - {name: base-full, prompt: configs/prompts/planner.v1.txt, record: true}
+      - {name: all-r4, model: all-r4, prompt: configs/prompts/planner.compact.v1.txt,
+         record: true}
+  - name: qwen3.5-4b-w4a16
+    engine: vllm
+    model: RedHatAI/Qwen3.5-4B-quantized.w4a16
+    revision: 7a613872f394578b0b52b683ff4ac47516b4bcaf
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    lora_modules:
+      all-r4: models/lora/lora-plan-a40-b-all-r4.tar
+    variants:
+      - {name: base-full, prompt: configs/prompts/planner.v1.txt, record: true}
+      - {name: all-r4, model: all-r4, prompt: configs/prompts/planner.compact.v1.txt,
+         record: true}
+  - name: merged-all-r4
+    engine: vllm
+    model: Qwen/Qwen3.5-4B
+    revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+    merged: merged-all-r4
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    variants:
+      - {name: compact, prompt: configs/prompts/planner.compact.v1.txt, record: true}
+  - name: qwen3.5-4b-w8a8
+    engine: vllm
+    model: RedHatAI/Qwen3.5-4B-quantized.w8a8
+    revision: c30ff438442b337db924cadb5136847bbf3fb95a
+    args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+           --generation-config, vllm, --enable-prefix-caching]
+    request_extra: {chat_template_kwargs: {enable_thinking: false}}
+    lora_modules:
+      all-r4: models/lora/lora-plan-a40-b-all-r4.tar
+    variants:
+      - {name: base-full, prompt: configs/prompts/planner.v1.txt, record: true}
+      - {name: all-r4, model: all-r4, prompt: configs/prompts/planner.compact.v1.txt,
+         record: true}

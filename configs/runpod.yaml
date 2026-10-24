@@ -14,7 +14,10 @@ data_center_ids: []             # empty: wherever the GPU is in stock
 # Runpod's base image (Ubuntu 24.04; sshd from PUBLIC_KEY in /start.sh; python3, rsync, make,
 # curl), pinned by digest. No CUDA toolkit needed: the CUDA wheels bring their own libraries.
 image: runpod/base:1.0.3-ubuntu2404@sha256:d536f17af1c7bde1bc0ea642dbe0b0f222709ef3391588bce674eb9c55c1738b
-container_disk_gb: 40           # environment, CUDA wheels (~3 GB), clips, weights; wiped with the pod
+# Environment, CUDA wheels (~3 GB), clips, weights; wiped with the pod. 80 since 8.4 (2026-10-24):
+# vLLM's environment (~10 GB) plus three Qwen3.5-4B checkpoints (BF16 8.8 GB, W4A16 5.2 GB,
+# W8A8 6.1 GB) and a merged copy (8.8 GB) do not fit in 40. Disk costs ~$0.01/h at this size.
+container_disk_gb: 80
 ssh_user: root
 name_prefix: vms                # pods are named vms-gpu-<session id>: the leftover check
 # Safety net if this machine dies: the pod deletes itself after this long, through the API with

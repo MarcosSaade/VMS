@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import time
@@ -50,6 +51,24 @@ def http_get(url: str, timeout_s: float) -> tuple[int, bytes]:
         return 0, b""
 
 
+# What vLLM logs about memory at startup (v1 engine): the weights' GPU memory, the memory left
+# for the KV cache, and that cache's size in tokens. Not in its Prometheus metrics.
+VLLM_LOG_FACTS = {
+    "weights_gib": re.compile(r"Model loading took ([\d.]+) GiB"),
+    "kv_cache_gib": re.compile(r"Available KV cache memory: ([\d.]+) GiB"),
+    "kv_cache_tokens": re.compile(r"KV cache size: ([\d,]+) tokens"),
+}
+
+
+def vllm_log_facts(text: str) -> dict[str, float | None]:
+    """The first value of each `VLLM_LOG_FACTS` pattern in a server log, or None."""
+    out: dict[str, float | None] = {}
+    for key, pattern in VLLM_LOG_FACTS.items():
+        match = pattern.search(text)
+        out[key] = float(match.group(1).replace(",", "")) if match else None
+    return out
+
+
 def log_tail(path: Path, lines: int) -> str:
     if not path.is_file():
         return ""
@@ -82,6 +101,7 @@ class ProcessServer:
         self._clock = clock
         self._sleep = sleep
         self._proc: subprocess.Popen[bytes] | None = None
+        self._log_start = 0  # this run's part of an appended log
 
     @property
     def base_url(self) -> str:
@@ -89,6 +109,7 @@ class ProcessServer:
 
     def _spawn(self) -> None:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._log_start = self.log_path.stat().st_size if self.log_path.is_file() else 0
         out = self.log_path.open("ab")
         log.info("server starting", extra={"server": self.server.name, "command": self.command})
         self._proc = subprocess.Popen(
@@ -127,11 +148,22 @@ class ProcessServer:
         except ValueError:
             return None
 
+    def _log_since_spawn(self) -> str:
+        if not self.log_path.is_file():
+            return ""
+        with self.log_path.open("rb") as fh:
+            fh.seek(self._log_start)
+            return fh.read().decode("utf-8", "replace")
+
     def start(self) -> dict[str, Any]:
         t0 = self._clock()
         self._spawn()
         self._wait_healthy(self.server.start_timeout_s)
-        return {"startup_s": self._clock() - t0, "version": self._get_json("/version")}
+        return {
+            "startup_s": self._clock() - t0,
+            "version": self._get_json("/version"),
+            "memory": vllm_log_facts(self._log_since_spawn()),
+        }
 
     def metrics_text(self) -> str | None:
         status, body = http_get(self.root_url + "/metrics", self.settings.request_timeout_s)
@@ -225,13 +257,13 @@ def build_server(
             env={**o.env, "OLLAMA_HOST": f"{o.host}:{o.port}"},
         )
     v = settings.vllm
-    assert server.revision is not None
+    # A merged model is a local directory with no revision; a hub model is always pinned.
+    revision = ["--revision", server.revision] if server.revision else []
     command = [
         v.bin,
         "serve",
         server.model,
-        "--revision",
-        server.revision,
+        *revision,
         "--served-model-name",
         server.request_model,
         "--host",

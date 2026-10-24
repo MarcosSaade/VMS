@@ -16,10 +16,13 @@ ollama:
   host: 127.0.0.1
   port: 11434
   pull_timeout_s: 1800
-lora:                           # LoRA training on the pod (task 8.3, D42)
+lora:                           # LoRA training (task 8.3, D42) and merging (8.4) on the pod
   python: /root/vllm-env/bin/python  # vLLM's environment (CUDA torch, transformers) + peft
   script: scripts/lora_train.py
+  merge_script: scripts/lora_merge.py
   unpack_dir: data/serving/lora # adapter .tar files unpacked for vLLM
+  merged_dir: data/serving/merged  # base + adapter merged (8.4); ~9 GB each, not collected
+  merge_timeout_s: 1800
   work_dir: data/lora           # rendered training examples and run specs
   planner:                      # chosen on dev (E-073), reported on test; served only at this hash
     name: all-r4

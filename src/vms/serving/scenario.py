@@ -3,9 +3,10 @@ variants that are load tested and, optionally, recorded for the replayed dev eva
 
 A server is one engine process with one model and fixed server flags (prefix caching on or
 off is a server flag, so "off" is its own server entry), optionally with LoRA adapters served
-on the base (task 8.3, D42). A variant is what changes per request on the same server: the
-response format (structured outputs on or off), extra body fields, the planner prompt and the
-requested model (the base, or one of its adapters by name).
+on the base (task 8.3, D42). Its model can also be one the scenario builds on the pod first: a
+base with one adapter merged into its weights (task 8.4). A variant is what changes per request
+on the same server: the response format (structured outputs on or off), extra body fields, the
+planner prompt and the requested model (the base, or one of its adapters by name).
 """
 
 from __future__ import annotations
@@ -50,11 +51,22 @@ class Variant(_Model):
     prompt: Path | None = None  # planner prompt template; default configs/query.yaml's
 
 
+class Merge(_Model):
+    """A model built on the pod before any server starts (task 8.4): the pinned base with one
+    LoRA adapter merged into its weights (`scripts/lora_merge.py`), served like any model."""
+
+    name: str = Field(pattern=NAME)
+    model: str  # the adapter's base, Hugging Face repo id
+    revision: str  # pinned
+    adapter: Path  # adapter directory or .tar
+
+
 class Server(_Model):
     name: str = Field(pattern=NAME)
     engine: Engine
-    model: str  # Hugging Face repo id (vLLM) or Ollama tag
+    model: str  # Hugging Face repo id (vLLM) or Ollama tag; a merge's base when `merged`
     revision: str | None = None  # Hugging Face commit, pinned (vLLM)
+    merged: str | None = None  # vLLM only: serve this scenario merge instead of `model`
     served_name: str | None = None  # the `model` field in requests; default: `name`
     args: list[str] = Field(default_factory=list)  # extra server flags
     env: dict[str, str] = Field(default_factory=dict)
@@ -70,6 +82,8 @@ class Server(_Model):
     def _check(self) -> Server:
         if self.engine == "vllm" and not self.revision:
             raise ValueError(f"{self.name}: a vLLM model must be pinned by revision")
+        if self.merged and self.engine != "vllm":
+            raise ValueError(f"{self.name}: merged models are served by vLLM only")
         if self.engine == "external" and not self.base_url:
             raise ValueError(f"{self.name}: an external server needs base_url")
         if self.lora_modules and self.engine != "vllm":
@@ -104,6 +118,7 @@ class LlmScenario(_Model):
     logs_dir: Path = Path("data/serving/logs")
     load: LoadSpec
     record: RecordSpec = Field(default_factory=RecordSpec)
+    merges: list[Merge] = Field(default_factory=list)  # built before the first server starts
     servers: list[Server] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -111,4 +126,15 @@ class LlmScenario(_Model):
         names = [s.name for s in self.servers]
         if len(set(names)) != len(names):
             raise ValueError("server names must be unique")
+        merges = {m.name: m for m in self.merges}
+        if len(merges) != len(self.merges):
+            raise ValueError("merge names must be unique")
+        for s in self.servers:
+            if s.merged is None:
+                continue
+            merge = merges.get(s.merged)
+            if merge is None:
+                raise ValueError(f"{s.name}: unknown merge {s.merged!r}")
+            if (s.model, s.revision) != (merge.model, merge.revision):
+                raise ValueError(f"{s.name}: model and revision must be the merge's base")
         return self

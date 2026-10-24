@@ -6,8 +6,9 @@ catalog and few-shot bank, then one dev question), built exactly as the query se
 them, so prefix caching sees the real shared prefix. Plan validity is checked the way the
 planner checks it (parse, then validate against the catalog and policy), first attempt only.
 Recording runs the planner itself, with its repair turn, and keeps every reply for the replayed
-eval (`python -m vms.eval run --planner replay`). A server that fails to start is recorded with
-its log tail and the scenario moves on to the next one.
+eval (`python -m vms.eval run --planner replay`). Merged models (base + adapter, task 8.4) are
+built before the first server starts. A server that fails to start is recorded with its log
+tail and the scenario moves on to the next one.
 """
 
 from __future__ import annotations
@@ -49,6 +50,7 @@ from vms.query.semantic import validate_plan
 from vms.query.settings import QuerySettings
 from vms.serving.catalog_file import load_catalog_file
 from vms.serving.client import Sample, aiohttp_stream, closed_loop, stream_chat
+from vms.serving.merge import ScriptRunner, build_merges, run_python_script
 from vms.serving.replay import RecordingLlm
 from vms.serving.scenario import LlmScenario, Server, Variant
 from vms.serving.servers import (
@@ -181,6 +183,7 @@ def summarize_rep(
 ) -> dict[str, Any]:
     ok = [s for s in samples if s.ok]
     tokens = sum(s.completion_tokens for s in ok)
+    cached = [s.cached_tokens for s in ok if s.cached_tokens is not None]
     decode = sorted(r for s in ok if (r := s.decode_tokens_per_s) is not None)
     queries = sum(v for k, v in cache.items() if k.startswith("vllm:prefix_cache_queries"))
     hits = sum(v for k, v in cache.items() if k.startswith("vllm:prefix_cache_hits"))
@@ -194,6 +197,12 @@ def summarize_rep(
         "output_tokens_per_s": tokens / wall_s if wall_s > 0 else None,
         "prompt_tokens_mean": (sum(s.prompt_tokens for s in ok) / len(ok)) if ok else None,
         "completion_tokens_mean": tokens / len(ok) if ok else None,
+        # Totals over successful requests, for pricing a hosted model per request.
+        "tokens_total": {
+            "prompt": sum(s.prompt_tokens for s in ok),
+            "completion": tokens,
+            "cached": sum(cached) if cached else None,  # as the server reported them
+        },
         "latency_ms": percentiles_ms([s.latency_s for s in ok]),
         "ttft_ms": percentiles_ms([s.ttft_s for s in ok if s.ttft_s is not None]),
         "decode_tokens_per_s_p50": decode[len(decode) // 2] if decode else None,
@@ -316,12 +325,14 @@ def run_llm(
     root: Path = Path(),
     *,
     factory: Any = build_server,
+    script_runner: ScriptRunner = run_python_script,
 ) -> Path:
     scenario, raw = load_scenario(scenario_path)
     settings = load_settings(ServingSettings, "serving", config_dir=root / "configs")
     ctx = Context(scenario, root)
     started = datetime.now(UTC)
-    servers = serve_all(ctx, settings, root, factory)
+    merged, merges = build_merges(scenario, settings, root, script_runner)
+    servers = serve_all(ctx, settings, root, factory, merged)
     result = RunResult(
         run_id=new_ulid(),
         name=scenario.name,
@@ -334,7 +345,7 @@ def run_llm(
         packages=package_versions(PACKAGES),
         config=run_config(ctx, settings),
         scenario=raw,
-        metrics={"servers": servers},
+        metrics={"merges": merges, "servers": servers},
         notes="Closed-loop load on the planner's real first-attempt prompts (dev questions), "
         "warmup excluded; times are measured on the pod (client and server on one host). "
         "valid_rate = first-attempt replies that parse and pass the planner's validation. "
@@ -358,9 +369,14 @@ def run_config(ctx: Context, settings: ServingSettings) -> dict[str, Any]:
 
 
 def serve_all(
-    ctx: Context, settings: ServingSettings, root: Path, factory: Any = build_server
+    ctx: Context,
+    settings: ServingSettings,
+    root: Path,
+    factory: Any = build_server,
+    merged: dict[str, Path] | None = None,
 ) -> dict[str, Any]:
-    """Start each server in turn, load test and record its variants, stop it."""
+    """Start each server in turn, load test and record its variants, stop it. A server of a
+    merged model serves its directory from `merged` (built by `build_merges`)."""
     scenario = ctx.scenario
     servers: dict[str, Any] = {}
     for spec in scenario.servers:
@@ -368,10 +384,19 @@ def serve_all(
             "engine": spec.engine,
             "model": spec.model,
             "revision": spec.revision,
+            "merged": spec.merged,
             "args": spec.args,
             "env": spec.env,
             "request_extra": spec.request_extra,
         }
+        if spec.merged is not None:
+            path = (merged or {}).get(spec.merged)
+            if path is None:
+                entry["ok"], entry["error"] = False, f"merge {spec.merged!r} was not built"
+                servers[spec.name] = entry
+                continue
+            # A local directory: no revision to pin (the merge recorded its inputs' pins).
+            spec = spec.model_copy(update={"model": str(path.resolve()), "revision": None})
         try:
             server, entry["lora"] = with_lora(
                 spec, settings.lora.unpack_dir, root, settings.lora.planner
@@ -428,8 +453,7 @@ def with_lora(
     modules = []
     for name, path in server.lora_modules.items():
         src = root / path
-        if pinned and path == pinned.path and sha256_file(src) != pinned.sha256:
-            raise ValueError(f"{path}: hash differs from the pinned planner adapter")
+        check_pinned(path, src, pinned)
         adapter = unpack_adapter(src, root / unpack_dir, name)
         config = json.loads((adapter / "adapter_config.json").read_text(encoding="utf-8"))
         served[name] = {
@@ -451,6 +475,12 @@ def with_lora(
         *modules,
     ]
     return server.model_copy(update={"args": args}), served
+
+
+def check_pinned(path: Path, src: Path, pinned: PinnedAdapter | None) -> None:
+    """Refuse the pinned planner adapter's file at any other hash (D42)."""
+    if pinned and path == pinned.path and sha256_file(src) != pinned.sha256:
+        raise ValueError(f"{path}: hash differs from the pinned planner adapter")
 
 
 def sha256_file(path: Path) -> str:

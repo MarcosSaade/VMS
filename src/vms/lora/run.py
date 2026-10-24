@@ -37,6 +37,7 @@ from vms.lora.data import (
 )
 from vms.lora.scenario import LoraScenario, Run, load_spec_load
 from vms.query.settings import QuerySettings
+from vms.serving.merge import run_python_script
 from vms.serving.run import Context, run_config, serve_all, sha256_file
 from vms.serving.scenario import LlmScenario, Server, Variant
 from vms.serving.servers import build_server
@@ -59,21 +60,9 @@ def subprocess_trainer(
     settings: ServingSettings, spec_path: Path, log_path: Path, timeout_s: float
 ) -> dict[str, Any]:
     """Run the trainer script on one spec; its metrics file, or an error to record."""
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    spec = json.loads(spec_path.read_text(encoding="utf-8"))
-    with log_path.open("ab") as out:
-        proc = subprocess.run(
-            [settings.lora.python, str(settings.lora.script), str(spec_path)],
-            stdout=out,
-            stderr=subprocess.STDOUT,
-            timeout=timeout_s,
-            check=False,
-        )
-    if proc.returncode != 0:
-        tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-30:]
-        raise RuntimeError(f"trainer exited with {proc.returncode}:\n" + "\n".join(tail))
-    metrics: dict[str, Any] = json.loads(Path(spec["metrics_file"]).read_text(encoding="utf-8"))
-    return metrics
+    return run_python_script(
+        settings.lora.python, settings.lora.script, spec_path, log_path, timeout_s
+    )
 
 
 def pack_adapter(adapter_dir: Path, tar_path: Path) -> str:
