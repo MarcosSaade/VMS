@@ -4,7 +4,7 @@ A production-style Video Management System that ingests many camera streams, det
 
 Everything runs on a laptop CPU with `make demo`; GPU and cloud measurements come from short scripted sessions on rented machines with verified teardown (about $6 of compute in total).
 
-![Camera wall: live tiles with detection boxes, track IDs and zones](docs/images/ui-cameras.png)
+[![Watch the 2-minute demo: camera wall, a question answered through a query plan, dashboards and the headline measurements](docs/images/demo-poster.jpg)](https://marcossaade.github.io/vms-demo.mp4)
 
 <sub>Frames: MOT17 (Milan et al., arXiv:1603.00831, CC BY-NC-SA 3.0) and Wikimedia Commons (Qviri, CC BY-SA 4.0).</sub>
 

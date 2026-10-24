@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VMS slides</title>
+<style>
+  :root { --bg:#0b1020; --panel:#121a2e; --line:#22304d; --text:#e5e9f2; --muted:#8a96b0;
+          --accent:#60a5fa; --ok:#4ade80; --warn:#f59e0b; --bad:#f87171; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; }
+  .slide { display:none; height:100vh; padding:72px 96px; flex-direction:column; justify-content:center; }
+  .slide.on { display:flex; animation: in .5s ease-out both; }
+  @keyframes in { from { opacity:0; transform:translateY(12px);} to { opacity:1; transform:none; } }
+  .kicker { color:var(--accent); font-size:18px; letter-spacing:.14em; text-transform:uppercase; font-weight:600; }
+  h1 { font-size:64px; margin:14px 0 18px; line-height:1.08; letter-spacing:-.01em; }
+  h1 .logo { color:var(--bad); }
+  .lede { font-size:26px; color:var(--muted); max-width:1050px; line-height:1.4; margin:0; }
+  .big { font-size:120px; font-weight:750; letter-spacing:-.02em; line-height:1; margin:18px 0 10px; }
+  .big small { font-size:44px; color:var(--muted); font-weight:500; margin-left:14px; }
+  .what { font-size:30px; margin:0 0 22px; }
+  .how { font-size:22px; color:var(--muted); max-width:1100px; line-height:1.45; margin:0; }
+  .src { position:absolute; bottom:44px; left:96px; font: 16px ui-monospace, Menlo, monospace; color:#5d6a86; }
+  .row { display:flex; gap:56px; align-items:flex-start; margin-top:18px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:26px 30px; }
+  .bars div { display:flex; align-items:center; gap:14px; font-size:20px; margin:10px 0; }
+  .bar { height:26px; border-radius:6px; flex:none; }
+  .bars div > span:first-child { flex:0 0 170px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .url { font: 26px ui-monospace, Menlo, monospace; color:var(--accent); margin-top:34px; }
+  ul.facts { list-style:none; padding:0; margin:26px 0 0; font-size:26px; line-height:1.9; }
+  ul.facts b { color:var(--accent); font-weight:650; }
+  svg text { font-family: inherit; }
+</style>
+</head>
+<body>
+
+<section class="slide" id="title">
+  <div class="kicker">Video analytics, measured</div>
+  <h1><span class="logo">●</span> VMS</h1>
+  <p class="lede">Ingests many camera streams, detects and tracks people and vehicles, records zone
+    events, and answers plain-English questions about what the cameras saw.
+    Every design choice backed by a benchmark.</p>
+  <div class="url">github.com/MarcosSaade/VMS</div>
+</section>
+
+<section class="slide" id="capacity">
+  <div class="kicker">Pipeline capacity · laptop CPU</div>
+  <div class="big">2 → 5 <small>cameras per worker</small></div>
+  <p class="what">at 5 FPS, freshness p95 under 2 s, 0 frames lost</p>
+  <p class="how">Profiled first, then fixed the top bottlenecks: ONNX Runtime, cross-camera batching,
+    idle threads that sleep. End-to-end gain 1.8x vs 1.84 to 2.13x model-only.
+    On AWS: <b style="color:var(--text)">$0.12 per camera-hour</b> of compute.</p>
+  <div class="src">E-039…E-042, E-047…E-049, E-059 · bench/results/*.json</div>
+</section>
+
+<section class="slide" id="accuracy">
+  <div class="kicker">Question answering · frozen test split</div>
+  <div class="big">95.8% <small>[92.3, 98.6]</small></div>
+  <p class="what">execution accuracy on 142 held-out questions, 0 of 13 red-team attacks succeeded</p>
+  <p class="how">The LLM never writes SQL. It fills a typed QueryPlan that is validated, compiled to
+    parameterized SQL, checked by an allowlist and run as a read-only role.
+    Two independent golds per question; bootstrap confidence intervals.</p>
+  <div class="src">D13, D14, D29, D30 · E-036 · eval/results/*.json</div>
+</section>
+
+<section class="slide" id="d7">
+  <div class="kicker">Decision D7 · which LLM plans the queries?</div>
+  <h1 style="font-size:50px;margin:10px 0 4px">Hosted model vs my fine-tuned Qwen3.5-4B</h1>
+  <div class="row">
+    <div class="card bars" style="width:560px">
+      <div style="color:var(--muted);font-size:17px">Test accuracy (same frozen split)</div>
+      <div><span style="width:170px">Hosted</span><span class="bar" style="width:287px;background:var(--accent)"></span><span class="num">95.8%</span></div>
+      <div><span style="width:170px">LoRA</span><span class="bar" style="width:249px;background:var(--warn)"></span><span class="num">83.1%</span></div>
+      <div><span style="width:170px">LoRA 4-bit</span><span class="bar" style="width:247px;background:var(--warn);opacity:.7"></span><span class="num">82.4%</span></div>
+      <div><span style="width:170px">Base, few-shot</span><span class="bar" style="width:237px;background:var(--muted)"></span><span class="num">78.9%</span></div>
+      <div style="color:var(--muted);font-size:17px;margin-top:16px">4-bit LoRA: only option under the 1.5 s p95 SLO (1.33 s)</div>
+    </div>
+    <div class="card" style="width:640px">
+      <div style="color:var(--muted);font-size:17px;margin-bottom:6px">Monthly cost vs query volume</div>
+      <svg id="cost" width="580" height="300" viewBox="0 0 580 300"></svg>
+    </div>
+  </div>
+  <p class="how" style="margin-top:22px">Decision: <b style="color:var(--text)">hosted</b>. Self-hosting only wins on cost above
+    ~1.5M questions/month, and loses 13 points of accuracy at any volume.</p>
+  <div class="src">E-074…E-078 · bench/results/2026-10-24-d7-compare-*.json</div>
+</section>
+
+<section class="slide" id="drift">
+  <div class="kicker">Drift detection · out of sample</div>
+  <div class="big">36 / 36 <small>injected drifts caught</small></div>
+  <p class="what">median delay 4.8 s, 0 false alarms in 4.2 clean camera-hours</p>
+  <p class="how">Per-camera input and output statistics against a calibrated reference; CUSUM vs a
+    fixed threshold, scored on delay against false-alarm rate.
+    Negative results reported too: two detector fine-tunes against blur lost more than they gained and were not deployed.</p>
+  <div class="src">D33, D34, D36, D39 · E-051…E-055, E-060, E-061, E-067</div>
+</section>
+
+<section class="slide" id="close">
+  <div class="kicker">How the numbers are made</div>
+  <h1 style="font-size:54px">Every number comes from a results file</h1>
+  <ul class="facts">
+    <li>git SHA, resolved config, hardware, seed, cost: <b>in every results JSON</b></li>
+    <li>scenario YAML before the run, warmup excluded, ≥ 3 reps</li>
+    <li><b>43</b> decision records · <b>78</b> experiments, failures included</li>
+    <li>GPU and cloud runs scripted with verified teardown: <b>~$6</b> in total</li>
+  </ul>
+  <div class="url">github.com/MarcosSaade/VMS · make setup &amp;&amp; make up &amp;&amp; make demo</div>
+</section>
+
+<script>
+  // Cost curve for D7: hosted $0.294 per 1k questions vs a fixed $439/month A40 (E-078).
+  const svg = document.getElementById("cost"), W = 580, H = 300, L = 70, B = 40, T = 12, R = 40;
+  const x0 = Math.log10(1e5), x1 = Math.log10(1e7), yMax = 3000;
+  const X = (q) => L + (Math.log10(q) - x0) / (x1 - x0) * (W - L - R);
+  const Y = (c) => H - B - Math.min(c, yMax) / yMax * (H - B - T);
+  const el = (tag, attrs, text) => { const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text) e.textContent = text; svg.append(e); return e; };
+  for (const c of [0, 1000, 2000, 3000]) { el("line", {x1:L, x2:W-R, y1:Y(c), y2:Y(c), stroke:"#22304d"});
+    el("text", {x:L-10, y:Y(c)+5, "text-anchor":"end", fill:"#8a96b0", "font-size":14}, "$" + c.toLocaleString()); }
+  for (const [q, t] of [[1e5,"100k"],[1e6,"1M"],[1e7,"10M"]]) el("text", {x:X(q), y:H-12, "text-anchor":"middle", fill:"#8a96b0", "font-size":14}, t + "/mo");
+  const pts = []; for (let i = 0; i <= 60; i++) { const q = 10 ** (x0 + (x1 - x0) * i / 60); if (0.294 * q / 1000 <= yMax) pts.push(`${X(q)},${Y(0.294*q/1000)}`); }
+  el("polyline", {points: pts.join(" "), fill:"none", stroke:"#60a5fa", "stroke-width":3});
+  el("line", {x1:X(1e5), x2:X(1e7), y1:Y(439), y2:Y(439), stroke:"#f59e0b", "stroke-width":3});
+  const be = 1.49e6; el("line", {x1:X(be), x2:X(be), y1:Y(0), y2:Y(439), stroke:"#e5e9f2", "stroke-dasharray":"4 4"});
+  el("circle", {cx:X(be), cy:Y(439), r:6, fill:"#e5e9f2"});
+  el("text", {x:X(be)+10, y:Y(439)-12, fill:"#e5e9f2", "font-size":15}, "break-even 1.5M/mo");
+  el("text", {x:X(3.2e6), y:Y(2500), fill:"#60a5fa", "font-size":15}, "hosted");
+  el("text", {x:X(1.3e5), y:Y(439)-10, fill:"#f59e0b", "font-size":15}, "self-hosted A40");
+
+  const id = new URLSearchParams(location.search).get("s") || "title";
+  document.getElementById(id).classList.add("on");
+</script>
+</body>
+</html>

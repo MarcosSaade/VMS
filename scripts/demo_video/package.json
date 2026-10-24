@@ -1,0 +1,8 @@
+{
+  "name": "vms-demo-video",
+  "private": true,
+  "description": "Records the VMS demo video (scripts/demo_video/run.sh)",
+  "dependencies": {
+    "playwright-core": "1.48.2"
+  }
+}

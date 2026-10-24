@@ -47,7 +47,7 @@ Adding a clip: look at its frames first, keep only static cameras, and label the
 - Large artifacts we produce are tracked with DVC. The default remote is `local`, a gitignored directory `.dvc-storage/` at the repo root (configured in `.dvc/config`). In the cloud, an S3 remote is set in `.dvc/config.local` (not committed).
 - `make data-pull` runs `dvc pull` from the default remote. It is a no-op with a message when no remote is configured, the local remote directory is missing or empty, or nothing is DVC-tracked yet, so a fresh clone works offline.
 - Push new artifacts with `uv run dvc add <path> && uv run dvc push`, then commit the `.dvc` pointer.
-- Tracked now: the structured eval snapshot `eval/structured/snapshot.v1/` (16 MB; regenerable from its spec, see Evaluation).
+- Tracked now: the structured eval snapshot `eval/structured/snapshot.v1/` (16 MB; regenerable from its spec, see Evaluation), the planner training pairs `train/plans.v1/` (task 8.2), the six planner LoRA adapters `models/lora/*.tar` (task 8.3) and the four blur fine-tunes `models/finetune/*.pt` (tasks 9.5, 9.6); about 710 MB in all.
 
 ## Running locally
 
@@ -77,6 +77,21 @@ make zones          # builds the UI (Node 22), then http://127.0.0.1:8075
 - Afterwards: `make migrate` loads the zones into Postgres (running workers reload them within `zones.refresh_s`, 60 s), and check them on video: `uv run python -m vms.worker render mot17-09-mini:entrance mot17-04-mini:checkout commons-roncesvalles:parking_lot mot17-09-mini:loading_dock --out ~/Desktop/zones.mp4`.
 - Zone ids are `<camera_id>:<name>`: renaming a zone starts a new zone; events of the old name stay under the old id.
 - Show a different clip for a camera: `uv run python -m vms.zones edit --clip cam-004=mot17-04-mini`.
+
+### Demo video
+
+The 2-minute demo video (task 11.3, linked from the README) is recorded by a script, not by hand: headless Chrome driven by Playwright captures the UI and Grafana through the DevTools screencast, with captions and evidence cards (`scripts/demo_video/slides.html`), and ffmpeg encodes 1080p H.264.
+
+```bash
+make demo                                    # stack, app containers, data
+cd scripts/demo_video && npm ci && cd -      # playwright-core, pinned; uses the installed Chrome
+scripts/demo_video/run.sh vms-demo.mp4       # ~8 min: waits for an empty queue, streams 4 cameras for 5 min, records ~1:40
+```
+
+- Needs Node 22, ffmpeg and Chrome (`CHROME_PATH`, default `/usr/bin/google-chrome`). The shot list, captions and hold times are in `record.js`; page loads are cut out of the recording.
+- The 5-minute stream before recording keeps Grafana's 5-minute window to one steady run; a backlog left by an earlier run would show as red panels.
+- `poster.js` makes the README poster (`docs/images/demo-poster.jpg`) from a frame of the video.
+- The video is not in git (section 7 of AGENTS.md); it is hosted on the author's website.
 
 ### Stack
 
