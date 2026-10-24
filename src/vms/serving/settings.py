@@ -54,10 +54,22 @@ class LoraSettings(_Section):
     planner: PinnedAdapter | None = None
 
 
+class SelfHostedPlanner(_Section):
+    """How the planner is served when self-hosted (task 8.4, D43): the model, the vLLM flags,
+    and the adapter (`lora.planner`, served at its pinned hash) on top. D7 keeps the hosted
+    planner as the default; this is the measured configuration to fall back to."""
+
+    model: str
+    revision: str
+    args: list[str] = Field(default_factory=list)  # vLLM flags (without the LoRA ones)
+    request_extra: dict[str, object] = Field(default_factory=dict)
+
+
 class ServingSettings(ServiceSettings):
     vllm: EngineSettings
     ollama: EngineSettings
     lora: LoraSettings = Field(default_factory=LoraSettings)
+    planner_server: SelfHostedPlanner | None = None
     poll_s: float = Field(default=2.0, gt=0)
     stop_timeout_s: float = Field(default=60.0, gt=0)
     request_timeout_s: float = Field(default=120.0, gt=0)

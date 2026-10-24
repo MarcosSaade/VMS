@@ -31,6 +31,17 @@ lora:                           # LoRA training (task 8.3, D42) and merging (8.4
     base_model: Qwen/Qwen3.5-4B
     base_revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
     prompt: configs/prompts/planner.compact.v1.txt
+# The planner when self-hosted (task 8.4, D43; D7 keeps the hosted model as the default): the
+# GPTQ W4A16 base with lora.planner on top, prefix caching on. On one A40 it is the fastest
+# option measured (13.1 req/s at 32 concurrent, p95 1.18 s at 1) and the only one inside the
+# 1.5 s query SLO at concurrency 1, at -0.7 [-3.5, +1.4] test points against the BF16 adapter
+# (E-075, E-076). Served with the same flags as bench/scenarios/llm-quant-test-a40.yaml.
+planner_server:
+  model: RedHatAI/Qwen3.5-4B-quantized.w4a16
+  revision: 7a613872f394578b0b52b683ff4ac47516b4bcaf
+  args: [--max-model-len, "16384", --gpu-memory-utilization, "0.90", --language-model-only,
+         --generation-config, vllm, --enable-prefix-caching]
+  request_extra: {chat_template_kwargs: {enable_thinking: false}}
 poll_s: 2.0                     # health checks while a server starts
 stop_timeout_s: 60              # SIGTERM, then SIGKILL
 request_timeout_s: 120          # health, version and metrics reads

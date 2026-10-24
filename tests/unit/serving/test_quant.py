@@ -304,3 +304,21 @@ def test_hosted_load_matches_the_pod_load_profile() -> None:
     assert server.use_llm_api_key
     assert not any(v.record for v in server.variants)  # its test accuracy is E-036's
     assert yaml.safe_load(HOSTED.read_text())["kind"] == "llm"
+
+
+def test_the_self_hosted_planner_config_is_the_one_tested() -> None:
+    """configs/serving.yaml planner_server (D43) is the server of the quantized-LoRA test run,
+    with the pinned adapter, so the committed serving config is what the test number measured."""
+    settings = load_settings(ServingSettings, "serving", config_dir=REPO_ROOT / "configs")
+    deploy, pin = settings.planner_server, settings.lora.planner
+    assert deploy is not None
+    assert pin is not None
+    (server,) = serving_run.load_scenario(TEST)[0].servers
+    assert (deploy.model, deploy.revision, deploy.args, deploy.request_extra) == (
+        server.model,
+        server.revision,
+        server.args,
+        server.request_extra,
+    )
+    assert server.lora_modules == {pin.name: pin.path}
+    assert [v.prompt for v in server.variants] == [pin.prompt]

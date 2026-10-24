@@ -291,16 +291,18 @@ def markdown(metrics: Mapping[str, Any], slo_s: float) -> str:
     ]
     for name, o in metrics["options"].items():
         sat = next(lv for lv in o["levels"] if lv["concurrency"] == o["saturation_level"])
-        slo = f"c={o['slo_level']}" if o["slo_level"] is not None else "none"
+        slo = "none"
+        if o["slo_level"] is not None:
+            slo = f"c={o['slo_level']}"
+            if o["cost_kind"] == "gpu" and o["cost_at_slo"]:
+                slo += f" (USD {o['cost_at_slo']['usd_per_1k']:.3f}/1k there)"
         if o["cost_kind"] == "gpu":
-            at = o["cost_at_slo"] or o["cost_at_saturation"]
-            where = "at SLO" if o["cost_at_slo"] else "at saturation"
-            cost = f"{at['usd_per_1k']:.3f} ({where}, full use)"
+            # Saturation for every GPU option, so the column compares like with like.
+            cost = f"{o['cost_at_saturation']['usd_per_1k']:.3f} (saturation, full use)"
             fixed = f"{o['monthly_usd']:.0f}"
         else:
-            cost = (
-                f"{o['cost']['usd_per_1k']:.3f} (all-miss {o['cost']['usd_per_1k_all_miss']:.3f})"
-            )
+            c = o["cost"]
+            cost = f"{c['usd_per_1k']:.3f} (all-miss {c['usd_per_1k_all_miss']:.3f})"
             fixed = "0"
         rows.append(
             f"| {name} | {pct(o['accuracy'])} | {o['floor_p95_s']:.2f} s | {slo} | "

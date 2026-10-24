@@ -1,0 +1,45 @@
+name: d7-compare
+description: >
+  Task 8.5 (D7): the four planner options on the frozen test split (n=142), latency under the
+  same closed-loop load (concurrency 1 to 32, warmup excluded, 3 reps) and cost per 1,000
+  questions. Computed from results files only (no model calls). Self-hosted options on one
+  Runpod A40 at the 2026-10-24 session's price, all on vLLM 0.31 with prefix caching on; each
+  load test ran on the server with the adapter enabled, so the base few-shot's load includes
+  LoRA being enabled on its server (dev scenario llm-quant-a40). The hosted option is DeepSeek
+  deepseek-flash measured from the laptop (internet path included, llm-load-hosted). SLO: the
+  query service's p95 1.5 s (configs/bench.yaml query_p95_s), applied to the LLM call alone.
+kind: llm-compare
+seed: 2026
+slo_p95_s: 1.5
+hours_per_month: 730
+resamples: 2000
+options:
+  - name: hosted
+    description: DeepSeek deepseek-flash, full prompt, few-shot (E-036 test; llm-load-hosted)
+    accuracy: eval/results/2026-10-14-structured-test-deepseek-flash-01M4X596J9CHNDG20XEMRVQT2F.json
+    load: {results: bench/results/2026-10-24-llm-load-hosted-01M5PXAMV2Q6DSTWHBGB99BFJ6.json,
+           server: hosted, variant: structured}
+    cost: {kind: hosted, price: deepseek-flash}
+  - name: base-few-shot
+    description: Qwen3.5-4B BF16, full prompt with the few-shot bank (E-074 test)
+    accuracy: eval/results/2026-10-23-structured-test-replay-qwen3.5-4b-01M5NBSNHYDADVTS6G9XY2XK7V.json
+    load: {results: bench/results/2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06.json,
+           server: qwen3.5-4b, variant: base-full}
+    cost: {kind: gpu, session: bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json}
+  - name: lora
+    description: Qwen3.5-4B BF16 + all-r4 adapter, compact prompt (E-074 test)
+    accuracy: eval/results/2026-10-23-structured-test-replay-qwen3.5-4b-01M5NBSJR43JKPQ7AA9KQ0RW5W.json
+    load: {results: bench/results/2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06.json,
+           server: qwen3.5-4b, variant: all-r4}
+    cost: {kind: gpu, session: bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json}
+  - name: lora-w4a16
+    description: GPTQ W4A16 Qwen3.5-4B + the same adapter, compact prompt (llm-quant-test-a40)
+    accuracy: eval/results/2026-10-24-structured-test-replay-qwen3.5-4b-w4a16-01M5PZQ3154YACNZBERSBEFZ5B.json
+    load: {results: bench/results/2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06.json,
+           server: qwen3.5-4b-w4a16, variant: all-r4}
+    cost: {kind: gpu, session: bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json}
+paired:
+  - [hosted, lora]
+  - [hosted, lora-w4a16]
+  - [lora, base-few-shot]
+  - [lora-w4a16, lora]
