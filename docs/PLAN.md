@@ -120,9 +120,9 @@ Added 2026-10-16 by the user's decision, as work after checkpoint C1; 8.1 to 8.3
   - Understand it: which filter removed the most pairs, and how do you know no test question leaked in?
 - [x] 8.3 LoRA fine-tune on plan JSON with ablations (results JSON, no W&B: D16; optional SQL adapter for D11). Run 2026-10-23 on the A40, three sessions (E-071 OOM attempt, E-072 to E-074; D42 accepted): Qwen3.5-4B, BF16 LoRA, compact prompt; dev: all pairs 83.9 to 84.7% at ranks 4/16/64, 500 and 1,000 pairs 74.5 to 78.1%, base 74.5%; test once for all-r4: 83.1% [76.8, 88.7] vs base 78.9% [71.8, 85.2], hosted 95.8%. Adapters in DVC, all-r4 pinned by sha256 in `configs/serving.yaml`; $2.19 Runpod. Not done: the optional SQL adapter (D11 stays default). "Understand it" answered 2026-10-23
   - Understand it: how did accuracy move with data size and rank on dev, and what did the one test run show?
-- [ ] 8.4 Quantization; multi-LoRA (plan + SQL adapters) or adapter vs merged overhead
+- [x] 8.4 Quantization; multi-LoRA (plan + SQL adapters) or adapter vs merged overhead. Run 2026-10-24 on the A40 (E-075, E-076; D43): RedHatAI GPTQ W4A16 and W8A8 bases with the pinned adapter, and the adapter merged; W4A16 1.5x the BF16 adapter at concurrency 1 (p95 1.18 vs 1.78 s, decode 79 vs 51 tok/s), +17% at 32, weights 4.5 vs 8.0 GiB, test 82.4% vs 83.1% (paired -0.7 [-3.5, +1.4]); merged = adapter (146/147 identical replies) and 13 to 14% faster; multi-LoRA not needed (one adapter). Serving config: `configs/serving.yaml` `planner_server`. $0.445 Runpod
   - Understand it: what did AWQ/GPTQ cost in accuracy and buy in latency and memory?
-- [ ] 8.5 Decide D7: hosted vs few-shot vs LoRA on accuracy, p95, cost
+- [x] 8.5 Decide D7: hosted vs few-shot vs LoRA on accuracy, p95, cost. Done 2026-10-24 (E-077, E-078): D7 accepted, hosted: test 95.8% vs 83.1% LoRA (paired +12.7 [+7.0, +19.0]), $0.29 per 1k questions vs a fixed $439/month A40, break-even ~1.5M questions/month; only the W4A16 LoRA meets p95 1.5 s (at concurrency 1). Hosted load test $0.19
   - Understand it: at what query volume does self-hosting beat the hosted model per 1,000 queries, if ever?
 
 ## Interview defense

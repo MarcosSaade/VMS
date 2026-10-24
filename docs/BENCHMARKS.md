@@ -42,6 +42,7 @@ Self-measured on `laptop` unless a row names another host; 95% bootstrap interva
 | Fine-tune follow-up (9.6), frozen backbone, same data and eval | Recipe loss mostly fixed (no-blur control clean MOT17 +0.5 [-0.2, +1.3], COCO -3.0, from -3.2 / -5.6) but the blur gain shrinks to +1.2 [+0.5, +1.9] over the control; still not deployed | E-067 (Drift detection, fine-tune follow-up) |
 | Self-hosted planner on one A40 (vLLM 0.31, BF16, real ~4.1k-token planner prompt) | Prefix caching: TTFT **162 vs 728 ms**, **3.1x** throughput at 16 concurrent (Qwen3.5-9B); structured outputs: no measurable speed cost; dev accuracy **75.2% [67.9, 82.5]** (Qwen3.5-9B and -4B) vs **94.2%** hosted DeepSeek, so D7 keeps the hosted planner | E-068, E-069 (LLM serving) |
 | Planner LoRA (8.3): Qwen3.5-4B, rank 4 on 2,660 **synthetic** pairs, compact prompt, one A40 | Test **83.1% [76.8, 88.7]** vs the base on its full prompt **78.9% [71.8, 85.2]** (intervals overlap; dev +10 points), 1.75x faster per call (p50 1.50 vs 2.63 s); still under hosted DeepSeek's 95.8% | E-072 to E-074 (LLM serving, LoRA) |
+| Planner strategy (D7, 8.5): hosted vs self-hosted on test, one A40 | Hosted DeepSeek **95.8%** vs LoRA 83.1% / W4A16 LoRA 82.4% (paired **+12.7 [+7.0, +19.0]** points); hosted **$0.29 per 1k questions** vs a fixed **$439/month** A40: self-hosting is cheaper only above **~1.5M questions/month**; 4-bit LoRA is the only option with p95 under 1.5 s (1.33 s at 1 concurrent) | E-075 to E-078 (LLM serving, D7) |
 | Precision ladder, CPU, model-only (`detect_batch`, batch 1) | ONNX Runtime FP32 **1.84x** PyTorch for yolo11n (48.8 vs 26.5 images/s) and **1.65x** for yolo11s (21.3 vs 12.9), identical mAP; INT8 is faster still (65.8 and 38.2) but fails D32 for both models (COCO mAP@50-95 -1.30 and -1.07 points), so not kept | E-044 to E-046 (Inference, precision ladder) |
 
 ## Ingest and pipeline capacity
@@ -494,9 +495,59 @@ Frozen test split (n=142, sha256 `0330b3db...`), run once for the chosen adapter
 - **The adapter learned the task, not just the format**: with the compact prompt and no adapter the base scores 0% on expressible questions; with the adapter it beats the base on its full prompt. On test the gain is +4.2 points with overlapping intervals (dev: +10), so it is likely but not shown; most of it is abstention (+8.9 points), expressible questions +2.1.
 - **Data size matters, rank does not** (dev): all pairs is 6 to 10 points above 500 or 1,000; ranks 4, 16 and 64 are within 0.8 points, under the 3.6 points between two identical n1000-r16 runs (run-to-run noise from non-deterministic GPU training). Rank 4 is chosen as the best point estimate and abstention and the smallest adapter; rank 64 abstains wrongly more (4.1%).
 - **Faster through the shorter prompt**: recorded call p50 1.50 s vs 2.63 s on test (no prefix caching on either; with caching, 8.1's full prompt costs less, so the speed comparison under load belongs to 8.4 and 8.5).
-- **Still not the hosted planner**: 12.7 points under DeepSeek on test; D7 is decided in 8.5 with cost per 1,000 queries and p95 under load.
-- Not measured: a paired test difference (the eval has no paired compare for structured runs), more than one training seed per configuration, the linear-attention projections as LoRA targets, and live serving in the query service.
+- **Still not the hosted planner**: 12.7 points under DeepSeek on test (paired +12.7 [+7.0, +19.0], E-078); D7 is decided below.
+- Not measured here: a paired test difference (added in 8.5: LoRA - base +4.2 [-0.7, +9.9], E-078), more than one training seed per configuration, the linear-attention projections as LoRA targets, and live serving in the query service.
 - Evidence: [session 1](../bench/results/2026-10-23-lora-plan-a40-01M5MW72R48ZCKHG15CY12MGZM.json), [session 2](../bench/results/2026-10-23-lora-plan-a40-b-01M5N2QY7YSASA28F4JTEGQZ24.json), [test recording](../bench/results/2026-10-23-lora-plan-test-a40-01M5NBRPMC2QS6FSF853KGRA83.json); dev replays `eval/results/2026-10-23-structured-dev-replay-qwen3.5-4b-01M5N2V5590AR4ANA57HTQ2D6X.json` to `-01M5NB06FJS9BPP9J2FHW673XD.json`. Adapters: `models/lora/*.tar` (DVC); the chosen one is pinned by sha256 in `configs/serving.yaml` (`lora.planner`).
+
+### Quantized and merged planner serving (task 8.4; E-075, E-076, D43)
+
+`runpod-a40` (EU-SE-1), clean commit 08c744e, `bench/scenarios/llm-quant-a40.yaml` and `llm-quant-test-a40.yaml` in one session. vLLM 0.31.0, prefix caching on, structured outputs on, greedy, thinking off; the pinned all-r4 adapter (D42) with its compact prompt on every base, and the base with the service's full prompt as a control. Quantized bases are RedHatAI's GPTQ checkpoints of the same Qwen3.5-4B weights (LLM Compressor; attention and MLP projections quantized, linear attention, vision tower, embeddings and lm_head BF16). Merged: all-r4 merged into the BF16 base on the pod (FP32 merge, BF16 weights, `scripts/lora_merge.py`). Closed loop on the 137 dev questions, 4 warmup requests excluded, 3 reps (16, 16, 64, 128 requests at concurrency 1, 4, 16, 32); means over reps. Accuracy replayed through the unchanged eval (0 replay misses). **Self-measured on a rented pod.**
+
+| Server (adapter, compact prompt) | Weights GiB | KV cache tokens | c=1 req/s | c=1 p95 ms | Decode tok/s c=1 | c=32 req/s | c=32 p95 ms | Dev accuracy (n=137) |
+|---|---|---|---|---|---|---|---|---|
+| BF16 + adapter (baseline) | 8.03 | 788k | 0.92 | 1,779 | 50.5 | 11.20 | 4,156 | 84.7% [78.8, 90.5] |
+| BF16 merged | 7.99 | 803k | 1.05 | 1,546 | 58.6 | 12.67 | 3,656 | 83.9% [78.1, 89.8] |
+| W8A8 + adapter | 5.71 | 849k | 1.12 | 1,434 | 63.4 | 13.07 | 3,660 | 83.2% [76.6, 89.1] |
+| **W4A16 + adapter** | **4.53** | **880k** | **1.37** | **1,177** | **79.1** | **13.06** | 3,820 | 81.8% [75.2, 88.3] |
+
+| Base, full prompt (control) | c=1 req/s | c=1 p95 ms | c=32 req/s | c=32 p95 ms | Dev accuracy |
+|---|---|---|---|---|---|
+| BF16 | 0.88 | 2,093 | 8.82 | 6,070 | 75.2% [67.9, 82.5] |
+| W8A8 | 1.17 | 1,369 | 9.94 | 5,565 | 73.0% [65.0, 80.3] |
+| W4A16 | 1.50 | 1,039 | 10.14 | 5,040 | 70.1% [62.0, 78.1] |
+
+Test split (n=142), once, W4A16 + adapter (chosen for the D7 test run before any result): **82.4% [76.1, 88.0]** vs the BF16 adapter's 83.1% [76.8, 88.7] (E-074); paired -0.7 points [-3.5, +1.4] (1 question only W4A16 got right, 2 only BF16; E-078).
+
+- **4-bit buys speed where decode is memory-bound**: at concurrency 1 the W4A16 adapter decodes 79 vs 51 tok/s and answers 1.5x as many requests per second, p95 1.18 vs 1.78 s; at 32 concurrent the gain shrinks to +17% (compute and scheduling, not weight reads, dominate). Weights drop 44% (not 75%: linear attention, embeddings and the vision tower stay BF16), and the freed memory is 12% more KV cache.
+- **It costs the adapter little accuracy and the base more**: adapter -2.9 dev points and -0.7 [-3.5, +1.4] on test, inside noise; base on its full prompt -5.1 dev points (W8A8 -2.2). 127 of 145 adapter replies are byte-identical between BF16 and W4A16.
+- **Merged = adapter, minus vLLM's LoRA overhead**: 146 of 147 dev replies identical (one question differs), +14% req/s at concurrency 1 and +13% at 32. Multi-LoRA was not needed: there is one adapter (no SQL adapter, D11 unchanged).
+- Prefix-cache hit rate: 89% on the full prompt, 63% on the compact one (a shorter shared prefix).
+- Chosen serving configuration (D43): W4A16 + adapter, `configs/serving.yaml` `planner_server`.
+- Evidence: [dev session](../bench/results/2026-10-24-llm-quant-a40-01M5PZEPSC48GZTPADB095KA06.json), [test recording](../bench/results/2026-10-24-llm-quant-test-a40-01M5PZKZ7HYPV8M76F77KC342F.json), [session](../bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json); replays `eval/results/2026-10-24-structured-dev-replay-*.json`, `eval/results/2026-10-24-structured-test-replay-qwen3.5-4b-w4a16-01M5PZQ3154YACNZBERSBEFZ5B.json`.
+
+### D7: hosted vs few-shot vs LoRA vs quantized LoRA (task 8.5; E-077, E-078)
+
+`make bench SCENARIO=bench/scenarios/d7-compare.yaml` (no model calls; commit 2329705). Test accuracy: each option's one test run (same file, sha256 `0330b3db...`), paired differences by bootstrap over the same questions (2,000 resamples). Latency: the same closed-loop profile on dev questions, worst rep's p95; self-hosted on the A40 (client on the pod, E-075; the base's load ran with LoRA enabled on its server), hosted from the laptop over the internet (E-077: DeepSeek `deepseek-flash`, full prompt, 96.5% of prompt tokens cache hits). Cost: A40 at $0.601/h ($439/month always on); hosted at configs/eval.yaml prices. LLM calls per question (repairs) from the test runs: 1.05 to 1.14.
+
+| Option | Test accuracy | p95 at c=1 | Best level within 1.5 s p95 | Saturation (req/s, p95) | USD per 1k questions | Fixed USD/month |
+|---|---|---|---|---|---|---|
+| **hosted (D7)** | **95.8% [92.3, 98.6]** | 2.77 s | none | 11.66 at c=32, 3.40 s | 0.294 (all-miss 1.597) | 0 |
+| base-few-shot | 78.9% [71.8, 85.2] | 2.20 s | none | 8.82 at c=32, 6.30 s | 0.022 (saturation, full use) | 439 |
+| lora | 83.1% [76.8, 88.7] | 2.02 s | none | 11.20 at c=32, 4.26 s | 0.016 (saturation, full use) | 439 |
+| lora-w4a16 | 82.4% [76.1, 88.0] | 1.33 s | c=1 (USD 0.132/1k there) | 13.06 at c=32, 3.87 s | 0.014 (saturation, full use) | 439 |
+
+| Paired difference (test) | Points [95% CI] | Only a / only b |
+|---|---|---|
+| hosted - lora | +12.7 [+7.0, +19.0] | 20 / 2 |
+| hosted - lora-w4a16 | +13.4 [+7.7, +19.7] | 21 / 2 |
+| lora - base-few-shot | +4.2 [-0.7, +9.9] | 10 / 4 |
+| lora-w4a16 - lora | -0.7 [-3.5, +1.4] | 1 / 2 |
+
+- **Accuracy decides it**: the hosted model is 12.7 to 13.4 points ahead of either LoRA option, intervals well clear of zero; the LoRA's gain over the base is likely but not shown (+4.2 [-0.7, +9.9]).
+- **Break-even volume: 1.49M questions/month** (~2,000 an hour around the clock) for one always-on A40 against $0.29 per 1,000 hosted questions. Below it the hosted model is cheaper; one A40 at saturation would answer ~27 to 32M a month at $0.014 to $0.022 per 1,000. At ~$1.60 per 1,000 (no cache hits) break-even falls to ~275k a month.
+- **Latency**: only the W4A16 LoRA meets the 1.5 s query SLO, and only at concurrency 1; the hosted model's p95 is 2.6 to 3.4 s at every level (the provider scales, the floor is the round trip and its decode).
+- Not measured: the network between the query service and a self-hosted GPU, the hosted provider's rate limits, a reserved or cheaper GPU, engineering and on-call time.
+- Evidence: [comparison](../bench/results/2026-10-24-d7-compare-01M5PZTAAM7FWWA8C5WMB4AYF2.json), [hosted load](../bench/results/2026-10-24-llm-load-hosted-01M5PXAMV2Q6DSTWHBGB99BFJ6.json).
 
 ## Drift detection
 
@@ -624,6 +675,8 @@ Per-session cost, estimated as the live catalog price x billed seconds (Runpod) 
 | LoRA session 1: three trainings, five dev recordings (E-072) | runpod-a40, $0.595/h | 4,848 s | $0.802 | `bench/results/2026-10-23-gpu-session-01M5MQKTZ748HYDXP902G61P52.json` |
 | LoRA session 2: three trainings, seven dev recordings (E-073) | runpod-a40, $0.595/h | 6,895 s | $1.141 | `bench/results/2026-10-23-gpu-session-01M5MW85GEF097E394EZZFGWX1.json` |
 | LoRA test session: two test recordings (E-074) | runpod-a40, $0.595/h | 671 s | $0.111 | `bench/results/2026-10-23-gpu-session-01M5NB4JNRN6P3478CK6B086PG.json` |
+| Quantization session: 4 servers, merge, 7 dev and 1 test recording (E-075, E-076) | runpod-a40, $0.601/h | 2,663 s | $0.445 | `bench/results/2026-10-24-gpu-session-01M5PX4DGN3R4E9RM0YK0M1YCK.json` |
+| Hosted planner load test, DeepSeek (E-077) | API, peak prices | 672 requests | $0.19 | `bench/results/2026-10-24-llm-load-hosted-01M5PXAMV2Q6DSTWHBGB99BFJ6.json` |
 
 Cost per camera-hour at full scale: placeholder (task 10.3). Measured so far: $0.12 per camera-hour of on-demand CPU compute on aws-c7i-2xl (3 rated cameras, E-059).
 
@@ -632,6 +685,7 @@ Cost per camera-hour at full scale: placeholder (task 10.3). Measured so far: $0
 One `make` or `python -m vms...` command per table. `make bench SCENARIO=bench/scenarios/<name>.yaml` reruns any scenario named in a table (`make demo` first for end-to-end ones; `make loadgen-stub` for the stub scenarios; `make data-mini` and `make models` for the model-only ones), and `make bench-report RESULTS=...` renders a results file as the table rows above.
 
 - Planner LoRA (8.3): `make data-pull` (training pairs and adapters), `make traindata-catalogs`, then the three `scripts/runpod_session.sh run --yes bench/scenarios/lora-plan-*.yaml` sessions in RUNBOOK (GPU sessions, LoRA), then `make eval-replay` per recorded variant (`SPLIT=test` for the test recording).
+- Quantized and merged serving, D7 (8.4, 8.5): `make data-pull` (adapters), `scripts/runpod_session.sh run --yes bench/scenarios/llm-quant-a40.yaml bench/scenarios/llm-quant-test-a40.yaml`, `make bench SCENARIO=bench/scenarios/llm-load-hosted.yaml` (DeepSeek key in .env, ~$0.20), `make eval-replay` per recorded variant, then `make bench SCENARIO=bench/scenarios/d7-compare.yaml` after updating the results paths in it.
 - Structured eval scores: `make eval-db`, then `make eval SPLIT=dev` and, once per configuration, `make eval SPLIT=test` (LLM from `LLM_*`; DeepSeek needs `VMS_LLM__RESPONSE_FORMAT=json_object`), `make eval-report RESULTS=...`.
 - Detection quality: `make models`, `make eval-detection-data`, then `make eval SUITE=detection` and `make eval SUITE=detection WEIGHTS=yolo11n`.
 - Detection quality under drift: `make models`, `make onnx`, `make eval-detection-data`, then `make eval-drift` (~13 min).

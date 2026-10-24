@@ -458,6 +458,31 @@ dvc add models/lora/*.tar && dvc push            # then commit the .dvc pointers
 ```
 Runs train in priority order under `train_budget_minutes`: after the first, the measured seconds per example predict each next run, and a run that would not fit is skipped (recorded), never cut short; continue in a second scenario that lists the earlier tars under `serve.adapters`. The trainer probes the micro-batch on the longest examples and halves it (doubling accumulation) on out-of-memory; the 248k-token vocabulary's logits are what fill memory (E-071). EU-SE-1 hosts sometimes have no public IP (E-063); pin `VMS_DATA_CENTER_IDS` to CA-MTL-1 and retry on "no instances" (free) or "no direct SSH" (~$0.03). The test split is recorded once, by a `kind: llm` scenario with `split: test` and the chosen adapter in `lora_modules` (`bench/scenarios/lora-plan-test-a40.yaml`; push only that tar with `VMS_REMOTE__DATA='["models/lora/lora-plan-a40-b-all-r4.tar"]'`), and scored with `make eval-replay ... SPLIT=test`; replay refuses a recording of the other split. The chosen adapter is pinned in `configs/serving.yaml` (`lora.planner`: path and sha256); a server is refused that file if its hash differs. The laptop drives the session over SSH: keep it awake (`systemd-inhibit --what=sleep:idle:handle-lid-switch ...`), or the session dies and the pod's self-delete timer is what stops the cost.
 
+### Quantization, merging and the D7 comparison (tasks 8.4, 8.5; D43, D7)
+
+A `kind: llm` scenario can list `merges` (a base and an adapter, merged on the pod by `scripts/lora_merge.py` in vLLM's environment before any server starts, into `data/serving/merged/<name>`, ~9 GB, not collected) and serve them with `merged: <name>`; quantized bases are ordinary pinned Hugging Face checkpoints. Three Qwen3.5-4B checkpoints plus a merged copy need the pod's 80 GB container disk (`configs/runpod.yaml`). The pinned adapter is refused at any other hash when merged too. One session, about 45 minutes and $0.45 on an A40:
+```bash
+make data-pull                                    # models/lora (the pinned adapter)
+scripts/runpod_session.sh run --yes bench/scenarios/llm-quant-a40.yaml bench/scenarios/llm-quant-test-a40.yaml
+make bench SCENARIO=bench/scenarios/llm-load-hosted.yaml   # hosted planner, same load, from the laptop (~$0.20)
+make eval-replay REPLAY=bench/results/<date>-llm-quant-a40-<id>.json SERVER=qwen3.5-4b-w4a16 VARIANT=all-r4
+make eval-replay REPLAY=bench/results/<date>-llm-quant-test-a40-<id>.json SERVER=qwen3.5-4b-w4a16 VARIANT=all-r4 SPLIT=test
+make bench SCENARIO=bench/scenarios/d7-compare.yaml        # after pointing it at the new results files
+```
+Each vLLM server's `info.memory` holds the weights' GPU memory, the KV-cache memory and its size in tokens, read from vLLM's startup log. The load client records the provider's cache hits (`prompt_tokens_details.cached_tokens`, or DeepSeek's `prompt_cache_hit_tokens`), which price the hosted option. The comparison refuses dev runs and options scored on different test files.
+
+Self-hosting the planner (the D7 fallback; the hosted model is the default): serve `planner_server` from `configs/serving.yaml` with the pinned adapter, then point the query service at it:
+```bash
+vllm serve RedHatAI/Qwen3.5-4B-quantized.w4a16 --revision 7a613872f394578b0b52b683ff4ac47516b4bcaf \
+  --served-model-name planner --max-model-len 16384 --gpu-memory-utilization 0.90 --language-model-only \
+  --generation-config vllm --enable-prefix-caching \
+  --enable-lora --max-loras 1 --max-lora-rank 8 --lora-modules all-r4=<unpacked models/lora/lora-plan-a40-b-all-r4.tar>
+# .env: LLM_BASE_URL=http://<gpu-host>:8000/v1  LLM_MODEL=all-r4  VMS_LLM__RESPONSE_FORMAT=json_schema
+#       VMS_ASSETS__PLANNER_PROMPT=configs/prompts/planner.compact.v1.txt
+#       VMS_LLM__EXTRA_BODY='{"chat_template_kwargs": {"enable_thinking": false}}'   # planner_server.request_extra
+```
+Check the tar's sha256 against `lora.planner.sha256` before serving it. Not exercised end to end against the query service (no Docker on a pod, D37); the replayed eval runs the same planner and client code.
+
 ### EC2 GPU sessions (D28; waiting for a quota)
 
 One on-demand GPU instance per session, launched, used and destroyed by `scripts/gpu_session.sh` (`python -m vms.cloud`; design in ARCHITECTURE 9, D28). Settings: `configs/cloud.yaml`. Not usable while the account's G and VT quota is 0; kept because the CPU sessions share the driver.
