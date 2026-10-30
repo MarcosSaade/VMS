@@ -32,7 +32,7 @@ htmlcov/
 *.jpeg
 *.png
 *.webp
-# README images are the exception (AGENTS.md section 7)
+# README images are the exception
 !docs/images/*.png
 !docs/images/*.jpg
 !docs/images/*.webp
@@ -96,3 +96,7 @@ frontend/dist/
 
 # Claude Code local state (sidebar scratchpad, local settings)
 .claude/
+
+# Local coding-agent instructions
+AGENTS.md
+CLAUDE.md

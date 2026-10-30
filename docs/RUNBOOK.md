@@ -91,7 +91,7 @@ scripts/demo_video/run.sh vms-demo.mp4       # ~8 min: waits for an empty queue,
 - Needs Node 22, ffmpeg and Chrome (`CHROME_PATH`, default `/usr/bin/google-chrome`). The shot list, captions and hold times are in `record.js`; page loads are cut out of the recording.
 - The 5-minute stream before recording keeps Grafana's 5-minute window to one steady run; a backlog left by an earlier run would show as red panels.
 - `poster.js` makes the README poster (`docs/images/demo-poster.jpg`) from a frame of the video.
-- The video is not in git (section 7 of AGENTS.md); it is hosted on the author's website.
+- The video is not in git; it is hosted on the author's website.
 
 ### Stack
 

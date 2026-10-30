@@ -44,41 +44,47 @@ Read mix for load tests: 60% structured, 30% semantic, 10% hybrid, at swept conc
 
 The diagram shows the target design; the current scope (top of this file) builds a subset of it.
 
-```
- loadgen: N virtual cameras, fixed FPS, drift injection
-        |  gRPC client stream (JPEG + metadata)          [REST baseline in Phase 1]
-        v
- ingest-gateway ------------------------------> object store (SeaweedFS / S3): frames
-        |  frame refs (not images)
-        v
- queue keyed by camera_id (in scope: Postgres SKIP LOCKED; roadmap: Redis Streams | Kafka)
-        |
-        v
- inference-worker: batching, tracking, zone events --gRPC--> Triton
-        |                     |                              (YOLO11, CLIP image, CLIP text)
-        |  [optional, D3: detections/events topic (Kafka) -> store sink + drift-monitor]
-        v                     v
- detection store          vector store
- (ClickHouse | Postgres)  (pgvector | Qdrant)
-        ^                     ^
-        |  compiled,          |
-        |  parameterized SQL  |
- query-service (FastAPI, REST + SSE): planner -> QueryPlan -> compiler -> executor
-        |        --OpenAI-compatible API, structured outputs--> llm-service (vLLM + LoRA adapters)
-        ^                                                        fallback: hosted LLM
-        |
- frontend (React + TS, minimal)
+```mermaid
+flowchart TD
+    LG["loadgen<br/>N virtual cameras, fixed FPS, drift injection"]
+    IN[ingest-gateway]
+    OS[("object store<br/>SeaweedFS / S3: frames")]
+    Q[["queue keyed by camera_id<br/>in scope: Postgres SKIP LOCKED<br/>roadmap: Redis Streams | Kafka"]]
+    WK["inference-worker<br/>batching, tracking, zone events"]
+    TR["Triton<br/>YOLO11, CLIP image, CLIP text"]
+    DS[("detection store<br/>ClickHouse | Postgres")]
+    VS[("vector store<br/>pgvector | Qdrant")]
+    QS["query-service (FastAPI, REST + SSE)<br/>planner → QueryPlan → compiler → executor"]
+    LLM["llm-service<br/>vLLM + LoRA adapters<br/>fallback: hosted LLM"]
+    FE["frontend<br/>React + TS, minimal"]
+    EV{{"detections/events topic (Kafka)<br/>optional, D3"}}
+    DM["drift-monitor"]
 
- drift-monitor: reads stream aggregates -> Prometheus metrics -> Alertmanager
-        (as built, 9.1: reads done frames and detections from Postgres per window, D33)
- metadata DB (Postgres): cameras, zones, model versions, query log
- observability: OpenTelemetry -> collector -> Prometheus + Tempo -> Grafana
- eval and benchmark results: results JSON files in the repo (no experiment tracker, D16)
- artifacts: DVC (datasets, adapters, fine-tuned weights) -> local remote | S3
- cloud: AWS (S3, ECR, IAM, Budgets, EC2 GPU + k3s), all via Terraform
-        (as built, 2.4: one scripted on-demand GPU instance per session, D28)
- [stretch, D10: orchestrator (Prefect | Airflow) for the retraining loop]
+    LG -->|"gRPC client stream (JPEG + metadata)<br/>REST baseline in Phase 1"| IN
+    IN -->|frames| OS
+    IN -->|"frame refs (not images)"| Q
+    Q --> WK
+    WK <-->|gRPC| TR
+    WK --> DS
+    WK --> VS
+    WK -.-> EV
+    EV -.->|store sink| DS
+    EV -.-> DM
+    QS -->|"compiled, parameterized SQL"| DS
+    QS --> VS
+    QS <-->|"OpenAI-compatible API,<br/>structured outputs"| LLM
+    FE <--> QS
 ```
+
+Supporting pieces:
+
+- **drift-monitor:** reads stream aggregates → Prometheus metrics → Alertmanager (as built, 9.1: reads done frames and detections from Postgres per window, D33).
+- **metadata DB (Postgres):** cameras, zones, model versions, query log.
+- **observability:** OpenTelemetry → collector → Prometheus + Tempo → Grafana.
+- **eval and benchmark results:** results JSON files in the repo (no experiment tracker, D16).
+- **artifacts:** DVC (datasets, adapters, fine-tuned weights) → local remote | S3.
+- **cloud:** AWS (S3, ECR, IAM, Budgets, EC2 GPU + k3s), all via Terraform (as built, 2.4: one scripted on-demand GPU instance per session, D28).
+- **stretch, D10:** orchestrator (Prefect | Airflow) for the retraining loop.
 
 ## 4. Components
 
@@ -344,7 +350,6 @@ Targets may be revised with evidence; record any change in `docs/DECISIONS.md`.
 
 ```
 .
-├── AGENTS.md
 ├── README.md
 ├── Makefile
 ├── pyproject.toml, uv.lock

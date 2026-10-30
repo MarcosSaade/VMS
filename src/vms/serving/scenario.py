@@ -108,7 +108,7 @@ class LlmScenario(_Model):
     description: str = ""
     kind: Literal["llm"] = "llm"
     seed: int
-    # Dev for tuning; test only for the one reported run of a chosen model (AGENTS 8).
+    # Dev for tuning; test only for the one reported run of a chosen model.
     split: Literal["dev", "test"] = "dev"
     catalog: Path
     max_items: int | None = Field(default=None, ge=1)  # smoke runs only: not reportable

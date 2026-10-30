@@ -533,7 +533,7 @@ def cmd_run(
 ) -> int:
     items, split_sha = select_items(settings, split, limit, ids)
     if split is Split.TEST:
-        log.warning("test split: use only for reported numbers, never for tuning (AGENTS 8)")
+        log.warning("test split: use only for reported numbers, never for tuning")
     manifest = snap.read_manifest(settings.snapshot.manifest)
     check_eval_db(settings, manifest)
     # The service runs with .env's VMS_* overrides (compose env_file), e.g. the LLM's

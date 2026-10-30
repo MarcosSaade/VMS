@@ -5,7 +5,7 @@
 
 # A40 (Ampere, 48 GB): the L4 D37 first chose had no stock on 2026-10-19; same price, and 48 GB
 # also fits Phase 8 (a 7B model in 16-bit plus LoRA). Every GPU number in the project comes from
-# this one type; another type is a new baseline, never mixed (AGENTS 8).
+# this one type; another type is a new baseline, never mixed.
 gpu_type: NVIDIA A40            # a catalog id: GET https://api.runpod.io/v2/catalog/gpus
 gpu_count: 1
 cloud: SECURE                   # Runpod-owned data centers; COMMUNITY hosts vary more

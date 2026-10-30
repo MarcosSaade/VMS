@@ -1,6 +1,6 @@
 """Pretrained weights: pinned in `configs/models.yaml`, fetched and verified by checksum.
 
-Weights are never committed (AGENTS.md section 7). `ensure_weights` downloads a file once into
+Weights are never committed. `ensure_weights` downloads a file once into
 `weights_dir`, verifies size and sha256, and on later calls only re-verifies the cached copy.
 """
 

@@ -1,4 +1,4 @@
-"""The results JSON every benchmark, eval and training run writes (AGENTS.md section 7).
+"""The results JSON every benchmark, eval and training run writes.
 
 Results files under `bench/results/` are the source of truth for reported numbers. Each one is
 self-describing: what ran (resolved config, git SHA and dirty flag, seed), where (hardware,
